@@ -21,12 +21,13 @@ jobs:
       uses: gradle/actions/setup-gradle@v3
       with:
          gradle-version: '8.2'
+         cache-disabled: true
 
     - name: Build Debug APK
       run: |
         cd Zkp-App/android
         chmod +x gradlew || true
-        gradle assembleDebug
+        gradle assembleDebug --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
