@@ -22,7 +22,6 @@ android {
         }
     }
     
-    // 👇 YEH LINE BOHOT ZAROORI HAI: Rust libs ko include karne ke liye
     sourceSets {
         main {
             jniLibs.srcDirs = ['src/main/jniLibs']
