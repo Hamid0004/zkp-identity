@@ -38,7 +38,9 @@ jobs:
 
     - name: Build Debug APK
       working-directory: ./Zkp-App/android
-      run: gradle assembleDebug  # 👈 FIX: Humne './gradlew' hata diya hai
+      run: |
+        chmod +x gradlew
+        ./gradlew assembleDebug   # 👈 FIX: Wapis './gradlew' use kar rahe hain
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
