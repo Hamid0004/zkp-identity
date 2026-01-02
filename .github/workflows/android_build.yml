@@ -21,12 +21,14 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
+    # 👇 FIX: Yahan humne 'stable' ko 'nightly' kar diya hai
     - name: Set up Rust Toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: stable
+        toolchain: nightly
         target: aarch64-linux-android
         override: true
+        components: rust-src
 
     - name: Install cargo-ndk
       run: cargo install cargo-ndk
@@ -40,10 +42,10 @@ jobs:
       working-directory: ./Zkp-App/android
       run: |
         chmod +x gradlew
-        ./gradlew assembleDebug   # 👈 FIX: Wapis './gradlew' use kar rahe hain
+        ./gradlew assembleDebug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: ZkpApp-Rust-Integrated
+        name: ZkpApp-Plonky2-Powered
         path: Zkp-App/android/app/build/outputs/apk/debug/app-debug.apk
