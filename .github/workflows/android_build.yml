@@ -38,12 +38,10 @@ jobs:
 
     - name: Build Debug APK
       working-directory: ./Zkp-App/android
-      run: |
-        chmod +x gradlew
-        ./gradlew assembleDebug
+      run: gradle assembleDebug  # 👈 FIX: Humne './gradlew' hata diya hai
 
     - name: Upload APK
-      uses: actions/upload-artifact@v4   # 👈 Yahan humne v4 kar diya hai
+      uses: actions/upload-artifact@v4
       with:
         name: ZkpApp-Rust-Integrated
         path: Zkp-App/android/app/build/outputs/apk/debug/app-debug.apk
