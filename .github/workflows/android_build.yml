@@ -21,13 +21,11 @@ jobs:
         distribution: 'temurin'
         cache: gradle
 
-    # 👇 FIX: Yahan humne 'stable' ko 'nightly' kar diya hai
+    # �� UPGRADE: Purana 'actions-rs' hata diya, Naya tool lagaya
     - name: Set up Rust Toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly
-        target: aarch64-linux-android
-        override: true
+        targets: aarch64-linux-android
         components: rust-src
 
     - name: Install cargo-ndk
