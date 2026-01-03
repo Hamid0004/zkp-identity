@@ -4,20 +4,16 @@ import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
-import android.widget.Toast
+import android.graphics.Color // 👈 Color add kiya
 
 class MainActivity : AppCompatActivity() {
 
-    // 👇 1. Rust Library Load karna
-    // Yeh App start hote hi 'libzkp_mobile_logic.so' ko dhoond kar memory mein layega
     companion object {
         init {
             System.loadLibrary("zkp_mobile_logic")
         }
     }
 
-    // 👇 2. Rust Function ka Wada (Declaration)
-    // Hum Kotlin ko bata rahe hain ke ye function bahar (Rust mein) mojood hai
     external fun stringFromRust(): String
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,12 +24,17 @@ class MainActivity : AppCompatActivity() {
         val button = findViewById<Button>(R.id.myButton)
 
         button.setOnClickListener {
-            // 👇 3. Rust ko Call Karein!
-            // Jab button dabega, hum Rust se text mangwayenge
-            val messageFromRust = stringFromRust()
+            // 1. Rust ko call karo
+            val message = stringFromRust()
             
-            textView.text = messageFromRust
-            Toast.makeText(this, "Rust Connected! 🦀⚡", Toast.LENGTH_SHORT).show()
+            // 2. Logic Check: Kya Error hai?
+            if (message.startsWith("❌ Error")) {
+                textView.setTextColor(Color.RED) // Danger Color
+            } else {
+                textView.setTextColor(Color.parseColor("#FF6200EE")) // Normal Purple
+            }
+
+            textView.text = message
         }
     }
 }

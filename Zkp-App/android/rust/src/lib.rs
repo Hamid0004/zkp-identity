@@ -5,8 +5,8 @@ use plonky2_field::types::Field;
 use plonky2_field::goldilocks_field::GoldilocksField;
 use plonky2::hash::poseidon::PoseidonHash;
 use plonky2::plonk::config::Hasher;
+use std::panic;
 
-// 👇 Type alias taaki baar baar lamba naam na likhna pade
 type F = GoldilocksField;
 
 #[no_mangle]
@@ -15,21 +15,29 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     _class: JClass,
 ) -> jstring {
     
-    // 1. Inputs define karein (Hum '123' aur '456' ka hash nikalenge)
-    let input_1 = F::from_canonical_u64(123);
-    let input_2 = F::from_canonical_u64(456);
+    // 🛡️ SAFETY NET START
+    // Hum puri logic ko 'catch_unwind' mein lapet rahe hain
+    let result = panic::catch_unwind(|| {
+        
+        // --- Heavy Logic Shuru ---
+        let input_1 = F::from_canonical_u64(123);
+        let input_2 = F::from_canonical_u64(456);
+        let hash_result = PoseidonHash::hash_no_pad(&[input_1, input_2]);
+        
+        format!(
+            "🔥 Success! Hash: {}",
+            hash_result.elements[0]
+        )
+        // --- Heavy Logic Khatam ---
+    });
 
-    // 2. Hashing shuru karein (Poseidon Hash - ZK friendly hash)
-    // Yeh wahi hash hai jo Polygon zkEVM use karta hai!
-    let hash_result = PoseidonHash::hash_no_pad(&[input_1, input_2]);
+    // 🛡️ SAFETY CHECK
+    // Ab check karte hain ke result 'Ok' hai ya 'Panic'
+    let output_msg = match result {
+        Ok(msg) => msg, // Sab sahi raha
+        Err(_) => String::from("❌ Error: Rust Engine Panicked! Calculation Failed."), // Crash pakda gaya
+    };
 
-    // 3. Result ko string banayen
-    let output_msg = format!(
-        "🔥 Plonky2 Hash Generated!\nInput: [123, 456]\nHash: {}",
-        hash_result.elements[0] // Hash ka pehla hissa dikhayenge
-    );
-
-    // 4. Java/Kotlin ko wapis bhejen
     let output_java_string = env.new_string(output_msg).expect("Couldn't create java string!");
     output_java_string.into_raw()
 }
