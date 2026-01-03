@@ -1,7 +1,13 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
+use plonky2_field::types::Field;
+use plonky2_field::goldilocks_field::GoldilocksField;
+use plonky2::hash::poseidon::PoseidonHash;
+use plonky2::plonk::config::Hasher;
 use std::panic;
+
+type F = GoldilocksField;
 
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
@@ -9,21 +15,24 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     _class: JClass,
 ) -> jstring {
     
-    // 🛡️ SAFETY NET
+    // 🛡️ SAFETY NET (Abhi bhi laga hua hai, safety ke liye)
     let result = panic::catch_unwind(|| {
         
-        // 🧪 CRASH TEST DUMMY
-        // Hum jaan boojh kar engine fail kar rahe hain
-        panic!("Simulated Crash: Engine Overheat! 🔥💥");
+        // --- Asli Logic Wapis Aa Gaya ---
+        let input_1 = F::from_canonical_u64(123);
+        let input_2 = F::from_canonical_u64(456);
+        let hash_result = PoseidonHash::hash_no_pad(&[input_1, input_2]);
         
-        // Yeh line kabhi execute nahi hogi
-        "This will never be reached".to_string()
+        format!(
+            "🔥 Success! Hash: {}",
+            hash_result.elements[0]
+        )
     });
 
-    // 🛡️ ERROR HANDLING
+    // 🛡️ ERROR HANDLING CHECK
     let output_msg = match result {
-        Ok(msg) => msg, // Agar sab sahi raha (Jo ke nahi hoga)
-        Err(_) => String::from("❌ Error: Rust Engine Panicked! App Saved from Crash."), // 👈 Yeh return hona chahiye
+        Ok(msg) => msg, 
+        Err(_) => String::from("❌ Error: Rust Engine Panicked! Calculation Failed."),
     };
 
     let output_java_string = env.new_string(output_msg).expect("Couldn't create java string!");
