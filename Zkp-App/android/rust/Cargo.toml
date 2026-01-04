@@ -13,3 +13,5 @@ plonky2 = { git = "https://github.com/mir-protocol/plonky2.git" }
 plonky2_field = { git = "https://github.com/mir-protocol/plonky2.git" }
 base64 = "0.21"
 getrandom = { version = "0.2", features = ["js"] } # Random data ke liye
+serde = { version = "1.0", features = ["derive"] }
+bincode = "1.3"
