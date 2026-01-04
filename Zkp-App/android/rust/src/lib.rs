@@ -1,14 +1,9 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
-use plonky2_field::types::Field;
-use plonky2_field::goldilocks_field::GoldilocksField;
-use plonky2::hash::poseidon::PoseidonHash;
-use plonky2::plonk::config::Hasher;
 use std::panic;
-use std::time::Instant; // 👈 1. Ghadi (Stopwatch) import ki
-
-type F = GoldilocksField;
+use base64::{Engine as _, engine::general_purpose};
+use std::iter;
 
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
@@ -16,32 +11,30 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     _class: JClass,
 ) -> jstring {
     
-    // 🛡️ SAFETY NET
     let result = panic::catch_unwind(|| {
         
-        // ⏱️ START TIMER
-        let start_time = Instant::now();
+        // 🧪 SIMULATION: Generating a Mock Proof
+        // Hum 2KB (2048 bytes) ka dummy data bana rahe hain
+        // Asli ZK Proof bhi 'bytes' ka dher hota hai.
+        let dummy_proof_size = 2048; 
+        let dummy_data: Vec<u8> = iter::repeat(0u8).take(dummy_proof_size).collect();
 
-        // --- Asli Heavy Logic ---
-        let input_1 = F::from_canonical_u64(123);
-        let input_2 = F::from_canonical_u64(456);
-        let hash_result = PoseidonHash::hash_no_pad(&[input_1, input_2]);
-        
-        // ⏱️ STOP TIMER
-        let duration = start_time.elapsed();
+        // 🔄 CONVERSION: Bytes -> Base64 String
+        // QR Code ko "Text" pasand hai, "Binary" nahi.
+        let encoded_proof = general_purpose::STANDARD.encode(&dummy_data);
 
-        // Result mein Time bhi bhejenge
+        // 📏 REPORT
         format!(
-            "⚡ Speed: {:?}\nHash: {}",
-            duration, // Kitna waqt laga (e.g., 500µs or 2ms)
-            hash_result.elements[0]
+            "📦 Generated Mock Proof!\nOriginal Size: {} bytes\nBase64 Size: {} chars\n\nData Preview: {}...",
+            dummy_proof_size,
+            encoded_proof.len(),
+            &encoded_proof[0..50] // Sirf shuru ke 50 chars dikhayenge
         )
     });
 
-    // 🛡️ ERROR HANDLING
     let output_msg = match result {
         Ok(msg) => msg, 
-        Err(_) => String::from("❌ Error: Rust Engine Panicked!"),
+        Err(_) => String::from("❌ Error: Memory Issue!"),
     };
 
     let output_java_string = env.new_string(output_msg).expect("Couldn't create java string!");
