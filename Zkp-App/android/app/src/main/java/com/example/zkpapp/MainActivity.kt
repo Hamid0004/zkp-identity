@@ -13,15 +13,19 @@ import org.json.JSONArray
 
 class MainActivity : AppCompatActivity() {
 
-    // ❌ Purana 'binding' variable hata diya (Clean code)
-
     companion object {
         init {
-            System.loadLibrary("rust")
+            // 🛠️ FIX: Loading the correct library name
+            // Logs showed 'librust_layer.so', so we try loading that first.
+            try {
+                System.loadLibrary("rust_layer")
+            } catch (e: UnsatisfiedLinkError) {
+                // Agar 'rust_layer' nahi mila, toh 'rust' try karein
+                System.loadLibrary("rust")
+            }
         }
     }
 
-    // ✅ FIX: 'fn' ko badal kar 'fun' kar diya
     external fun stringFromRust(): String
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -36,7 +40,6 @@ class MainActivity : AppCompatActivity() {
             textView.text = "⏳ Generating Proof & Slicing..."
             
             CoroutineScope(Dispatchers.IO).launch {
-                // Ab yeh function sahi call hoga
                 val jsonResponse = stringFromRust() 
 
                 withContext(Dispatchers.Main) {
@@ -67,12 +70,12 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val bitmap: Bitmap = encoder.encodeBitmap(chunkData, BarcodeFormat.QR_CODE, 600, 600)
                         imageView.setImageBitmap(bitmap)
-                        statusView.text = "�� Transmitting: Chunk ${i + 1} / ${dataChunks.length()}"
+                        statusView.text = "📡 Transmitting: Chunk ${i + 1} / ${dataChunks.length()}"
                     } catch (e: Exception) {
                         statusView.text = "⚠️ QR Error"
                     }
 
-                    delay(150) 
+                    delay(150) // Speed: 150ms per frame
                 }
                 delay(1000)
             }
