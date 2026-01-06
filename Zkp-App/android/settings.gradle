@@ -6,11 +6,13 @@ pluginManagement {
     }
 }
 dependencyResolutionManagement {
+    // Hum force kar rahe hain ke saari libraries यहीं se manage hon (Conflict hat jayega)
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
+        maven { url 'https://jitpack.io' } // Backup repository
     }
 }
-rootProject.name = "ZKP Mobile"
+rootProject.name = "ZkpApp"
 include ':app'
