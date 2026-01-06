@@ -1,17 +1,16 @@
 pluginManagement {
     repositories {
         google()
-        mavenCentral()
+        maven { url "https://repo1.maven.org/maven2/" } // Direct Mirror
         gradlePluginPortal()
     }
 }
 dependencyResolutionManagement {
-    // Hum force kar rahe hain ke saari libraries यहीं se manage hon (Conflict hat jayega)
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
-        mavenCentral()
-        maven { url 'https://jitpack.io' } // Backup repository
+        maven { url "https://repo1.maven.org/maven2/" } // Direct Mirror
+        maven { url "https://jitpack.io" }
     }
 }
 rootProject.name = "ZkpApp"
