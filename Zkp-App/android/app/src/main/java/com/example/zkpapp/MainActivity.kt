@@ -1,5 +1,6 @@
 package com.example.zkpapp
 
+import android.content.Intent // 👈 Yeh import zaroori hai nayi activity ke liye
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
@@ -15,7 +16,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         init {
-            // 🛠️ FIX: Loading the UNIQUE name 'zkp_mobile'
+            // Loading the Rust library
             System.loadLibrary("zkp_mobile")
         }
     }
@@ -29,42 +30,60 @@ class MainActivity : AppCompatActivity() {
         val textView: TextView = findViewById(R.id.sample_text)
         val qrImageView: ImageView = findViewById(R.id.qr_image)
         val btnMagic: Button = findViewById(R.id.btn_magic)
+        val btnScan: Button = findViewById(R.id.btn_scan) // 👈 Getting the new button
 
+        // 🟢 LOGIC 1: SENDER (Start Transmission)
         btnMagic.setOnClickListener {
-            textView.text = "⏳ Slicing Data..."
+            textView.text = "⏳ Generating Proof & Slicing..."
             
             CoroutineScope(Dispatchers.IO).launch {
                 val jsonResponse = stringFromRust() 
+
                 withContext(Dispatchers.Main) {
                     try {
                         val jsonArray = JSONArray(jsonResponse)
                         val totalChunks = jsonArray.length()
                         textView.text = "🎬 Stream: $totalChunks Frames"
+
                         playQrAnimation(jsonArray, qrImageView, textView)
+
                     } catch (e: Exception) {
                         textView.text = "❌ Error: ${e.message}"
                     }
                 }
             }
         }
+
+        // 🟠 LOGIC 2: RECEIVER (Scan & Verify) - YEH MISSING THA
+        btnScan.setOnClickListener {
+            // Nayi Screen (VerifierActivity) kholo
+            val intent = Intent(this, VerifierActivity::class.java)
+            startActivity(intent)
+        }
     }
 
     private fun playQrAnimation(dataChunks: JSONArray, imageView: ImageView, statusView: TextView) {
         val encoder = BarcodeEncoder()
+        
         CoroutineScope(Dispatchers.Main).launch {
-            for (cycle in 1..5) { 
+            // Infinite loop for demo purposes (User can stop by pressing Back)
+            while (isActive) { 
                 for (i in 0 until dataChunks.length()) {
+                    
                     val chunkData = dataChunks.getString(i)
+                    
                     try {
                         val bitmap: Bitmap = encoder.encodeBitmap(chunkData, BarcodeFormat.QR_CODE, 600, 600)
                         imageView.setImageBitmap(bitmap)
                         statusView.text = "Chunk ${i + 1} / ${dataChunks.length()}"
-                    } catch (e: Exception) { }
-                    delay(150) 
+                    } catch (e: Exception) {
+                        statusView.text = "⚠️ QR Error"
+                    }
+
+                    delay(100) // Fast speed (100ms) for video effect
                 }
-                delay(1000)
+                delay(1000) // Pause before restarting loop
             }
-            statusView.text = "✅ Done"
         }
     }
 }
