@@ -1,13 +1,14 @@
 package com.example.zkpapp
 
+import android.content.Intent // Import for switching screens
 import android.os.Bundle
+import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
 
     // 1. Loading the Rust Engine
-    // Jaise hi App khulegi, yeh "librust_layer.so" ko memory mein load karega
     companion object {
         init {
             System.loadLibrary("rust_layer")
@@ -15,24 +16,33 @@ class MainActivity : AppCompatActivity() {
     }
 
     // 2. Declaring the Rust Function
-    // Hum Kotlin ko bata rahe hain ke "yeh function bahar (native) se aayega"
     private external fun runZkp(): String
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         
-        // Simple UI setup (Programmatically, without XML for now)
-        val textView = TextView(this)
-        textView.textSize = 20f
-        textView.setPadding(50, 50, 50, 50)
-        textView.text = "⏳ Generating Zero-Knowledge Proof..."
-        setContentView(textView)
+        // IMPORTANT: Connect to the XML layout from Step 2
+        setContentView(R.layout.activity_main)
 
-        // 3. Calling the Rust Function (Background Thread is better, but simple for now)
-        // Yeh line Rust ke 'lib.rs' mein jayegi aur magic karegi
-        val resultMessage = runZkp()
+        // UI Elements ko find karein
+        val txtStatus: TextView = findViewById(R.id.sample_text)
+        val btnMagic: Button = findViewById(R.id.btn_magic)
+        val btnScan: Button = findViewById(R.id.btn_scan) // Step 5: New Button
 
-        // 4. Updating UI with Result
-        textView.text = resultMessage
+        // 3. Magic Button Logic (Proof Generation)
+        btnMagic.setOnClickListener {
+            txtStatus.text = "⚡ Computing ZKP..."
+            // Rust function call
+            val resultMessage = runZkp()
+            txtStatus.text = resultMessage
+            // (Note: QR Code generation logic usually goes here)
+        }
+
+        // 4. Scan Button Logic (Step 5)
+        btnScan.setOnClickListener {
+            // Verifier Activity kholne ka code
+            val intent = Intent(this, VerifierActivity::class.java)
+            startActivity(intent)
+        }
     }
 }

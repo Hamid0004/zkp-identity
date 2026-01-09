@@ -31,4 +31,12 @@
         android:text="Start Transmission 📡"
         android:layout_marginTop="30dp"/>
 
+    <Button
+        android:id="@+id/btn_scan"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="🕵️ Scan & Verify Mode"
+        android:backgroundTint="#FF5722"
+        android:layout_marginTop="20dp"/>
+
 </LinearLayout>
