@@ -15,14 +15,8 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         init {
-            // 🛠️ FIX: Loading the correct library name
-            // Logs showed 'librust_layer.so', so we try loading that first.
-            try {
-                System.loadLibrary("rust_layer")
-            } catch (e: UnsatisfiedLinkError) {
-                // Agar 'rust_layer' nahi mila, toh 'rust' try karein
-                System.loadLibrary("rust")
-            }
+            // 🛠️ FIX: Loading the UNIQUE name 'zkp_mobile'
+            System.loadLibrary("zkp_mobile")
         }
     }
 
@@ -37,19 +31,16 @@ class MainActivity : AppCompatActivity() {
         val btnMagic: Button = findViewById(R.id.btn_magic)
 
         btnMagic.setOnClickListener {
-            textView.text = "⏳ Generating Proof & Slicing..."
+            textView.text = "⏳ Slicing Data..."
             
             CoroutineScope(Dispatchers.IO).launch {
                 val jsonResponse = stringFromRust() 
-
                 withContext(Dispatchers.Main) {
                     try {
                         val jsonArray = JSONArray(jsonResponse)
                         val totalChunks = jsonArray.length()
-                        textView.text = "🎬 Starting Stream: $totalChunks Frames"
-
+                        textView.text = "🎬 Stream: $totalChunks Frames"
                         playQrAnimation(jsonArray, qrImageView, textView)
-
                     } catch (e: Exception) {
                         textView.text = "❌ Error: ${e.message}"
                     }
@@ -60,26 +51,20 @@ class MainActivity : AppCompatActivity() {
 
     private fun playQrAnimation(dataChunks: JSONArray, imageView: ImageView, statusView: TextView) {
         val encoder = BarcodeEncoder()
-        
         CoroutineScope(Dispatchers.Main).launch {
             for (cycle in 1..5) { 
                 for (i in 0 until dataChunks.length()) {
-                    
                     val chunkData = dataChunks.getString(i)
-                    
                     try {
                         val bitmap: Bitmap = encoder.encodeBitmap(chunkData, BarcodeFormat.QR_CODE, 600, 600)
                         imageView.setImageBitmap(bitmap)
-                        statusView.text = "📡 Transmitting: Chunk ${i + 1} / ${dataChunks.length()}"
-                    } catch (e: Exception) {
-                        statusView.text = "⚠️ QR Error"
-                    }
-
-                    delay(150) // Speed: 150ms per frame
+                        statusView.text = "Chunk ${i + 1} / ${dataChunks.length()}"
+                    } catch (e: Exception) { }
+                    delay(150) 
                 }
                 delay(1000)
             }
-            statusView.text = "✅ Transmission Complete"
+            statusView.text = "✅ Done"
         }
     }
 }
