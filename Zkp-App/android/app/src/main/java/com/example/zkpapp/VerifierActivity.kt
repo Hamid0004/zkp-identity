@@ -3,7 +3,6 @@ package com.example.zkpapp
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Bundle
-import android.view.View
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
@@ -17,32 +16,37 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 
 class VerifierActivity : AppCompatActivity() {
 
+    // 👇 1. RUST CONNECTION (Yeh naya hai, isay zaroor add karein)
+    companion object {
+        init {
+            System.loadLibrary("zkp_mobile") // Library load ki
+        }
+    }
+    // Rust function declare kiya (Jo verify karega)
+    external fun verifyProofFromRust(proof: String): Boolean
+
+
+    // UI Variables
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
     
-    // 🧠 THE BRAIN: Data Collection
-    // Hum ek Map use karenge taaki duplicate chunks save na hon
-    // Format: Index -> Data String
+    // Logic Variables
     private val receivedChunks = HashMap<Int, String>()
-    private var totalChunksExpected = -1 // Abhi humein nahi pata total kitne hain
+    private var totalChunksExpected = -1 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // UI Setup programmatically (Simple rakhne ke liye XML nahi bana rahe)
-        setContentView(R.layout.activity_verifier) // ⚠️ Note: Iska XML hum Step 4 mein banayenge
+        setContentView(R.layout.activity_verifier)
 
         barcodeView = findViewById(R.id.barcode_scanner)
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
-        // Camera Permission Request
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
 
-        // 👁️ START CONTINUOUS SCANNING
         startScanning()
     }
 
@@ -57,54 +61,79 @@ class VerifierActivity : AppCompatActivity() {
         })
     }
 
-    // 🧩 STITCHING LOGIC
     private fun processQrData(data: String) {
         try {
             // Expected Format: "1/184|Base64Data..."
             if (!data.contains("|") || !data.contains("/")) return
 
             val parts = data.split("|", limit = 2)
-            val header = parts[0] // "1/184"
-            val payload = parts[1] // "Base64..."
+            val header = parts[0] 
+            val payload = parts[1] 
 
             val headerParts = header.split("/")
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // First time setup
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
-            // Save Chunk (Agar pehle se nahi hai)
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
                 
-                // Update UI
                 runOnUiThread {
                     statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
                     progressBar.progress = receivedChunks.size
                     
-                    // ✅ VICTORY CHECK
+                    // Jab saare tukde mil jayen, tab finish call karo
                     if (receivedChunks.size == totalChunksExpected) {
-                        finishScanning()
+                        finishScanning() 
                     }
                 }
             }
-
         } catch (e: Exception) {
-            // Bad QR code, ignore
+            // Ignore bad data
         }
     }
 
+    // 👇 2. UPDATED LOGIC (Aapka sawal yahan hai)
+    // Is function ko replace kiya gaya hai Rust Logic ke saath
     private fun finishScanning() {
         barcodeView.pause()
-        statusText.text = "🎉 COMPLETE! Reassembling Monster..."
+        statusText.text = "🧩 Stitching & Verifying..."
         
-        // TODO: Kal hum is poore data ko Rust bhej kar Verify karenge
-        // Aaj ke liye bas Toast dikhate hain
-        Toast.makeText(this, "All 184 Chunks Collected!", Toast.LENGTH_LONG).show()
+        // A. REASSEMBLE (Tukdon ko jodna)
+        val fullProofBuilder = StringBuilder()
+        for (i in 1..totalChunksExpected) {
+            if (receivedChunks.containsKey(i)) {
+                fullProofBuilder.append(receivedChunks[i])
+            } else {
+                statusText.text = "❌ Error: Missing Chunk #$i"
+                return
+            }
+        }
+        val fullProofString = fullProofBuilder.toString()
+
+        // B. SEND TO RUST (Background Thread par)
+        Thread {
+            // Rust ko call kiya
+            val isValid = verifyProofFromRust(fullProofString)
+            
+            runOnUiThread {
+                if (isValid) {
+                    // 🎉 SUCCESS UI
+                    statusText.text = "✅ VERIFIED!\nProof is Valid."
+                    statusText.setTextColor(android.graphics.Color.GREEN)
+                    // Progress bar ko Green kar diya
+                    progressBar.progressDrawable.setColorFilter(android.graphics.Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
+                } else {
+                    // ❌ FAILURE UI
+                    statusText.text = "⛔ INVALID!\nFake Proof Detected."
+                    statusText.setTextColor(android.graphics.Color.RED)
+                }
+            }
+        }.start()
     }
 
     override fun onResume() {
