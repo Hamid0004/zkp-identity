@@ -9,9 +9,9 @@ crate-type = ["cdylib"]
 
 [dependencies]
 jni = "0.21.1"
-# 👇 Monster is back!
-plonky2 = { version = "0.1" } 
-plonky2_field = "0.1"
+# 👇 UPDATED: v0.1 -> v0.2.2 (Fixes compilation error)
+plonky2 = { version = "0.2.2" } 
+plonky2_field = { version = "0.2.2" }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 base64 = "0.21"
