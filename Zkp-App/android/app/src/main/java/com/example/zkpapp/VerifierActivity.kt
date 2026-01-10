@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.os.Bundle
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -17,132 +16,131 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 
 class VerifierActivity : AppCompatActivity() {
 
-    // 👇 1. RUST CONNECTION
+    // ✅ FIXED: Correct native library name
     companion object {
         init {
-            // MUST MATCH MainActivity and CMakeLists.txt
-            System.loadLibrary("rust_layer") 
+            System.loadLibrary(""rust_layer"")
         }
     }
-    
-    // Rust function declaration
+
+    // Rust JNI function
     external fun verifyProofFromRust(proof: String): Boolean
 
-    // UI Variables
+    // UI
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // Logic Variables
+    // Logic
     private val receivedChunks = HashMap<Int, String>()
-    private var totalChunksExpected = -1 
+    private var totalChunksExpected = -1
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_verifier) // Creates the UI
+        setContentView(R.layout.activity_verifier)
 
-        // Link UI components
         barcodeView = findViewById(R.id.barcode_scanner)
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
-        // Request Permissions
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+        // Camera permission
+        if (ContextCompat.checkSelfPermission(
+                this,
+                Manifest.permission.CAMERA
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                1
+            )
         }
 
         startScanning()
     }
 
     private fun startScanning() {
-        // Continuous decoding (scanning)
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
-                result?.text?.let { rawData ->
-                    processQrData(rawData)
-                }
+                result?.text?.let { processQrData(it) }
             }
+
             override fun possibleResultPoints(resultPoints: MutableList<ResultPoint>?) {}
         })
     }
 
     private fun processQrData(data: String) {
         try {
-            // Expected Format: "1/184|Base64Data..."
+            // Expected: "1/184|BASE64..."
             if (!data.contains("|") || !data.contains("/")) return
 
-            val parts = data.split("|", limit = 2)
-            val header = parts[0] 
-            val payload = parts[1] 
+            val (header, payload) = data.split("|", limit = 2)
+            val (indexStr, totalStr) = header.split("/")
 
-            val headerParts = header.split("/")
-            val currentIndex = headerParts[0].toInt()
-            val total = headerParts[1].toInt()
+            val index = indexStr.toInt()
+            val total = totalStr.toInt()
 
-            // Setup Progress Bar on first valid scan
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
-            // Store Data if new
-            if (!receivedChunks.containsKey(currentIndex)) {
-                receivedChunks[currentIndex] = payload
+            if (!receivedChunks.containsKey(index)) {
+                receivedChunks[index] = payload
 
                 runOnUiThread {
-                    statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
+                    statusText.text =
+                        "Caught: ${receivedChunks.size} / $totalChunksExpected"
                     progressBar.progress = receivedChunks.size
 
-                    // Trigger finish when all chunks are collected
                     if (receivedChunks.size == totalChunksExpected) {
-                        finishScanning() 
+                        finishScanning()
                     }
                 }
             }
-        } catch (e: Exception) {
-            // Ignore corrupted scans
+        } catch (_: Exception) {
+            // Ignore corrupted frames
         }
     }
 
-    // 👇 2. UPDATED LOGIC (Debugging + Rust Call)
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "🧩 Stitching & Verifying..."
 
-        // A. REASSEMBLE
-        val fullProofBuilder = StringBuilder()
+        val proofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
-            if (receivedChunks.containsKey(i)) {
-                fullProofBuilder.append(receivedChunks[i])
-            } else {
-                statusText.text = "❌ Error: Missing Chunk #$i"
-                return
-            }
+            val chunk = receivedChunks[i]
+                ?: run {
+                    statusText.text = "❌ Missing chunk $i"
+                    return
+                }
+            proofBuilder.append(chunk)
         }
-        val fullProofString = fullProofBuilder.toString()
 
-        println("Sending to Rust: Size = ${fullProofString.length}")
+        val fullProof = proofBuilder.toString()
 
-        // B. SEND TO RUST (Background Thread)
         Thread {
-            val isValid = verifyProofFromRust(fullProofString)
+            val isValid = verifyProofFromRust(fullProof)
 
             runOnUiThread {
                 if (isValid) {
-                    // 🎉 SUCCESS
-                    statusText.text = "✅ VERIFIED!\nProof is Valid."
+                    statusText.text = "✅ VERIFIED\nProof is valid"
                     statusText.setTextColor(Color.GREEN)
-                    progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                 } else {
-                    // ❌ FAILURE
-                    statusText.text = "⛔ INVALID!\nFake Proof Detected."
+                    statusText.text = "⛔ INVALID\nFake proof"
                     statusText.setTextColor(Color.RED)
-                    progressBar.progressDrawable.setColorFilter(Color.RED, android.graphics.PorterDuff.Mode.SRC_IN)
                 }
             }
         }.start()
     }
 
-    override fun onResume() { super.onResume(); barcodeView.resume() }
-    override fun onPause() { super.onPause(); barcodeView.pause() }
+    override fun onResume() {
+        super.onResume()
+        barcodeView.resume()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        barcodeView.pause()
+    }
 }
