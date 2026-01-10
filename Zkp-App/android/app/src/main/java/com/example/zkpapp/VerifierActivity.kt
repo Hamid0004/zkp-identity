@@ -20,7 +20,7 @@ class VerifierActivity : AppCompatActivity() {
     // 👇 1. RUST CONNECTION
     companion object {
         init {
-            // ✅ FIX: "zkp_mobile" (Quotes are strictly required)
+            // Library load kar rahe hain (Naam check kar lein)
             System.loadLibrary("zkp_mobile") 
         }
     }
@@ -39,7 +39,7 @@ class VerifierActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_verifier) // Creates the UI
+        setContentView(R.layout.activity_verifier)
 
         // Link UI components
         barcodeView = findViewById(R.id.barcode_scanner)
@@ -55,7 +55,6 @@ class VerifierActivity : AppCompatActivity() {
     }
 
     private fun startScanning() {
-        // Continuous decoding (scanning)
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
                 result?.text?.let { rawData ->
@@ -68,7 +67,6 @@ class VerifierActivity : AppCompatActivity() {
 
     private fun processQrData(data: String) {
         try {
-            // Expected Format: "1/184|Base64Data..."
             if (!data.contains("|") || !data.contains("/")) return
 
             val parts = data.split("|", limit = 2)
@@ -79,13 +77,11 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // Setup Progress Bar on first valid scan
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
-            // Store Data if new
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
 
@@ -93,18 +89,17 @@ class VerifierActivity : AppCompatActivity() {
                     statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
                     progressBar.progress = receivedChunks.size
 
-                    // Trigger finish when all chunks are collected
                     if (receivedChunks.size == totalChunksExpected) {
                         finishScanning() 
                     }
                 }
             }
         } catch (e: Exception) {
-            // Ignore corrupted scans
+            // Ignore bad scans
         }
     }
 
-    // 👇 2. LOGIC (Debugging + Rust Call)
+    // 👇 UPDATED: Single & Safe finishScanning Function
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "🧩 Stitching & Verifying..."
@@ -123,21 +118,32 @@ class VerifierActivity : AppCompatActivity() {
 
         println("Sending to Rust: Size = ${fullProofString.length}")
 
-        // B. SEND TO RUST (Background Thread)
+        // B. SEND TO RUST (Safe Mode)
         Thread {
-            val isValid = verifyProofFromRust(fullProofString)
+            try {
+                // ⚠️ Yahan App crash ho rahi thi, ab humne Safety laga di hai
+                val isValid = verifyProofFromRust(fullProofString)
 
-            runOnUiThread {
-                if (isValid) {
-                    // 🎉 SUCCESS
-                    statusText.text = "✅ VERIFIED!\nProof is Valid."
-                    statusText.setTextColor(Color.GREEN)
-                    progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
-                } else {
-                    // ❌ FAILURE
-                    statusText.text = "⛔ INVALID!\nFake Proof Detected."
-                    statusText.setTextColor(Color.RED)
-                    progressBar.progressDrawable.setColorFilter(Color.RED, android.graphics.PorterDuff.Mode.SRC_IN)
+                runOnUiThread {
+                    if (isValid) {
+                        // 🎉 SUCCESS
+                        statusText.text = "✅ VERIFIED!\nProof is Valid."
+                        statusText.setTextColor(Color.GREEN)
+                        progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
+                    } else {
+                        // ❌ LOGIC FAILURE (Fake Proof)
+                        statusText.text = "⛔ INVALID!\nFake Proof Detected."
+                        statusText.setTextColor(Color.RED)
+                        progressBar.progressDrawable.setColorFilter(Color.RED, android.graphics.PorterDuff.Mode.SRC_IN)
+                    }
+                }
+            } catch (e: Throwable) {
+                // 🛡️ CRASH CAUGHT HERE
+                // Agar App band hone wali thi, to ab wo band nahi hogi, bas ye message dikhayegi
+                runOnUiThread {
+                    statusText.text = "💥 CRASH CAUGHT:\n${e.message}"
+                    statusText.setTextColor(Color.YELLOW)
+                    println("ZKP_ERROR: ${e.stackTraceToString()}")
                 }
             }
         }.start()
