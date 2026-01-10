@@ -90,7 +90,8 @@ class MainActivity : AppCompatActivity() {
 
                     // ⏱️ STEP 2: SLOW DOWN (250ms)
                     // Camera ko focus karne ka time milega
-                    delay(250) 
+                    // ⚡ SPEED: 100ms (Fast Cycle)
+                    delay(100) 
                 }
                 // Loop khatam hone par thoda sa saans lo
                 delay(500) 
