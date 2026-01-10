@@ -2,6 +2,7 @@ package com.example.zkpapp
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Bundle
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -16,33 +17,36 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 
 class VerifierActivity : AppCompatActivity() {
 
-    // 👇 1. RUST CONNECTION (Yeh naya hai, isay zaroor add karein)
+    // 👇 1. RUST CONNECTION
     companion object {
         init {
-            System.loadLibrary("zkp_mobile") // Library load ki
+            // MUST MATCH MainActivity and CMakeLists.txt
+            System.loadLibrary("rust_layer") 
         }
     }
-    // Rust function declare kiya (Jo verify karega)
+    
+    // Rust function declaration
     external fun verifyProofFromRust(proof: String): Boolean
-
 
     // UI Variables
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
-    
+
     // Logic Variables
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_verifier)
+        setContentView(R.layout.activity_verifier) // Creates the UI
 
+        // Link UI components
         barcodeView = findViewById(R.id.barcode_scanner)
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
+        // Request Permissions
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
@@ -51,6 +55,7 @@ class VerifierActivity : AppCompatActivity() {
     }
 
     private fun startScanning() {
+        // Continuous decoding (scanning)
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
                 result?.text?.let { rawData ->
@@ -74,36 +79,37 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
+            // Setup Progress Bar on first valid scan
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
+            // Store Data if new
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
-                
+
                 runOnUiThread {
                     statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
                     progressBar.progress = receivedChunks.size
-                    
-                    // Jab saare tukde mil jayen, tab finish call karo
+
+                    // Trigger finish when all chunks are collected
                     if (receivedChunks.size == totalChunksExpected) {
                         finishScanning() 
                     }
                 }
             }
         } catch (e: Exception) {
-            // Ignore bad data
+            // Ignore corrupted scans
         }
     }
 
-    // 👇 2. UPDATED LOGIC (Aapka sawal yahan hai)
-    // Is function ko replace kiya gaya hai Rust Logic ke saath
+    // 👇 2. UPDATED LOGIC (Debugging + Rust Call)
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "🧩 Stitching & Verifying..."
-        
-        // A. REASSEMBLE (Tukdon ko jodna)
+
+        // A. REASSEMBLE
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
             if (receivedChunks.containsKey(i)) {
@@ -115,34 +121,28 @@ class VerifierActivity : AppCompatActivity() {
         }
         val fullProofString = fullProofBuilder.toString()
 
-        // B. SEND TO RUST (Background Thread par)
+        println("Sending to Rust: Size = ${fullProofString.length}")
+
+        // B. SEND TO RUST (Background Thread)
         Thread {
-            // Rust ko call kiya
             val isValid = verifyProofFromRust(fullProofString)
-            
+
             runOnUiThread {
                 if (isValid) {
-                    // 🎉 SUCCESS UI
+                    // 🎉 SUCCESS
                     statusText.text = "✅ VERIFIED!\nProof is Valid."
-                    statusText.setTextColor(android.graphics.Color.GREEN)
-                    // Progress bar ko Green kar diya
-                    progressBar.progressDrawable.setColorFilter(android.graphics.Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
+                    statusText.setTextColor(Color.GREEN)
+                    progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                 } else {
-                    // ❌ FAILURE UI
+                    // ❌ FAILURE
                     statusText.text = "⛔ INVALID!\nFake Proof Detected."
-                    statusText.setTextColor(android.graphics.Color.RED)
+                    statusText.setTextColor(Color.RED)
+                    progressBar.progressDrawable.setColorFilter(Color.RED, android.graphics.PorterDuff.Mode.SRC_IN)
                 }
             }
         }.start()
     }
 
-    override fun onResume() {
-        super.onResume()
-        barcodeView.resume()
-    }
-
-    override fun onPause() {
-        super.onPause()
-        barcodeView.pause()
-    }
+    override fun onResume() { super.onResume(); barcodeView.resume() }
+    override fun onPause() { super.onPause(); barcodeView.pause() }
 }

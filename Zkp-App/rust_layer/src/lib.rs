@@ -7,15 +7,15 @@ use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::hash::poseidon::PoseidonHash;
 use plonky2::plonk::config::Hasher;
 
-// 👇 NEW IMPORTS (Step 1 Requirement)
+// 👇 Imports for Verification
 use plonky2::plonk::proof::ProofWithPublicInputs; 
 use base64::{Engine as _, engine::general_purpose};
 use std::panic;
 
-// 👇 JNI Tools Import
+// 👇 JNI Tools
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
-use jni::sys::{jstring, jboolean}; // Added jboolean
+use jni::sys::{jstring, jboolean};
 use std::ffi::CString;
 
 // =============================================================
@@ -53,19 +53,25 @@ fn generate_identity_proof() -> Result<()> {
     let config = CircuitConfig::standard_recursion_config();
     let mut builder = CircuitBuilder::<F, D>::new(config);
 
-    // Logic: Identity + Balance
+    // --- 🔒 CIRCUIT DEFINITION START ---
+    // 1. Define Balance Target
     let balance_target = builder.add_virtual_target();
+    
+    // 2. Hash the Balance (Public Input)
     let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(vec![balance_target]);
     let expected_hash_target = builder.add_virtual_hash();
     builder.register_public_input(expected_hash_target.elements[0]);
     builder.connect_hashes(computed_hash, expected_hash_target);
 
+    // 3. Constraint: Balance >= 10,000
     let min_required = builder.constant(F::from_canonical_u64(10000));
     let diff = builder.sub(balance_target, min_required);
     builder.range_check(diff, 32); 
+    // --- 🔒 CIRCUIT DEFINITION END ---
 
     let data = builder.build::<C>();
 
+    // Witness (Secrets)
     let my_real_balance = F::from_canonical_u64(50000);
     let my_balance_hash = PoseidonHash::hash_no_pad(&[my_real_balance]);
 
@@ -80,17 +86,16 @@ fn generate_identity_proof() -> Result<()> {
 }
 
 // =============================================================
-// 🆕 VERIFY FUNCTION (VERIFIER - VerifierActivity)
-// This receives the Base64 Proof from Android and checks it.
+// 🆕 SAFE VERIFY FUNCTION (VERIFIER - VerifierActivity)
 // =============================================================
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromRust(
     mut env: JNIEnv,
     _class: JClass,
-    proof_str: JString, // Kotlin sends Base64 string
-) -> jboolean { // Returns: 1 (True) or 0 (False)
+    proof_str: JString,
+) -> jboolean {
     
-    // Define Types locally for this function
+    // Constants must match Prover
     const D: usize = 2;
     type C = PoseidonGoldilocksConfig;
     type F = <C as GenericConfig<D>>::F;
@@ -102,30 +107,47 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
     };
 
     let result = panic::catch_unwind(|| {
+        
         // 2️⃣ DECODE: Base64 -> Bytes
-        let proof_bytes = general_purpose::STANDARD.decode(&proof_base64).expect("Base64 decode failed");
+        let proof_bytes = match general_purpose::STANDARD.decode(&proof_base64) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        };
 
-        // 3️⃣ DESERIALIZE: Bytes -> Plonky2 Proof Object
-        let proof: ProofWithPublicInputs<F, C, D> = bincode::deserialize(&proof_bytes).expect("Invalid Proof Structure");
+        // 3️⃣ DESERIALIZE: Bytes -> Proof Object
+        let proof: ProofWithPublicInputs<F, C, D> = match bincode::deserialize(&proof_bytes) {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
 
-        // 4️⃣ REBUILD CIRCUIT (Must match Prover's circuit structure)
-        // Note: For this tutorial, we are rebuilding the simple circuit. 
-        // In a real app, this must match the circuit in generate_identity_proof EXACTLY.
+        // 4️⃣ REBUILD CIRCUIT (⚠️ MUST BE IDENTICAL TO PROVER)
         let config = CircuitConfig::standard_recursion_config();
         let mut builder = CircuitBuilder::<F, D>::new(config);
+
+        // --- 👇 COPY OF PROVER LOGIC 👇 ---
+        // 1. Define Balance Target
+        let balance_target = builder.add_virtual_target();
         
-        // This logic mimics the "x * y = z" example for testing verification flows
-        let x = builder.add_virtual_target();
-        let y = builder.add_virtual_target();
-        let z = builder.mul(x, y);
-        builder.register_public_input(z);
-        
+        // 2. Hash the Balance (Public Input)
+        // Note: Even though Verifier doesn't know the balance, 
+        // it must define the mathematical structure of the hash.
+        let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(vec![balance_target]);
+        let expected_hash_target = builder.add_virtual_hash();
+        builder.register_public_input(expected_hash_target.elements[0]);
+        builder.connect_hashes(computed_hash, expected_hash_target);
+
+        // 3. Constraint: Balance >= 10,000
+        let min_required = builder.constant(F::from_canonical_u64(10000));
+        let diff = builder.sub(balance_target, min_required);
+        builder.range_check(diff, 32); 
+        // --- 👆 COPY OF PROVER LOGIC END 👆 ---
+
         let data = builder.build::<C>();
 
-        // 5️⃣ THE VERDICT ⚖️
+        // 5️⃣ VERIFY
         match data.verify(proof) {
-            Ok(_) => true,  // ✅ Valid
-            Err(_) => false, // ❌ Invalid
+            Ok(_) => true,
+            Err(_) => false,
         }
     });
 
