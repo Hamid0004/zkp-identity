@@ -19,7 +19,7 @@ class VerifierActivity : AppCompatActivity() {
     // ✅ FIXED: Correct native library name
     companion object {
         init {
-            System.loadLibrary(""rust_layer"")
+            System.loadLibrary(""zkp_mobile"")
         }
     }
 
