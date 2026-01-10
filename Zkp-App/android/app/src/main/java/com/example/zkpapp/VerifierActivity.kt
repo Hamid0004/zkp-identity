@@ -1,6 +1,3 @@
-cd /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/java/com/example/zkpapp
-
-cat <<EOF > VerifierActivity.kt
 package com.example.zkpapp
 
 import android.Manifest
@@ -23,7 +20,7 @@ class VerifierActivity : AppCompatActivity() {
     // 👇 1. RUST CONNECTION
     companion object {
         init {
-            // ✅ FIX: Quotes added around the name!
+            // ✅ FIX: "zkp_mobile" (Quotes are strictly required)
             System.loadLibrary("zkp_mobile") 
         }
     }
@@ -93,7 +90,7 @@ class VerifierActivity : AppCompatActivity() {
                 receivedChunks[currentIndex] = payload
 
                 runOnUiThread {
-                    statusText.text = "Caught: \${receivedChunks.size} / \$totalChunksExpected"
+                    statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
                     progressBar.progress = receivedChunks.size
 
                     // Trigger finish when all chunks are collected
@@ -118,13 +115,13 @@ class VerifierActivity : AppCompatActivity() {
             if (receivedChunks.containsKey(i)) {
                 fullProofBuilder.append(receivedChunks[i])
             } else {
-                statusText.text = "❌ Error: Missing Chunk #\$i"
+                statusText.text = "❌ Error: Missing Chunk #$i"
                 return
             }
         }
         val fullProofString = fullProofBuilder.toString()
 
-        println("Sending to Rust: Size = \${fullProofString.length}")
+        println("Sending to Rust: Size = ${fullProofString.length}")
 
         // B. SEND TO RUST (Background Thread)
         Thread {
@@ -149,4 +146,3 @@ class VerifierActivity : AppCompatActivity() {
     override fun onResume() { super.onResume(); barcodeView.resume() }
     override fun onPause() { super.onPause(); barcodeView.pause() }
 }
-EOF
