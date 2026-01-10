@@ -1,6 +1,6 @@
 package com.example.zkpapp
 
-import android.content.Intent // 👈 Yeh import zaroori hai nayi activity ke liye
+import android.content.Intent // ✅ Correct Import
 import android.graphics.Bitmap
 import android.os.Bundle
 import android.widget.Button
@@ -30,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         val textView: TextView = findViewById(R.id.sample_text)
         val qrImageView: ImageView = findViewById(R.id.qr_image)
         val btnMagic: Button = findViewById(R.id.btn_magic)
-        val btnScan: Button = findViewById(R.id.btn_scan) // 👈 Getting the new button
+        val btnScan: Button = findViewById(R.id.btn_scan)
 
         // 🟢 LOGIC 1: SENDER (Start Transmission)
         btnMagic.setOnClickListener {
@@ -54,35 +54,46 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 🟠 LOGIC 2: RECEIVER (Scan & Verify) - YEH MISSING THA
+        // 🟠 LOGIC 2: RECEIVER (Scan & Verify)
         btnScan.setOnClickListener {
-            // Nayi Screen (VerifierActivity) kholo
             val intent = Intent(this, VerifierActivity::class.java)
             startActivity(intent)
         }
     }
 
+    // 👇 UPDATED: Slower (250ms) & Randomized Animation
     private fun playQrAnimation(dataChunks: JSONArray, imageView: ImageView, statusView: TextView) {
         val encoder = BarcodeEncoder()
         
         CoroutineScope(Dispatchers.Main).launch {
-            // Infinite loop for demo purposes (User can stop by pressing Back)
+            // Hum indices (0 to 183) ki ek list banayenge
+            val indices = (0 until dataChunks.length()).toMutableList()
+            
             while (isActive) { 
-                for (i in 0 until dataChunks.length()) {
-                    
+                // 🔀 STEP 1: SHUFFLE (Har loop mein order change karo)
+                // Isse "waiting time" kam lagega aur scanning natural lagegi
+                indices.shuffle()
+
+                for (i in indices) {
                     val chunkData = dataChunks.getString(i)
                     
                     try {
-                        val bitmap: Bitmap = encoder.encodeBitmap(chunkData, BarcodeFormat.QR_CODE, 600, 600)
+                        // QR Generate karo (Size 800x800 for better quality)
+                        val bitmap: Bitmap = encoder.encodeBitmap(chunkData, BarcodeFormat.QR_CODE, 800, 800)
                         imageView.setImageBitmap(bitmap)
-                        statusView.text = "Chunk ${i + 1} / ${dataChunks.length()}"
+                        
+                        // User ko batao kaunsa chunk chal raha hai
+                        statusView.text = "Broadcasting: Chunk ${i + 1} / ${dataChunks.length()}"
                     } catch (e: Exception) {
                         statusView.text = "⚠️ QR Error"
                     }
 
-                    delay(100) // Fast speed (100ms) for video effect
+                    // ⏱️ STEP 2: SLOW DOWN (250ms)
+                    // Camera ko focus karne ka time milega
+                    delay(250) 
                 }
-                delay(1000) // Pause before restarting loop
+                // Loop khatam hone par thoda sa saans lo
+                delay(500) 
             }
         }
     }
