@@ -6,7 +6,6 @@ import android.graphics.Color
 import android.os.Bundle
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -20,7 +19,7 @@ class VerifierActivity : AppCompatActivity() {
     // 👇 1. RUST CONNECTION
     companion object {
         init {
-            // Library load kar rahe hain (Naam check kar lein)
+            // ✅ Correct Library Name
             System.loadLibrary("zkp_mobile") 
         }
     }
@@ -99,10 +98,10 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 UPDATED: Single & Safe finishScanning Function
+    // 👇 UPDATED: Single, Clean function with Timer ⏱️
     private fun finishScanning() {
         barcodeView.pause()
-        statusText.text = "🧩 Stitching & Verifying..."
+        statusText.text = "⏱️ Verifying..."
 
         // A. REASSEMBLE
         val fullProofBuilder = StringBuilder()
@@ -116,34 +115,35 @@ class VerifierActivity : AppCompatActivity() {
         }
         val fullProofString = fullProofBuilder.toString()
 
-        println("Sending to Rust: Size = ${fullProofString.length}")
-
-        // B. SEND TO RUST (Safe Mode)
+        // B. SEND TO RUST (With Stopwatch)
         Thread {
             try {
-                // ⚠️ Yahan App crash ho rahi thi, ab humne Safety laga di hai
+                // ⏱️ START WATCH
+                val startTime = System.currentTimeMillis()
+
                 val isValid = verifyProofFromRust(fullProofString)
+
+                // ⏱️ STOP WATCH
+                val endTime = System.currentTimeMillis()
+                val duration = endTime - startTime // Total waqt (ms mein)
 
                 runOnUiThread {
                     if (isValid) {
-                        // 🎉 SUCCESS
-                        statusText.text = "✅ VERIFIED!\nProof is Valid."
+                        // 🎉 SUCCESS WITH TIME
+                        statusText.text = "✅ VERIFIED!\nTime: ${duration}ms"
                         statusText.setTextColor(Color.GREEN)
                         progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                     } else {
-                        // ❌ LOGIC FAILURE (Fake Proof)
-                        statusText.text = "⛔ INVALID!\nFake Proof Detected."
+                        // ⛔ FAILURE
+                        statusText.text = "⛔ INVALID!\nFake Proof."
                         statusText.setTextColor(Color.RED)
-                        progressBar.progressDrawable.setColorFilter(Color.RED, android.graphics.PorterDuff.Mode.SRC_IN)
                     }
                 }
             } catch (e: Throwable) {
-                // 🛡️ CRASH CAUGHT HERE
-                // Agar App band hone wali thi, to ab wo band nahi hogi, bas ye message dikhayegi
+                // 🛡️ CRASH HANDLING
                 runOnUiThread {
-                    statusText.text = "💥 CRASH CAUGHT:\n${e.message}"
+                    statusText.text = "💥 ERROR: ${e.message}"
                     statusText.setTextColor(Color.YELLOW)
-                    println("ZKP_ERROR: ${e.stackTraceToString()}")
                 }
             }
         }.start()
