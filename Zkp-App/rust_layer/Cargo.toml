@@ -1,17 +1,24 @@
-
 [package]
-name = "rust_layer"
+name = "rust"
 version = "0.1.0"
 edition = "2021"
 
-# 👇 YEH SABSE ZAROORI HAI: Android ke liye Library format
 [lib]
+name = "zkp_mobile"
 crate-type = ["cdylib"]
 
 [dependencies]
-# ZKP Tools
-plonky2 = "0.2.2"
+jni = "0.21.1"
+plonky2 = { version = "0.2.2" }
+plonky2_field = { version = "0.2.2" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+base64 = "0.21"
+bincode = "1.3"
+getrandom = { version = "0.2", features = ["js"] }
+rayon = "=1.10.0"
 anyhow = "1.0"
 
-# Android Bridge Tool (Kal use hoga, aaj install kar lete hain)
-jni = "0.21.1"
+# 👇 NEW FOR LOGGING & TIMING
+log = "0.4"
+android_logger = "0.13"
