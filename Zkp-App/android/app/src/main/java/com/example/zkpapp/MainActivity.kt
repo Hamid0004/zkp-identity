@@ -8,13 +8,13 @@ import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType // 👈 NEW IMPORT
-import com.google.zxing.MultiFormatWriter // 👈 NEW IMPORT
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel // 👈 NEW IMPORT
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.*
 import org.json.JSONArray
-import java.util.EnumMap // 👈 NEW IMPORT
+import java.util.EnumMap
 
 class MainActivity : AppCompatActivity() {
 
@@ -65,47 +65,59 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 UPDATED: Optimized for High Density (750 Chars)
+    // 👇 UPDATED: Hybrid Strategy (Sequential First -> Then Random)
     private fun playQrAnimation(dataChunks: JSONArray, imageView: ImageView, statusView: TextView) {
         val encoder = BarcodeEncoder()
         
-        // 🛠️ SETUP HINTS: Low Error Correction = Cleaner QR for Phone Screens
+        // 🛠️ SETUP HINTS: Low Error Correction = Cleaner QR
         val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java)
-        hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L // 👈 KEY CHANGE
-        hints[EncodeHintType.MARGIN] = 1 // Remove big white borders
+        hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L 
+        hints[EncodeHintType.MARGIN] = 1 
         
         CoroutineScope(Dispatchers.Main).launch {
             val indices = (0 until dataChunks.length()).toMutableList()
+            var isFirstLoop = true // 🚩 FLAG: Check if it's the first run
             
             while (isActive) { 
-                // 🔀 SHUFFLE
-                indices.shuffle()
+                
+                if (isFirstLoop) {
+                    // 🟢 ROUND 1: SEQUENTIAL (Line se chalo 1...129)
+                    // Isse guarantee milti hai ke har frame kam az kam ek baar screen par aayega.
+                    indices.sort() 
+                    isFirstLoop = false
+                    statusView.text = "🚀 Broadcasting: Initial Sequence..."
+                } else {
+                    // 🔀 ROUND 2+: RANDOM (Shuffle)
+                    // Jo miss ho gaye, unhein pakdne ke liye.
+                    indices.shuffle()
+                }
 
                 for (i in indices) {
                     val chunkData = dataChunks.getString(i)
                     
                     try {
-                        // 👇 USE MultiFormatWriter TO APPLY HINTS
+                        // 👇 Generate High Density QR
                         val matrix = MultiFormatWriter().encode(
                             chunkData, 
                             BarcodeFormat.QR_CODE, 
-                            800, // Resolution
                             800, 
-                            hints // 👈 PASSING OPTIMIZATION HERE
+                            800, 
+                            hints 
                         )
                         val bitmap = encoder.createBitmap(matrix)
-                        
                         imageView.setImageBitmap(bitmap)
-                        statusView.text = "Broadcasting: Chunk ${i + 1} / ${dataChunks.length()}"
+                        
+                        // Status Update
+                        val mode = if (isFirstLoop) "Seq" else "Rnd"
+                        statusView.text = "[$mode] Chunk ${i + 1} / ${dataChunks.length()}"
                     } catch (e: Exception) {
                         statusView.text = "⚠️ QR Error"
                     }
 
-                    // ⚡ SPEED: 100ms (Fast Cycle)
-                    delay(100) 
+                    // ⏱️ TIMING: 130ms (Better Focus)
+                    delay(130) 
                 }
-                // Loop khatam hone par thoda sa saans lo
-                delay(500) 
+                delay(200) 
             }
         }
     }
