@@ -26,15 +26,13 @@ fn init_logger() {
     );
 }
 
-// 🔧 CONFIGURATION: The "Sweet Spot" (Safe & Light)
+// 🔧 CONFIGURATION: Standard (100% Safe - No Crash)
 fn get_diet_config() -> CircuitConfig {
-    let mut config = CircuitConfig::standard_recursion_config();
+    // ✅ FIX: Use Standard Config to ensure stability.
+    // Rounds kam karne se crash ho raha tha, isliye default use kar rahe hain.
+    let config = CircuitConfig::standard_recursion_config();
     
-    // ✅ 24 ROUNDS: 
-    // - 20 crash kar raha tha.
-    // - 28 (default) bohot bada hai.
-    // - 24 perfect balance hai.
-    config.fri_config.num_query_rounds = 24; 
+    // config.fri_config.num_query_rounds = 24; // REMOVED (Safety First)
     
     config
 }
@@ -65,10 +63,10 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
 ) -> jstring {
     init_logger();
     let start_time = Instant::now();
-    info!("🚀 PROVER START: Generating Proof (Rounds=24)...");
+    info!("🚀 PROVER START: Generating Standard Proof...");
 
     let result = panic::catch_unwind(|| -> Result<String> {
-        let config = get_diet_config(); // ✅ Uses 24 Rounds
+        let config = get_diet_config(); // ✅ Safe Config
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
         let (balance_target, expected_hash_target) = build_identity_circuit(&mut builder);
@@ -89,13 +87,12 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
         let proof_bytes = bincode::serialize(&proof)?;
         let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
         
-        // 👇 OPTIMIZATION: 750 Chars per QR 
-        // Yeh 4GB RAM phones ke liye safe limit hai.
+        // 👇 OPTIMIZATION: 750 Chars per QR (Safe & Fast)
         let chunk_size = 750; 
         
         let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
         
-        info!("📉 FINAL OPTIMIZED SIZE: {} chunks (Rounds: 24 | QR: 750)", total_chunks);
+        info!("📦 FINAL SIZE: {} chunks (Standard Config | QR: 750)", total_chunks);
 
         let mut json_array = String::from("[");
         for i in 0..total_chunks {
@@ -154,8 +151,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
             Err(_) => return false,
         };
 
-        // ✅ Uses 24 Rounds (Must match Sender)
-        let config = get_diet_config();
+        let config = get_diet_config(); // Use same Safe Config
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
         build_identity_circuit(&mut builder);
