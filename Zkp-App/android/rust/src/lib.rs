@@ -6,7 +6,7 @@ use std::panic;
 use std::time::Instant;
 use base64::{Engine as _, engine::general_purpose};
 use android_logger::Config;
-use log::{info, LevelFilter};
+use log::{info, error, LevelFilter};
 
 // Plonky2 Imports
 use plonky2::field::types::Field;
@@ -19,22 +19,19 @@ use plonky2::plonk::config::Hasher;
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
 use anyhow::Result;
 
-// Logger
+// Logger Init
 fn init_logger() {
     let _ = android_logger::init_once(
         Config::default().with_max_level(LevelFilter::Info).with_tag("RustZKP"),
     );
 }
 
-// 🔧 CUSTOM CONFIGURATION (The "Diet" Plan)
-// Is function se hum Proof ka size control karenge.
+// 🔧 CUSTOM CONFIGURATION (Balanced Diet)
 fn get_diet_config() -> CircuitConfig {
     let mut config = CircuitConfig::standard_recursion_config();
     
-    // 👇 MAGIC: Reducing security bits slightly to shrink proof size
-    // Default queries ~28 hote hain. Hum 10 kar rahe hain.
-    // Result: Proof Size ~50-60% kam ho jayega!
-    config.fri_config.num_query_rounds = 10; 
+    // ✅ FIX: 20 Rounds is Safe (Won't crash) & Small
+    config.fri_config.num_query_rounds = 20; 
     
     config
 }
@@ -65,10 +62,10 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
 ) -> jstring {
     init_logger();
     let start_time = Instant::now();
-    info!("🚀 PROVER START: Generating Optimized Proof...");
+    info!("🚀 PROVER START: Generating Balanced Proof...");
 
     let result = panic::catch_unwind(|| -> Result<String> {
-        // ✅ USE DIET CONFIG
+        // ✅ USE BALANCED CONFIG
         let config = get_diet_config();
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
@@ -90,12 +87,10 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
         let proof_bytes = bincode::serialize(&proof)?;
         let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
         
-        // Chunking (Size kam hoga, toh chunks kam honge)
         let chunk_size = 500;
         let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
         
-        // LOG NEW SIZE
-        info!("📉 NEW SIZE: {} chunks (Original was ~194)", total_chunks);
+        info!("📉 BALANCED SIZE: {} chunks", total_chunks);
 
         let mut json_array = String::from("[");
         for i in 0..total_chunks {
@@ -112,10 +107,18 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     let output = match result {
         Ok(Ok(json)) => json,
         Ok(Err(e)) => {
-            info!("❌ PROVER ERROR: {}", e);
-            format!("Error: {}", e)
+            error!("❌ LOGIC ERROR: {}", e);
+            format!("[\"Error: {}\"]", e)
         },
-        Err(_) => "Panic".to_string(),
+        Err(e) => {
+             let msg = if let Some(s) = e.downcast_ref::<&str>() {
+                 format!("Panic: {}", s)
+             } else {
+                 "Panic: Unknown Rust Error".to_string()
+             };
+             error!("❌ RUST CRASH: {}", msg);
+             format!("[\"Error: {}\"]", msg)
+        },
     };
     let output_java = env.new_string(output).expect("Error");
     output_java.into_raw()
@@ -130,7 +133,6 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
 ) -> jboolean {
     init_logger();
     let start_time = Instant::now();
-    info!("🕵️ VERIFIER START...");
 
     let proof_base64: String = match env.get_string(&proof_str) {
         Ok(s) => s.into(),
@@ -147,7 +149,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
             Err(_) => return false,
         };
 
-        // ✅ USE DIET CONFIG (Must match Prover)
+        // ✅ USE SAME BALANCED CONFIG
         let config = get_diet_config();
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
