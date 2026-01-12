@@ -19,12 +19,10 @@ class VerifierActivity : AppCompatActivity() {
     // 👇 1. RUST CONNECTION
     companion object {
         init {
-            // ✅ Correct Library Name
             System.loadLibrary("zkp_mobile") 
         }
     }
-    
-    // Rust function declaration
+
     external fun verifyProofFromRust(proof: String): Boolean
 
     // UI Variables
@@ -40,12 +38,10 @@ class VerifierActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_verifier)
 
-        // Link UI components
         barcodeView = findViewById(R.id.barcode_scanner)
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
-        // Request Permissions
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
@@ -76,11 +72,26 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
+            // 👇 NEW: SESSION RESET LOGIC 🔄
+            // Agar Chunk #1 dikhe, toh samajh lo naya proof aa raha hai.
+            // Purana data clear karo taaki mixing na ho.
+            if (currentIndex == 1 && receivedChunks.size > 1) {
+                receivedChunks.clear()
+                totalChunksExpected = -1
+                runOnUiThread {
+                    statusText.text = "🔄 New Session Detected..."
+                    statusText.setTextColor(Color.WHITE)
+                    progressBar.progress = 0
+                }
+            }
+
+            // Normal Setup
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
+            // Save Chunk
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
 
@@ -98,7 +109,6 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 UPDATED: Single, Clean function with Timer ⏱️
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "⏱️ Verifying..."
@@ -115,32 +125,25 @@ class VerifierActivity : AppCompatActivity() {
         }
         val fullProofString = fullProofBuilder.toString()
 
-        // B. SEND TO RUST (With Stopwatch)
+        // B. SEND TO RUST
         Thread {
             try {
-                // ⏱️ START WATCH
                 val startTime = System.currentTimeMillis()
-
                 val isValid = verifyProofFromRust(fullProofString)
-
-                // ⏱️ STOP WATCH
                 val endTime = System.currentTimeMillis()
-                val duration = endTime - startTime // Total waqt (ms mein)
+                val duration = endTime - startTime 
 
                 runOnUiThread {
                     if (isValid) {
-                        // 🎉 SUCCESS WITH TIME
                         statusText.text = "✅ VERIFIED!\nTime: ${duration}ms"
                         statusText.setTextColor(Color.GREEN)
                         progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                     } else {
-                        // ⛔ FAILURE
                         statusText.text = "⛔ INVALID!\nFake Proof."
                         statusText.setTextColor(Color.RED)
                     }
                 }
             } catch (e: Throwable) {
-                // 🛡️ CRASH HANDLING
                 runOnUiThread {
                     statusText.text = "💥 ERROR: ${e.message}"
                     statusText.setTextColor(Color.YELLOW)
