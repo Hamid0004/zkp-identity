@@ -23,7 +23,8 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    external fun verifyProofFromRust(proof: String): Boolean
+    // 👇 UPDATE: Return type is now STRING (Contains "Verified" + Timings)
+    external fun verifyProofFromRust(proof: String): String
 
     // UI Variables
     private lateinit var barcodeView: DecoratedBarcodeView
@@ -72,9 +73,7 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // 👇 NEW: SESSION RESET LOGIC 🔄
-            // Agar Chunk #1 dikhe, toh samajh lo naya proof aa raha hai.
-            // Purana data clear karo taaki mixing na ho.
+            // 🔄 SESSION RESET LOGIC (From Day 45) - KEEP THIS!
             if (currentIndex == 1 && receivedChunks.size > 1) {
                 receivedChunks.clear()
                 totalChunksExpected = -1
@@ -128,18 +127,18 @@ class VerifierActivity : AppCompatActivity() {
         // B. SEND TO RUST
         Thread {
             try {
-                val startTime = System.currentTimeMillis()
-                val isValid = verifyProofFromRust(fullProofString)
-                val endTime = System.currentTimeMillis()
-                val duration = endTime - startTime 
+                // 👇 CALL RUST (Returns detailed Report String)
+                val resultReport = verifyProofFromRust(fullProofString)
 
                 runOnUiThread {
-                    if (isValid) {
-                        statusText.text = "✅ VERIFIED!\nTime: ${duration}ms"
+                    // Agar report mein "Verified" hai, toh Green karo
+                    if (resultReport.contains("Verified")) {
+                        statusText.text = resultReport // 👈 SHOW BENCHMARK DATA
                         statusText.setTextColor(Color.GREEN)
                         progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                     } else {
-                        statusText.text = "⛔ INVALID!\nFake Proof."
+                        // Fail
+                        statusText.text = resultReport
                         statusText.setTextColor(Color.RED)
                     }
                 }

@@ -1,6 +1,6 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
-use jni::sys::{jstring, jboolean};
+use jni::sys::{jstring}; // Note: jboolean hata diya hai kyunki ab hum String bhej rahe hain
 use std::ffi::CString;
 use std::panic;
 use std::time::Instant;
@@ -26,14 +26,9 @@ fn init_logger() {
     );
 }
 
-// 🔧 CONFIGURATION: Standard (100% Safe - No Crash)
+// 🔧 CONFIGURATION: Standard (100% Safe)
 fn get_diet_config() -> CircuitConfig {
-    // ✅ FIX: Use Standard Config to ensure stability.
-    // Rounds kam karne se crash ho raha tha, isliye default use kar rahe hain.
     let config = CircuitConfig::standard_recursion_config();
-    
-    // config.fri_config.num_query_rounds = 24; // REMOVED (Safety First)
-    
     config
 }
 
@@ -55,7 +50,7 @@ fn build_identity_circuit(builder: &mut CircuitBuilder<F, D>) -> (plonky2::iop::
     (balance_target, expected_hash_target)
 }
 
-// 1️⃣ PROVER (Sender)
+// 1️⃣ PROVER (Sender) - Returns JSON Chunks
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     env: JNIEnv,
@@ -66,7 +61,7 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
     info!("🚀 PROVER START: Generating Standard Proof...");
 
     let result = panic::catch_unwind(|| -> Result<String> {
-        let config = get_diet_config(); // ✅ Safe Config
+        let config = get_diet_config(); 
         
         let mut builder = CircuitBuilder::<F, D>::new(config);
         let (balance_target, expected_hash_target) = build_identity_circuit(&mut builder);
@@ -87,12 +82,11 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
         let proof_bytes = bincode::serialize(&proof)?;
         let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
         
-        // 👇 OPTIMIZATION: 750 Chars per QR (Safe & Fast)
+        // 👇 OPTIMIZATION: 750 Chars per QR
         let chunk_size = 750; 
-        
         let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
         
-        info!("📦 FINAL SIZE: {} chunks (Standard Config | QR: 750)", total_chunks);
+        info!("📦 FINAL SIZE: {} chunks", total_chunks);
 
         let mut json_array = String::from("[");
         for i in 0..total_chunks {
@@ -108,66 +102,68 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
 
     let output = match result {
         Ok(Ok(json)) => json,
-        Ok(Err(e)) => {
-            error!("❌ LOGIC ERROR: {}", e);
-            format!("[\"Error: {}\"]", e)
-        },
-        Err(e) => {
-             let msg = if let Some(s) = e.downcast_ref::<&str>() {
-                 format!("Panic: {}", s)
-             } else {
-                 "Panic: Unknown Rust Error".to_string()
-             };
-             error!("❌ RUST CRASH: {}", msg);
-             format!("[\"Error: {}\"]", msg)
-        },
+        Ok(Err(e)) => format!("[\"Error: {}\"]", e),
+        Err(_) => "[\"Error: Panic\"]".to_string(),
     };
-    let output_java = env.new_string(output).expect("Error");
-    output_java.into_raw()
+    env.new_string(output).expect("Error").into_raw()
 }
 
-// 2️⃣ VERIFIER (Receiver)
+// 2️⃣ VERIFIER (Receiver) - Returns REPORT STRING (Benchmarks) 📊
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromRust(
     mut env: JNIEnv,
     _class: JClass,
     proof_str: JString,
-) -> jboolean {
+) -> jstring { // 👈 Ab hum String return kar rahe hain
     init_logger();
-    let start_time = Instant::now();
 
     let proof_base64: String = match env.get_string(&proof_str) {
         Ok(s) => s.into(),
-        Err(_) => return 0,
+        Err(_) => return env.new_string("❌ Error: JNI String Fail").unwrap().into_raw(),
     };
 
-    let result = panic::catch_unwind(|| {
+    // Result ab String Report hogi
+    let result_msg = panic::catch_unwind(|| {
+        let deser_start = Instant::now();
+        
         let proof_bytes = match general_purpose::STANDARD.decode(&proof_base64) {
             Ok(b) => b,
-            Err(_) => return false,
+            Err(_) => return "❌ Error: Base64 Fail".to_string(),
         };
+        
         let proof: ProofWithPublicInputs<F, C, D> = match bincode::deserialize(&proof_bytes) {
             Ok(p) => p,
-            Err(_) => return false,
+            Err(_) => return "❌ Error: Parse Fail".to_string(),
         };
-
-        let config = get_diet_config(); // Use same Safe Config
         
+        let deser_time = deser_start.elapsed(); // ⏱️ Time 1 (Parsing)
+        
+        let math_start = Instant::now();
+        
+        let config = get_diet_config(); 
         let mut builder = CircuitBuilder::<F, D>::new(config);
         build_identity_circuit(&mut builder);
         let data = builder.build::<C>();
 
-        match data.verify(proof) {
+        let is_valid = match data.verify(proof) {
             Ok(_) => true,
             Err(_) => false,
+        };
+        
+        let math_time = math_start.elapsed(); // ⏱️ Time 2 (Math)
+        
+        // 👇 FINAL REPORT
+        if is_valid {
+            format!("✅ Verified!\n📂 Parse: {:.2?}\n🧮 Math: {:.2?}", deser_time, math_time)
+        } else {
+            "⛔ Invalid Proof".to_string()
         }
     });
 
-    let duration = start_time.elapsed();
-    info!("⚖️ VERIFICATION DONE in: {:.2?}", duration);
+    let final_output = match result_msg {
+        Ok(msg) => msg,
+        Err(_) => "💥 Rust Panic (Crash)".to_string(),
+    };
 
-    match result {
-        Ok(true) => 1,
-        _ => 0,
-    }
+    env.new_string(final_output).expect("Could not create string").into_raw()
 }
