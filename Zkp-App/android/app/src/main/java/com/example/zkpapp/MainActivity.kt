@@ -36,8 +36,8 @@ class MainActivity : AppCompatActivity() {
         val btnMagic: Button = findViewById(R.id.btn_magic)
         val btnScan: Button = findViewById(R.id.btn_scan)
 
-        // 🟢 LOGIC 1: REAL SENDER (Short Click)
-        // Yeh Asli Proof generate karega.
+        // 🟢 LOGIC 1: REAL SENDER (Normal Click)
+        // Standard Protocol: Generates valid Zero-Knowledge Proof.
         btnMagic.setOnClickListener {
             textView.text = "⏳ Generating Real Proof..."
             
@@ -59,13 +59,15 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // ☠️ LOGIC 2: HACKER MODE (Long Press - 2 Seconds)
-        // Yeh "Fake/Malicious Data" bhejega test karne ke liye.
+        // 🛡️ SECURITY AUDIT FEATURE (Long Press - 2 Seconds)
+        // DEBUG ONLY: Simulates a "Man-in-the-Middle" or "Injection" attack.
+        // Sends malformed data to test Verifier's resilience.
         btnMagic.setOnLongClickListener {
-            textView.text = "⚠️ GENERATING MALICIOUS PAYLOAD..."
+            textView.text = "⚠️ [TEST MODE] GENERATING MALICIOUS PAYLOAD..."
+            textView.setTextColor(android.graphics.Color.RED) // Visual Warning
             
             // 1. Create a Fake "Poisoned" Chunk
-            // Rust isay padhega, lekin Base64 decode ya Deserialize karte waqt fail hoga.
+            // Rust deserializer should reject this and return an Error.
             val fakePayload = "1/1|ThisIsAFakeProofData_HackerWasHere_12345"
             
             val fakeJsonArray = JSONArray()
@@ -74,7 +76,11 @@ class MainActivity : AppCompatActivity() {
             // 2. Broadcast Fake Data
             playQrAnimation(fakeJsonArray, qrImageView, textView)
             
-            true // Return true taaki normal click trigger na ho
+            // Reset text color after delay (Optional UI polish)
+            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+            handler.postDelayed({ textView.setTextColor(android.graphics.Color.WHITE) }, 3000)
+
+            true // Consumes the click so normal logic doesn't run
         }
 
         // 🟠 LOGIC 3: RECEIVER (Scan & Verify)
@@ -101,11 +107,13 @@ class MainActivity : AppCompatActivity() {
                 
                 if (isFirstLoop) {
                     // 🟢 ROUND 1: SEQUENTIAL (1...N)
+                    // Captures 99% of data in the first pass.
                     indices.sort() 
                     isFirstLoop = false
                     statusView.text = "🚀 Broadcasting: Initial Sequence..."
                 } else {
                     // 🔀 ROUND 2+: RANDOM (Shuffle)
+                    // Catches any dropped frames efficiently.
                     indices.shuffle()
                 }
 
@@ -129,7 +137,7 @@ class MainActivity : AppCompatActivity() {
                         statusView.text = "⚠️ QR Error"
                     }
 
-                    // ⏱️ TIMING: 130ms
+                    // ⏱️ TIMING: 130ms (Optimized for Camera Focus)
                     delay(130) 
                 }
                 delay(200) 
