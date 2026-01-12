@@ -36,9 +36,10 @@ class MainActivity : AppCompatActivity() {
         val btnMagic: Button = findViewById(R.id.btn_magic)
         val btnScan: Button = findViewById(R.id.btn_scan)
 
-        // 🟢 LOGIC 1: SENDER (Start Transmission)
+        // 🟢 LOGIC 1: REAL SENDER (Short Click)
+        // Yeh Asli Proof generate karega.
         btnMagic.setOnClickListener {
-            textView.text = "⏳ Generating Proof & Slicing..."
+            textView.text = "⏳ Generating Real Proof..."
             
             CoroutineScope(Dispatchers.IO).launch {
                 val jsonResponse = stringFromRust() 
@@ -47,7 +48,7 @@ class MainActivity : AppCompatActivity() {
                     try {
                         val jsonArray = JSONArray(jsonResponse)
                         val totalChunks = jsonArray.length()
-                        textView.text = "🎬 Stream: $totalChunks Frames"
+                        textView.text = "🎬 Stream: $totalChunks Frames (Real)"
 
                         playQrAnimation(jsonArray, qrImageView, textView)
 
@@ -58,37 +59,53 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 🟠 LOGIC 2: RECEIVER (Scan & Verify)
+        // ☠️ LOGIC 2: HACKER MODE (Long Press - 2 Seconds)
+        // Yeh "Fake/Malicious Data" bhejega test karne ke liye.
+        btnMagic.setOnLongClickListener {
+            textView.text = "⚠️ GENERATING MALICIOUS PAYLOAD..."
+            
+            // 1. Create a Fake "Poisoned" Chunk
+            // Rust isay padhega, lekin Base64 decode ya Deserialize karte waqt fail hoga.
+            val fakePayload = "1/1|ThisIsAFakeProofData_HackerWasHere_12345"
+            
+            val fakeJsonArray = JSONArray()
+            fakeJsonArray.put(fakePayload)
+
+            // 2. Broadcast Fake Data
+            playQrAnimation(fakeJsonArray, qrImageView, textView)
+            
+            true // Return true taaki normal click trigger na ho
+        }
+
+        // 🟠 LOGIC 3: RECEIVER (Scan & Verify)
         btnScan.setOnClickListener {
             val intent = Intent(this, VerifierActivity::class.java)
             startActivity(intent)
         }
     }
 
-    // 👇 UPDATED: Hybrid Strategy (Sequential First -> Then Random)
+    // 👇 HYBRID STRATEGY: Sequential First -> Then Random
     private fun playQrAnimation(dataChunks: JSONArray, imageView: ImageView, statusView: TextView) {
         val encoder = BarcodeEncoder()
         
-        // 🛠️ SETUP HINTS: Low Error Correction = Cleaner QR
+        // 🛠️ SETUP HINTS: Low Error Correction for Density
         val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java)
         hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L 
         hints[EncodeHintType.MARGIN] = 1 
         
         CoroutineScope(Dispatchers.Main).launch {
             val indices = (0 until dataChunks.length()).toMutableList()
-            var isFirstLoop = true // 🚩 FLAG: Check if it's the first run
+            var isFirstLoop = true 
             
             while (isActive) { 
                 
                 if (isFirstLoop) {
-                    // 🟢 ROUND 1: SEQUENTIAL (Line se chalo 1...129)
-                    // Isse guarantee milti hai ke har frame kam az kam ek baar screen par aayega.
+                    // 🟢 ROUND 1: SEQUENTIAL (1...N)
                     indices.sort() 
                     isFirstLoop = false
                     statusView.text = "🚀 Broadcasting: Initial Sequence..."
                 } else {
                     // 🔀 ROUND 2+: RANDOM (Shuffle)
-                    // Jo miss ho gaye, unhein pakdne ke liye.
                     indices.shuffle()
                 }
 
@@ -96,7 +113,6 @@ class MainActivity : AppCompatActivity() {
                     val chunkData = dataChunks.getString(i)
                     
                     try {
-                        // 👇 Generate High Density QR
                         val matrix = MultiFormatWriter().encode(
                             chunkData, 
                             BarcodeFormat.QR_CODE, 
@@ -107,14 +123,13 @@ class MainActivity : AppCompatActivity() {
                         val bitmap = encoder.createBitmap(matrix)
                         imageView.setImageBitmap(bitmap)
                         
-                        // Status Update
                         val mode = if (isFirstLoop) "Seq" else "Rnd"
                         statusView.text = "[$mode] Chunk ${i + 1} / ${dataChunks.length()}"
                     } catch (e: Exception) {
                         statusView.text = "⚠️ QR Error"
                     }
 
-                    // ⏱️ TIMING: 130ms (Better Focus)
+                    // ⏱️ TIMING: 130ms
                     delay(130) 
                 }
                 delay(200) 
