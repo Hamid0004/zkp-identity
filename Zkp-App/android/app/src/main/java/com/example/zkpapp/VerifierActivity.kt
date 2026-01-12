@@ -23,7 +23,7 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 UPDATE: Return type is now STRING (Contains "Verified" + Timings)
+    // 👇 UPDATE: Return type is String (Report + Benchmarks)
     external fun verifyProofFromRust(proof: String): String
 
     // UI Variables
@@ -43,6 +43,7 @@ class VerifierActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
+        // Camera Permission Check
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
@@ -73,7 +74,8 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // 🔄 SESSION RESET LOGIC (From Day 45) - KEEP THIS!
+            // 🔄 SESSION RESET LOGIC (From Day 45)
+            // Agar Chunk #1 wapis aaye aur pehle se data maudood ho, to reset karo
             if (currentIndex == 1 && receivedChunks.size > 1) {
                 receivedChunks.clear()
                 totalChunksExpected = -1
@@ -108,11 +110,19 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
+    // 👇 NEW: Helper function to calculate RAM Usage
+    private fun getMemoryUsage(): Long {
+        val runtime = Runtime.getRuntime()
+        // Used Memory = Total allocated - Free available
+        val usedMemInBytes = runtime.totalMemory() - runtime.freeMemory()
+        return usedMemInBytes / (1024 * 1024) // Convert to MB
+    }
+
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "⏱️ Verifying..."
 
-        // A. REASSEMBLE
+        // A. REASSEMBLE PROOF
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
             if (receivedChunks.containsKey(i)) {
@@ -124,20 +134,30 @@ class VerifierActivity : AppCompatActivity() {
         }
         val fullProofString = fullProofBuilder.toString()
 
-        // B. SEND TO RUST
+        // B. SEND TO RUST & MEASURE RAM
         Thread {
             try {
-                // 👇 CALL RUST (Returns detailed Report String)
+                // 👇 1. Measure RAM BEFORE Verification
+                val ramBefore = getMemoryUsage()
+
+                // Call Rust (This takes ~30ms)
                 val resultReport = verifyProofFromRust(fullProofString)
+                
+                // 👇 2. Measure RAM AFTER Verification
+                val ramAfter = getMemoryUsage()
+                
+                // Estimate Peak Usage
+                val ramPeak = if(ramAfter > ramBefore) ramAfter else ramBefore
 
                 runOnUiThread {
-                    // Agar report mein "Verified" hai, toh Green karo
                     if (resultReport.contains("Verified")) {
-                        statusText.text = resultReport // 👈 SHOW BENCHMARK DATA
+                        // 👇 Display Benchmarks + RAM
+                        val finalMsg = "$resultReport\n💾 RAM: ${ramPeak}MB Used"
+                        
+                        statusText.text = finalMsg
                         statusText.setTextColor(Color.GREEN)
                         progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
                     } else {
-                        // Fail
                         statusText.text = resultReport
                         statusText.setTextColor(Color.RED)
                     }
