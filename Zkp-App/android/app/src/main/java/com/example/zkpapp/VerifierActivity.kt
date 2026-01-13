@@ -23,7 +23,7 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 Return type is String (Report + Benchmarks)
+    // 👇 Returns Report String (Verified + Time + RAM info from Rust logs if added)
     external fun verifyProofFromRust(proof: String): String
 
     // UI Variables
@@ -75,11 +75,11 @@ class VerifierActivity : AppCompatActivity() {
             val total = headerParts[1].toInt()
 
             // 🔄 SMART SESSION RESET LOGIC 🧠
-            // Check: Kya yeh naya Proof hai ya wahi purana loop repeat ho raha hai?
+            // Check: Agar Chunk 1 aaya hai, toh kya yeh naya proof hai?
             if (currentIndex == 1 && receivedChunks.containsKey(1)) {
                 val oldPayload = receivedChunks[1]
                 
-                // Agar Data badal gaya hai, toh matlab naya session hai -> RESET
+                // Agar Payload different hai, toh matlab Naya Proof hai -> Reset
                 if (oldPayload != payload) {
                     receivedChunks.clear()
                     totalChunksExpected = -1
@@ -89,7 +89,7 @@ class VerifierActivity : AppCompatActivity() {
                         progressBar.progress = 0
                     }
                 }
-                // Agar Data same hai, toh kuch mat karo (Loop continue hone do)
+                // Agar Payload same hai, toh ignore karo (Sender loop repeat kar raha hai)
             }
 
             // Normal Setup
@@ -116,9 +116,10 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 Helper function to calculate RAM Usage
+    // 👇 DAY 47: RAM Usage Calculator Helper
     private fun getMemoryUsage(): Long {
         val runtime = Runtime.getRuntime()
+        // Used Memory = Total allocated - Free available
         val usedMemInBytes = runtime.totalMemory() - runtime.freeMemory()
         return usedMemInBytes / (1024 * 1024) // Convert to MB
     }
@@ -127,6 +128,7 @@ class VerifierActivity : AppCompatActivity() {
         barcodeView.pause()
         statusText.text = "⏱️ Verifying..."
 
+        // A. REASSEMBLE PROOF
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
             if (receivedChunks.containsKey(i)) {
@@ -138,21 +140,24 @@ class VerifierActivity : AppCompatActivity() {
         }
         val fullProofString = fullProofBuilder.toString()
 
+        // B. SEND TO RUST & MEASURE RAM
         Thread {
             try {
-                // 👇 1. Measure RAM BEFORE
+                // 👇 1. Measure RAM BEFORE Verification
                 val ramBefore = getMemoryUsage()
 
-                // Call Rust
+                // Call Rust (This takes ~30ms)
                 val resultReport = verifyProofFromRust(fullProofString)
                 
-                // 👇 2. Measure RAM AFTER
+                // 👇 2. Measure RAM AFTER Verification
                 val ramAfter = getMemoryUsage()
+                
+                // Estimate Peak Usage
                 val ramPeak = if(ramAfter > ramBefore) ramAfter else ramBefore
 
                 runOnUiThread {
                     if (resultReport.contains("Verified")) {
-                        // Display Benchmarks + RAM
+                        // 👇 Display Benchmarks + RAM Usage
                         val finalMsg = "$resultReport\n💾 RAM: ${ramPeak}MB Used"
                         
                         statusText.text = finalMsg
