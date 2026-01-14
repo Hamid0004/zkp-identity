@@ -1,11 +1,14 @@
 package com.example.zkpapp
 
 import android.Manifest
+import android.content.Context // 👈 New Import
 import android.content.pm.PackageManager
 import android.graphics.Color
+import android.os.BatteryManager // 👈 New Import
 import android.os.Bundle
 import android.widget.ProgressBar
 import android.widget.TextView
+import android.widget.Toast // 👈 New Import
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -16,24 +19,23 @@ import com.journeyapps.barcodescanner.DecoratedBarcodeView
 
 class VerifierActivity : AppCompatActivity() {
 
-    // 👇 1. RUST CONNECTION
     companion object {
         init {
             System.loadLibrary("zkp_mobile") 
         }
     }
 
-    // 👇 Returns Report String (Verified + Time + RAM info from Rust logs if added)
     external fun verifyProofFromRust(proof: String): String
 
-    // UI Variables
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // Logic Variables
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
+    
+    // 👇 Valid Proof ko save karenge Stress Test ke liye
+    private var lastVerifiedProofString: String? = null 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,9 +45,18 @@ class VerifierActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
-        // Camera Permission Check
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
+        }
+        
+        // 🔋 STRESS TEST TRIGGER (Long Press on Text)
+        statusText.setOnLongClickListener {
+            if (lastVerifiedProofString != null) {
+                runBatteryStressTest(lastVerifiedProofString!!)
+            } else {
+                Toast.makeText(this, "Scan a proof first!", Toast.LENGTH_SHORT).show()
+            }
+            true
         }
 
         startScanning()
@@ -74,31 +85,26 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // 🔄 SMART SESSION RESET LOGIC 🧠
-            // Check: Agar Chunk 1 aaya hai, toh kya yeh naya proof hai?
+            // 🔄 SMART SESSION RESET LOGIC
             if (currentIndex == 1 && receivedChunks.containsKey(1)) {
                 val oldPayload = receivedChunks[1]
-                
-                // Agar Payload different hai, toh matlab Naya Proof hai -> Reset
                 if (oldPayload != payload) {
                     receivedChunks.clear()
                     totalChunksExpected = -1
+                    lastVerifiedProofString = null // Reset stored proof
                     runOnUiThread {
-                        statusText.text = "🔄 New Session Detected..."
+                        statusText.text = "🔄 New Session..."
                         statusText.setTextColor(Color.WHITE)
                         progressBar.progress = 0
                     }
                 }
-                // Agar Payload same hai, toh ignore karo (Sender loop repeat kar raha hai)
             }
 
-            // Normal Setup
             if (totalChunksExpected == -1) {
                 totalChunksExpected = total
                 progressBar.max = total
             }
 
-            // Save Chunk
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
 
@@ -116,53 +122,89 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 👇 DAY 47: RAM Usage Calculator Helper
     private fun getMemoryUsage(): Long {
         val runtime = Runtime.getRuntime()
-        // Used Memory = Total allocated - Free available
         val usedMemInBytes = runtime.totalMemory() - runtime.freeMemory()
-        return usedMemInBytes / (1024 * 1024) // Convert to MB
+        return usedMemInBytes / (1024 * 1024) 
+    }
+
+    // 👇 NEW: Get Battery Percentage
+    private fun getBatteryLevel(): Int {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
+
+    // 👇 NEW: The Stress Test Function (100 Iterations)
+    private fun runBatteryStressTest(proofData: String) {
+        statusText.text = "🔥 Running Stress Test (100x)..."
+        statusText.setTextColor(Color.YELLOW)
+        
+        Thread {
+            val startBattery = getBatteryLevel()
+            val startTime = System.currentTimeMillis()
+            
+            // 🔄 LOOP 100 TIMES
+            var successCount = 0
+            for (i in 1..100) {
+                 val result = verifyProofFromRust(proofData)
+                 if (result.contains("Verified")) successCount++
+            }
+            
+            val endTime = System.currentTimeMillis()
+            val endBattery = getBatteryLevel()
+            val batteryDrop = startBattery - endBattery
+            val totalTime = endTime - startTime
+
+            runOnUiThread {
+                val report = "🔋 STRESS TEST COMPLETE\n" +
+                             "Loops: 100\n" +
+                             "Time Taken: ${totalTime}ms\n" +
+                             "Battery Drop: $batteryDrop%"
+                
+                statusText.text = report
+                
+                if (batteryDrop == 0) {
+                    statusText.setTextColor(Color.CYAN) // Perfect Score
+                } else {
+                    statusText.setTextColor(Color.WHITE)
+                }
+            }
+        }.start()
     }
 
     private fun finishScanning() {
         barcodeView.pause()
         statusText.text = "⏱️ Verifying..."
 
-        // A. REASSEMBLE PROOF
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
             if (receivedChunks.containsKey(i)) {
                 fullProofBuilder.append(receivedChunks[i])
             } else {
-                statusText.text = "❌ Error: Missing Chunk #$i"
                 return
             }
         }
         val fullProofString = fullProofBuilder.toString()
+        
+        // Save for Stress Test
+        lastVerifiedProofString = fullProofString
 
-        // B. SEND TO RUST & MEASURE RAM
         Thread {
             try {
-                // 👇 1. Measure RAM BEFORE Verification
                 val ramBefore = getMemoryUsage()
-
-                // Call Rust (This takes ~30ms)
                 val resultReport = verifyProofFromRust(fullProofString)
-                
-                // 👇 2. Measure RAM AFTER Verification
                 val ramAfter = getMemoryUsage()
-                
-                // Estimate Peak Usage
                 val ramPeak = if(ramAfter > ramBefore) ramAfter else ramBefore
 
                 runOnUiThread {
                     if (resultReport.contains("Verified")) {
-                        // 👇 Display Benchmarks + RAM Usage
                         val finalMsg = "$resultReport\n💾 RAM: ${ramPeak}MB Used"
-                        
                         statusText.text = finalMsg
                         statusText.setTextColor(Color.GREEN)
                         progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
+                        
+                        // Tip for user
+                        Toast.makeText(this, "Long Press Text for Battery Test", Toast.LENGTH_LONG).show()
                     } else {
                         statusText.text = resultReport
                         statusText.setTextColor(Color.RED)
@@ -170,8 +212,7 @@ class VerifierActivity : AppCompatActivity() {
                 }
             } catch (e: Throwable) {
                 runOnUiThread {
-                    statusText.text = "💥 ERROR: ${e.message}"
-                    statusText.setTextColor(Color.YELLOW)
+                    statusText.text = "Error"
                 }
             }
         }.start()
