@@ -1,14 +1,18 @@
 package com.example.zkpapp
 
 import android.Manifest
-import android.content.Context // 👈 New Import
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Color
-import android.os.BatteryManager // 👈 New Import
+import android.media.AudioManager
+import android.media.ToneGenerator
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.widget.ProgressBar
 import android.widget.TextView
-import android.widget.Toast // 👈 New Import
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -31,10 +35,9 @@ class VerifierActivity : AppCompatActivity() {
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
+    // Logic Variables
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
-    
-    // 👇 Valid Proof ko save karenge Stress Test ke liye
     private var lastVerifiedProofString: String? = null 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -49,7 +52,7 @@ class VerifierActivity : AppCompatActivity() {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
         
-        // 🔋 STRESS TEST TRIGGER (Long Press on Text)
+        // 🔋 Hidden Stress Test (Long Press)
         statusText.setOnLongClickListener {
             if (lastVerifiedProofString != null) {
                 runBatteryStressTest(lastVerifiedProofString!!)
@@ -85,16 +88,17 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // 🔄 SMART SESSION RESET LOGIC
+            // 🔄 SMART SESSION RESET
             if (currentIndex == 1 && receivedChunks.containsKey(1)) {
                 val oldPayload = receivedChunks[1]
                 if (oldPayload != payload) {
                     receivedChunks.clear()
                     totalChunksExpected = -1
-                    lastVerifiedProofString = null // Reset stored proof
+                    lastVerifiedProofString = null
                     runOnUiThread {
-                        statusText.text = "🔄 New Session..."
+                        statusText.text = "🔄 Scanning New Identity..."
                         statusText.setTextColor(Color.WHITE)
+                        statusText.setBackgroundColor(Color.TRANSPARENT) // Reset BG
                         progressBar.progress = 0
                     }
                 }
@@ -109,7 +113,9 @@ class VerifierActivity : AppCompatActivity() {
                 receivedChunks[currentIndex] = payload
 
                 runOnUiThread {
-                    statusText.text = "Caught: ${receivedChunks.size} / $totalChunksExpected"
+                    // Cleaner Progress Text
+                    val percent = (receivedChunks.size * 100) / totalChunksExpected
+                    statusText.text = "📥 Receiving... $percent%"
                     progressBar.progress = receivedChunks.size
 
                     if (receivedChunks.size == totalChunksExpected) {
@@ -117,9 +123,24 @@ class VerifierActivity : AppCompatActivity() {
                     }
                 }
             }
-        } catch (e: Exception) {
-            // Ignore bad scans
-        }
+        } catch (e: Exception) { }
+    }
+
+    // 👇 SENSORY FEEDBACK: Sound & Vibrate 📳🔊
+    private fun triggerSuccessFeedback() {
+        try {
+            // 1. Sound (Beep)
+            val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP)
+
+            // 2. Vibration (Haptic)
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                v.vibrate(150)
+            }
+        } catch (e: Exception) { }
     }
 
     private fun getMemoryUsage(): Long {
@@ -128,26 +149,21 @@ class VerifierActivity : AppCompatActivity() {
         return usedMemInBytes / (1024 * 1024) 
     }
 
-    // 👇 NEW: Get Battery Percentage
     private fun getBatteryLevel(): Int {
-        val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
-        return bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+        val bm = getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+        return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
     }
 
-    // 👇 NEW: The Stress Test Function (100 Iterations)
     private fun runBatteryStressTest(proofData: String) {
-        statusText.text = "🔥 Running Stress Test (100x)..."
+        statusText.text = "🔥 Stress Testing (100x)..."
         statusText.setTextColor(Color.YELLOW)
         
         Thread {
             val startBattery = getBatteryLevel()
             val startTime = System.currentTimeMillis()
             
-            // 🔄 LOOP 100 TIMES
-            var successCount = 0
             for (i in 1..100) {
-                 val result = verifyProofFromRust(proofData)
-                 if (result.contains("Verified")) successCount++
+                 verifyProofFromRust(proofData)
             }
             
             val endTime = System.currentTimeMillis()
@@ -156,37 +172,27 @@ class VerifierActivity : AppCompatActivity() {
             val totalTime = endTime - startTime
 
             runOnUiThread {
-                val report = "🔋 STRESS TEST COMPLETE\n" +
-                             "Loops: 100\n" +
-                             "Time Taken: ${totalTime}ms\n" +
-                             "Battery Drop: $batteryDrop%"
-                
+                val report = "🔋 EFFICIENCY REPORT\n" +
+                             "Loops: 100 | Drop: $batteryDrop%\n" +
+                             "Total Time: ${totalTime}ms"
                 statusText.text = report
-                
-                if (batteryDrop == 0) {
-                    statusText.setTextColor(Color.CYAN) // Perfect Score
-                } else {
-                    statusText.setTextColor(Color.WHITE)
-                }
+                statusText.setTextColor(Color.CYAN)
+                triggerSuccessFeedback() // Beep on finish
             }
         }.start()
     }
 
     private fun finishScanning() {
         barcodeView.pause()
-        statusText.text = "⏱️ Verifying..."
+        statusText.text = "🔐 Verifying Cryptography..."
 
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
             if (receivedChunks.containsKey(i)) {
                 fullProofBuilder.append(receivedChunks[i])
-            } else {
-                return
-            }
+            } else { return }
         }
         val fullProofString = fullProofBuilder.toString()
-        
-        // Save for Stress Test
         lastVerifiedProofString = fullProofString
 
         Thread {
@@ -198,22 +204,28 @@ class VerifierActivity : AppCompatActivity() {
 
                 runOnUiThread {
                     if (resultReport.contains("Verified")) {
-                        val finalMsg = "$resultReport\n💾 RAM: ${ramPeak}MB Used"
-                        statusText.text = finalMsg
-                        statusText.setTextColor(Color.GREEN)
-                        progressBar.progressDrawable.setColorFilter(Color.GREEN, android.graphics.PorterDuff.Mode.SRC_IN)
+                        // ✨ SUCCESS UI POLISH ✨
+                        triggerSuccessFeedback() // 🔊 + 📳
                         
-                        // Tip for user
-                        Toast.makeText(this, "Long Press Text for Battery Test", Toast.LENGTH_LONG).show()
+                        statusText.text = "🎉 IDENTITY VERIFIED!\n" +
+                                          "⚡ Speed: Fast | 💾 RAM: ${ramPeak}MB"
+                        
+                        // Green Background for clear visual cue
+                        statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Dark Green
+                        statusText.setTextColor(Color.WHITE)
+                        statusText.setPadding(20, 20, 20, 20)
+                        
+                        progressBar.progressDrawable.setColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+                        
                     } else {
-                        statusText.text = resultReport
-                        statusText.setTextColor(Color.RED)
+                        // ❌ FAILURE UI
+                        statusText.text = "⛔ INVALID PROOF DETECTED"
+                        statusText.setBackgroundColor(Color.parseColor("#C62828")) // Red
+                        statusText.setTextColor(Color.WHITE)
                     }
                 }
             } catch (e: Throwable) {
-                runOnUiThread {
-                    statusText.text = "Error"
-                }
+                runOnUiThread { statusText.text = "Error" }
             }
         }.start()
     }
