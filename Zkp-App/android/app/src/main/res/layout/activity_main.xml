@@ -39,4 +39,14 @@
         android:backgroundTint="#FF5722"
         android:layout_marginTop="20dp"/>
 
+    <Button
+        android:id="@+id/btn_scan_passport"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="20dp"
+        android:text="📷 Scan NFC Passport"
+        android:textSize="18sp"
+        android:backgroundTint="#009688"
+        android:textColor="#FFFFFF" />
+
 </LinearLayout>

@@ -1,6 +1,6 @@
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
-use jni::sys::{jstring}; // Note: jboolean hata diya hai kyunki ab hum String bhej rahe hain
+use jni::sys::{jstring, jbyteArray}; // Added jbyteArray here
 use std::ffi::CString;
 use std::panic;
 use std::time::Instant;
@@ -114,7 +114,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
     mut env: JNIEnv,
     _class: JClass,
     proof_str: JString,
-) -> jstring { // 👈 Ab hum String return kar rahe hain
+) -> jstring { 
     init_logger();
 
     let proof_base64: String = match env.get_string(&proof_str) {
@@ -122,7 +122,6 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
         Err(_) => return env.new_string("❌ Error: JNI String Fail").unwrap().into_raw(),
     };
 
-    // Result ab String Report hogi
     let result_msg = panic::catch_unwind(|| {
         let deser_start = Instant::now();
         
@@ -136,7 +135,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
             Err(_) => return "❌ Error: Parse Fail".to_string(),
         };
         
-        let deser_time = deser_start.elapsed(); // ⏱️ Time 1 (Parsing)
+        let deser_time = deser_start.elapsed(); 
         
         let math_start = Instant::now();
         
@@ -150,9 +149,8 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
             Err(_) => false,
         };
         
-        let math_time = math_start.elapsed(); // ⏱️ Time 2 (Math)
+        let math_time = math_start.elapsed(); 
         
-        // 👇 FINAL REPORT
         if is_valid {
             format!("✅ Verified!\n📂 Parse: {:.2?}\n🧮 Math: {:.2?}", deser_time, math_time)
         } else {
@@ -166,4 +164,36 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
     };
 
     env.new_string(final_output).expect("Could not create string").into_raw()
+}
+
+// 3️⃣ PASSPORT BRIDGE (Phase 6 Entry Point)
+// Input: Raw bytes from the NFC chip (SOD + DG1)
+// Output: Initial analysis string (later this will be the Proof)
+
+#[no_mangle]
+pub extern "system" fn Java_com_example_zkpapp_PassportActivity_processPassportData(
+    mut env: JNIEnv, // 👈 FIX: Changed from MainActivity to PassportActivity
+    _class: JClass,
+    input_data: jbyteArray, 
+) -> jstring {
+    init_logger();
+    info!("🛂 RUST: Passport Data Received");
+
+    let result = panic::catch_unwind(|| -> Result<String> {
+        let passport_bytes = env.convert_byte_array(input_data).unwrap_or(vec![]);
+        
+        info!("📊 Received {} bytes from NFC", passport_bytes.len());
+
+        // Future Day 66-70 Logic goes here
+        
+        Ok(format!("Rust received {} bytes. Ready for parsing.", passport_bytes.len()))
+    });
+
+    let output = match result {
+        Ok(Ok(msg)) => msg,
+        Ok(Err(e)) => format!("Error: {}", e),
+        Err(_) => "Panic in Passport processing".to_string(),
+    };
+    
+    env.new_string(output).expect("Error creating string").into_raw()
 }
