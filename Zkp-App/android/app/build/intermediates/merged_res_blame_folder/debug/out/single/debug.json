@@ -1,0 +1,10 @@
+[
+    {
+        "merged": "com.example.zkpapp-merged_res-29:/layout_activity_main.xml.flat",
+        "source": "com.example.zkpapp-main-31:/layout/activity_main.xml"
+    },
+    {
+        "merged": "com.example.zkpapp-merged_res-29:/layout_activity_verifier.xml.flat",
+        "source": "com.example.zkpapp-main-31:/layout/activity_verifier.xml"
+    }
+]

@@ -1,0 +1,19 @@
+R_DEF: Internal format may change without notice
+local
+color black
+color purple_500
+color purple_700
+color teal_200
+color white
+id barcode_scanner
+id btn_magic
+id btn_scan
+id btn_scan_passport
+id progress_bar
+id qr_image
+id sample_text
+id status_text
+layout activity_main
+layout activity_verifier
+string app_name
+style AppTheme

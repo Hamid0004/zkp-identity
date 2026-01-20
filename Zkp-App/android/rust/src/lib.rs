@@ -1,12 +1,12 @@
 use jni::JNIEnv;
-use jni::objects::{JClass, JString};
-use jni::sys::{jstring, jbyteArray}; // Added jbyteArray here
-use std::ffi::CString;
+// 👇 FIX 1: Added JByteArray to safe imports
+use jni::objects::{JClass, JString, JByteArray}; 
+use jni::sys::jstring; 
 use std::panic;
 use std::time::Instant;
 use base64::{Engine as _, engine::general_purpose};
 use android_logger::Config;
-use log::{info, error, LevelFilter};
+use log::{info, LevelFilter}; // Removed unused 'error'
 
 // Plonky2 Imports
 use plonky2::field::types::Field;
@@ -28,8 +28,7 @@ fn init_logger() {
 
 // 🔧 CONFIGURATION: Standard (100% Safe)
 fn get_diet_config() -> CircuitConfig {
-    let config = CircuitConfig::standard_recursion_config();
-    config
+    CircuitConfig::standard_recursion_config()
 }
 
 // Shared Constants
@@ -168,23 +167,23 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
 
 // 3️⃣ PASSPORT BRIDGE (Phase 6 Entry Point)
 // Input: Raw bytes from the NFC chip (SOD + DG1)
-// Output: Initial analysis string (later this will be the Proof)
-
+// Output: Initial analysis string
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_PassportActivity_processPassportData(
-    mut env: JNIEnv, // 👈 FIX: Changed from MainActivity to PassportActivity
+    mut env: JNIEnv,
     _class: JClass,
-    input_data: jbyteArray, 
+    input_data: JByteArray, // 👈 FIX 2: Changed from 'jbyteArray' (unsafe) to 'JByteArray' (safe)
 ) -> jstring {
     init_logger();
     info!("🛂 RUST: Passport Data Received");
 
     let result = panic::catch_unwind(|| -> Result<String> {
+        // Now this works because 'input_data' is the correct type
         let passport_bytes = env.convert_byte_array(input_data).unwrap_or(vec![]);
         
         info!("📊 Received {} bytes from NFC", passport_bytes.len());
 
-        // Future Day 66-70 Logic goes here
+        // TODO: Future parsing logic here
         
         Ok(format!("Rust received {} bytes. Ready for parsing.", passport_bytes.len()))
     });

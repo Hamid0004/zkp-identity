@@ -1,0 +1,156 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="com.example.zkpapp"
+4    android:versionCode="1"
+5    android:versionName="1.0" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="24"
+8-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
+9        android:targetSdkVersion="33" />
+9-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
+10
+11    <uses-permission android:name="android.permission.CAMERA" />
+11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:5-65
+11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:22-62
+12    <uses-permission android:name="android.permission.VIBRATE" />
+12-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:5-66
+12-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:22-63
+13    <uses-permission android:name="android.permission.NFC" />
+13-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:7:5-62
+13-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:7:22-59
+14
+15    <uses-feature
+15-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:5-81
+16        android:name="android.hardware.nfc"
+16-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:19-54
+17        android:required="true" />
+17-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:55-78
+18    <uses-feature android:name="android.hardware.camera" />
+18-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:5-60
+18-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:19-57
+19    <uses-feature android:name="android.hardware.camera.autofocus" />
+19-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:11:5-70
+19-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:11:19-67
+20    <uses-feature
+20-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:28:5-30:36
+21        android:name="android.hardware.camera.front"
+21-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:29:9-53
+22        android:required="false" />
+22-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:30:9-33
+23    <uses-feature
+23-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:36:5-38:36
+24        android:name="android.hardware.camera.flash"
+24-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:37:9-53
+25        android:required="false" />
+25-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:38:9-33
+26    <uses-feature
+26-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:39:5-41:36
+27        android:name="android.hardware.screen.landscape"
+27-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:40:9-57
+28        android:required="false" />
+28-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:41:9-33
+29    <uses-feature
+29-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:42:5-44:36
+30        android:name="android.hardware.wifi"
+30-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:43:9-45
+31        android:required="false" />
+31-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:44:9-33
+32
+33    <permission
+33-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:22:5-24:47
+34        android:name="com.example.zkpapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+34-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:23:9-81
+35        android:protectionLevel="signature" />
+35-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:24:9-44
+36
+37    <uses-permission android:name="com.example.zkpapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION" />
+37-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:26:5-97
+37-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:26:22-94
+38
+39    <application
+39-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:13:5-35:19
+40        android:allowBackup="true"
+40-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:14:9-35
+41        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
+41-->[androidx.core:core:1.9.0] /home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/AndroidManifest.xml:28:18-86
+42        android:debuggable="true"
+43        android:extractNativeLibs="false"
+44        android:label="ZKP Mobile"
+44-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:15:9-35
+45        android:theme="@style/Theme.AppCompat.Light.DarkActionBar" >
+45-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:16:9-67
+46        <activity
+46-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:18:9-24:20
+47            android:name="com.example.zkpapp.MainActivity"
+47-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:18:19-47
+48            android:exported="true" >
+48-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:19:13-36
+49            <intent-filter>
+49-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:20:13-23:29
+50                <action android:name="android.intent.action.MAIN" />
+50-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:17-69
+50-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:25-66
+51
+52                <category android:name="android.intent.category.LAUNCHER" />
+52-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:17-77
+52-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:27-74
+53            </intent-filter>
+54        </activity>
+55        <activity
+55-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:26:9-29:65
+56            android:name="com.example.zkpapp.VerifierActivity"
+56-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:26:19-51
+57            android:exported="false"
+57-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:27:13-37
+58            android:screenOrientation="portrait"
+58-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:28:13-49
+59            android:theme="@style/Theme.AppCompat.NoActionBar" />
+59-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:29:13-63
+60        <activity
+60-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:31:9-33:48
+61            android:name="com.example.zkpapp.PassportActivity"
+61-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:31:19-51
+62            android:exported="false"
+62-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:32:13-37
+63            android:label="Passport Scanner" />
+63-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:33:13-45
+64        <activity
+64-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:47:9-53:63
+65            android:name="com.journeyapps.barcodescanner.CaptureActivity"
+65-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:48:13-74
+66            android:clearTaskOnLaunch="true"
+66-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:49:13-45
+67            android:screenOrientation="sensorLandscape"
+67-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:50:13-56
+68            android:stateNotNeeded="true"
+68-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:51:13-42
+69            android:theme="@style/zxing_CaptureTheme"
+69-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:52:13-54
+70            android:windowSoftInputMode="stateAlwaysHidden" />
+70-->[com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:53:13-60
+71
+72        <provider
+72-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:24:9-32:20
+73            android:name="androidx.startup.InitializationProvider"
+73-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:25:13-67
+74            android:authorities="com.example.zkpapp.androidx-startup"
+74-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:26:13-68
+75            android:exported="false" >
+75-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:27:13-37
+76            <meta-data
+76-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:29:13-31:52
+77                android:name="androidx.emoji2.text.EmojiCompatInitializer"
+77-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:30:17-75
+78                android:value="androidx.startup" />
+78-->[androidx.emoji2:emoji2:1.2.0] /home/codespace/.gradle/caches/transforms-3/50ba610dd4844fad29258cb421b5f706/transformed/jetified-emoji2-1.2.0/AndroidManifest.xml:31:17-49
+79            <meta-data
+79-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/codespace/.gradle/caches/transforms-3/cb8144e92b689dd4bd43827b20692006/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:31:13-33:52
+80                android:name="androidx.lifecycle.ProcessLifecycleInitializer"
+80-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/codespace/.gradle/caches/transforms-3/cb8144e92b689dd4bd43827b20692006/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:32:17-78
+81                android:value="androidx.startup" />
+81-->[androidx.lifecycle:lifecycle-process:2.4.1] /home/codespace/.gradle/caches/transforms-3/cb8144e92b689dd4bd43827b20692006/transformed/jetified-lifecycle-process-2.4.1/AndroidManifest.xml:33:17-49
+82        </provider>
+83    </application>
+84
+85</manifest>
