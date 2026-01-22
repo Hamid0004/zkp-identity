@@ -2,12 +2,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.zkpapp">
 
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.NFC" />
-    
-    <uses-feature android:name="android.hardware.nfc" android:required="true" />
-    <uses-feature android:name="android.hardware.camera" />
+
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.camera.autofocus" />
 
     <application
@@ -23,13 +24,26 @@
             </intent-filter>
         </activity>
 
-        <activity android:name=".VerifierActivity" 
+        <activity android:name=".VerifierActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar"/>
 
         <activity android:name=".PassportActivity"
-            android:exported="false"
-            android:label="Passport Scanner" />
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:label="Passport Scanner">
+            <intent-filter>
+                <action android:name="android.nfc.action.TECH_DISCOVERED"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+            </intent-filter>
+        </activity>
 
-    </application> </manifest>
+        <activity android:name=".CameraActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+    </application>
+
+</manifest>
