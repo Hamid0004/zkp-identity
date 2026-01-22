@@ -15,7 +15,6 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-    <!-- MRZ Guide Box -->
     <View
         android:id="@+id/mrzOverlay"
         android:layout_width="0dp"
@@ -39,5 +38,4 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"/>
 
-</androidx.constraintlayout.widget.ConstraintLayout>
-                                                                           </androidx.constraintlayout.widget.ConstraintLayout>>
+</androidx.constraintlayout.widget.ConstraintLayout>                                                                           </androidx.constraintlayout.widget.ConstraintLayout>>
