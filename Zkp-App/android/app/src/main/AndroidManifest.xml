@@ -1,92 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.zkpapp">
-
-    <!-- ===================== -->
-    <!-- PERMISSIONS -->
-    <!-- ===================== -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
-    <!-- ===================== -->
-    <!-- HARDWARE FEATURES -->
-    <!-- ===================== -->
+    <uses-feature android:name="android.hardware.nfc" android:required="false" />
+    <uses-feature android:name="android.hardware.camera" android:required="true" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
-    <!-- NFC optional: app install ho jaye, runtime par check -->
-    <uses-feature
-        android:name="android.hardware.nfc"
-        android:required="false" />
-
-    <!-- Camera mandatory: MRZ scanning core dependency -->
-    <uses-feature
-        android:name="android.hardware.camera"
-        android:required="true" />
-
-    <!-- Autofocus optional -->
-    <uses-feature
-        android:name="android.hardware.camera.autofocus"
-        android:required="false" />
-
-    <!-- ===================== -->
-    <!-- APPLICATION -->
-    <!-- ===================== -->
     <application
         android:allowBackup="true"
         android:label="ZKP Mobile"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
 
-        <!-- ===================== -->
-        <!-- MAIN ENTRY -->
-        <!-- ===================== -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
-
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-
         </activity>
 
-        <!-- ===================== -->
-        <!-- PASSPORT NFC ACTIVITY -->
-        <!-- ===================== -->
         <activity
             android:name=".PassportActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:label="Passport Scanner"
-            android:permission="android.permission.NFC">
-
-            <!-- NFC TECH DISCOVERED -->
+            android:label="Passport Scanner">
+            
             <intent-filter>
                 <action android:name="android.nfc.action.TECH_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
-            <!-- IsoDep Filter -->
             <meta-data
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter" />
-
         </activity>
 
-        <!-- ===================== -->
-        <!-- CAMERA (MRZ OCR) -->
-        <!-- ===================== -->
         <activity
             android:name=".CameraActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
-        <!-- ===================== -->
-        <!-- VERIFIER -->
-        <!-- ===================== -->
         <activity
             android:name=".VerifierActivity"
             android:exported="false"
