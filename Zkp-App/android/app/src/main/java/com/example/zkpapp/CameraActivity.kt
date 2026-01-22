@@ -22,139 +22,153 @@ class CameraActivity : AppCompatActivity() {
 
     private lateinit var viewFinder: PreviewView
     private lateinit var cameraExecutor: ExecutorService
-    private var isProcessing = false // Taaki ek baar mein ek hi scan ho
+
+    @Volatile
+    private var scanLocked = false   // 🔒 Prevent multi-detection
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_camera) // Ensure XML file sahi bani ho
+        setContentView(R.layout.activity_camera)
 
         viewFinder = findViewById(R.id.viewFinder)
+        cameraExecutor = Executors.newSingleThreadExecutor()
 
-        // Permission check
-        if (allPermissionsGranted()) {
+        if (hasCameraPermission()) {
             startCamera()
         } else {
             ActivityCompat.requestPermissions(
-                this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS
+                this,
+                arrayOf(Manifest.permission.CAMERA),
+                REQUEST_CODE
             )
         }
-
-        cameraExecutor = Executors.newSingleThreadExecutor()
     }
 
+    // --------------------------------------------------
+    // CAMERA PIPELINE
+    // --------------------------------------------------
     private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        val providerFuture = ProcessCameraProvider.getInstance(this)
 
-        cameraProviderFuture.addListener({
-            // Camera Provider
-            val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
+        providerFuture.addListener({
+            val cameraProvider = providerFuture.get()
 
-            // Preview (Screen par dikhana)
-            val preview = Preview.Builder()
-                .build()
-                .also {
-                    it.setSurfaceProvider(viewFinder.surfaceProvider)
-                }
+            val preview = Preview.Builder().build().apply {
+                setSurfaceProvider(viewFinder.surfaceProvider)
+            }
 
-            // Image Analyzer (Text Padne wala dimagh)
-            val imageAnalyzer = ImageAnalysis.Builder()
+            val analyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
-                .also {
-                    it.setAnalyzer(cameraExecutor) { imageProxy ->
-                        processImageProxy(imageProxy)
+                .apply {
+                    setAnalyzer(cameraExecutor) { imageProxy ->
+                        analyzeFrame(imageProxy)
                     }
                 }
 
-            // Back Camera Select karein
-            val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
-
             try {
-                // Pehle sab unbind karein phir naya bind karein
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageAnalyzer
+                    this,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    analyzer
                 )
-            } catch (exc: Exception) {
-                Log.e(TAG, "Use case binding failed", exc)
+            } catch (e: Exception) {
+                Log.e(TAG, "Camera bind failed", e)
             }
 
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // 🧠 IMAGE PROCESSING LOGIC
-    @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class) 
-    private fun processImageProxy(imageProxy: ImageProxy) {
-        if (isProcessing) {
+    // --------------------------------------------------
+    // OCR ANALYSIS
+    // --------------------------------------------------
+    @OptIn(ExperimentalGetImage::class)
+    private fun analyzeFrame(imageProxy: ImageProxy) {
+        if (scanLocked) {
             imageProxy.close()
             return
         }
 
-        val mediaImage = imageProxy.image
-        if (mediaImage != null) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
-            
-            // Google ML Kit Text Recognizer
-            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-
-            recognizer.process(image)
-                .addOnSuccessListener { visionText ->
-                    // Text mil gaya, ab check karte hain ke MRZ hai ya nahi
-                    checkForMrz(visionText.text)
-                }
-                .addOnFailureListener { e ->
-                    Log.e(TAG, "Text detection failed", e)
-                }
-                .addOnCompleteListener {
-                    imageProxy.close()
-                }
-        } else {
+        val mediaImage = imageProxy.image ?: run {
             imageProxy.close()
+            return
         }
-    }
 
-    // 🕵️ MRZ FILTER (Magic Logic)
-    private fun checkForMrz(fullText: String) {
-        val lines = fullText.split("\n")
-        
-        // MRZ Logic: 
-        // 1. Line lambi honi chahiye (> 30 chars)
-        // 2. Usmein '<<<' hona chahiye (Passport format)
-        val mrzLine = lines.firstOrNull { it.length > 30 && it.contains("<<<") }
+        val image = InputImage.fromMediaImage(
+            mediaImage,
+            imageProxy.imageInfo.rotationDegrees
+        )
 
-        if (mrzLine != null) {
-            isProcessing = true // Scanning roko
-            Log.d(TAG, "MRZ FOUND: $mrzLine")
-            
-            runOnUiThread {
-                Toast.makeText(this, "✅ MRZ DETECTED!", Toast.LENGTH_SHORT).show()
-                
-                // Result wapas PassportActivity ko bhejein
-                val resultIntent = Intent()
-                resultIntent.putExtra("MRZ_DATA", mrzLine)
-                setResult(RESULT_OK, resultIntent)
-                finish() // Camera band karein
+        val recognizer = TextRecognition.getClient(
+            TextRecognizerOptions.DEFAULT_OPTIONS
+        )
+
+        recognizer.process(image)
+            .addOnSuccessListener { result ->
+                extractMrz(result.text)
             }
-        }
+            .addOnFailureListener {
+                Log.e(TAG, "OCR failed", it)
+            }
+            .addOnCompleteListener {
+                imageProxy.close()
+            }
     }
 
-    // --- PERMISSION HELPERS ---
+    // --------------------------------------------------
+    // MRZ DETECTION LOGIC (CORE DAY‑66)
+    // --------------------------------------------------
+    private fun extractMrz(rawText: String) {
+        val lines = rawText
+            .uppercase()
+            .replace(" ", "")
+            .split("\n")
+            .filter { it.length >= 30 }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CODE_PERMISSIONS) {
-            if (allPermissionsGranted()) {
-                startCamera()
-            } else {
-                Toast.makeText(this, "Camera permission denied.", Toast.LENGTH_SHORT).show()
+        // Passport MRZ: 2 or 3 consecutive lines with <<<
+        val candidates = lines.filter { it.contains("<<") }
+
+        if (candidates.size >= 2) {
+            scanLocked = true
+
+            val mrz = candidates.take(2).joinToString("\n")
+
+            Log.d(TAG, "MRZ DETECTED:\n$mrz")
+
+            runOnUiThread {
+                Toast.makeText(this, "✅ MRZ Detected", Toast.LENGTH_SHORT).show()
+
+                val intent = Intent().apply {
+                    putExtra("MRZ_DATA", mrz)
+                }
+                setResult(RESULT_OK, intent)
                 finish()
             }
         }
     }
 
-    private fun allPermissionsGranted() = REQUIRED_PERMISSIONS.all {
-        ContextCompat.checkSelfPermission(baseContext, it) == PackageManager.PERMISSION_GRANTED
+    // --------------------------------------------------
+    // PERMISSIONS
+    // --------------------------------------------------
+    private fun hasCameraPermission(): Boolean =
+        ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.CAMERA
+        ) == PackageManager.PERMISSION_GRANTED
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        if (requestCode == REQUEST_CODE && hasCameraPermission()) {
+            startCamera()
+        } else {
+            Toast.makeText(this, "Camera permission required", Toast.LENGTH_SHORT).show()
+            finish()
+        }
     }
 
     override fun onDestroy() {
@@ -164,7 +178,6 @@ class CameraActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "CameraActivity"
-        private const val REQUEST_CODE_PERMISSIONS = 10
-        private val REQUIRED_PERMISSIONS = arrayOf(Manifest.permission.CAMERA)
+        private const val REQUEST_CODE = 101
     }
 }

@@ -1,54 +1,43 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout 
+<androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#000000">
 
     <androidx.camera.view.PreviewView
         android:id="@+id/viewFinder"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
+    <!-- MRZ Guide Box -->
     <View
-        android:id="@+id/overlay"
+        android:id="@+id/mrzOverlay"
         android:layout_width="0dp"
         android:layout_height="120dp"
         android:background="@drawable/rounded_border"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent"
-        app:layout_constraintVertical_bias="0.45"
-        app:layout_constraintWidth_percent="0.95" />
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintWidth_percent="0.95"
+        android:layout_marginBottom="40dp"/>
 
     <TextView
-        android:id="@+id/guideText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginBottom="12dp"
-        android:text="Align MRZ Code Here\n(Bottom 2 lines of Passport)"
-        android:textAlignment="center"
+        android:text="Align MRZ (bottom 2 lines)"
         android:textColor="#FFFFFF"
-        android:textSize="16sp"
-        android:shadowColor="#000000"
-        android:shadowDx="1"
-        android:shadowDy="1"
+        android:textSize="15sp"
+        android:shadowColor="#000"
         android:shadowRadius="2"
-        app:layout_constraintBottom_toTopOf="@id/overlay"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent" />
-
-    <View
-        android:layout_width="0dp"
-        android:layout_height="2dp"
-        android:background="#00FF00"
-        android:alpha="0.6"
-        app:layout_constraintTop_toTopOf="@id/overlay"
-        app:layout_constraintBottom_toBottomOf="@id/overlay"
-        app:layout_constraintStart_toStartOf="@id/overlay"
-        app:layout_constraintEnd_toEndOf="@id/overlay" />
+        app:layout_constraintBottom_toTopOf="@id/mrzOverlay"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>
+                                                                           </androidx.constraintlayout.widget.ConstraintLayout>>
