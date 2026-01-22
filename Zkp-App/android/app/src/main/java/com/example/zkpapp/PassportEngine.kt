@@ -1,6 +1,8 @@
 package com.example.zkpapp
 
 import android.nfc.tech.IsoDep
+import android.util.Log
+import java.security.MessageDigest
 
 // ---------------------------
 // MODE DEFINITIONS
@@ -30,6 +32,11 @@ class PassportEngine(
     private val isoDep: IsoDep?
 ) {
 
+    companion object {
+        private const val TAG = "PassportEngine"
+        private const val DEBUG = true   // 🔒 Turn OFF for release
+    }
+
     var state: PassportState = PassportState.IDLE
         private set
 
@@ -37,12 +44,17 @@ class PassportEngine(
         state = PassportState.CONNECTING
 
         return try {
-            when (mode) {
+            val output = when (mode) {
                 PassportMode.REAL -> connectRealChip()
                 PassportMode.SIMULATION -> simulateChip()
             }
+
+            if (DEBUG) debugSnapshot(output)
+
+            output
         } catch (e: Exception) {
             state = PassportState.ERROR(e.message ?: "Unknown error")
+            Log.e(TAG, "ENGINE ERROR", e)
             throw e
         }
     }
@@ -71,7 +83,6 @@ class PassportEngine(
     }
 
     private fun pingChip(): Boolean {
-        // SELECT MF (3F00)
         val apdu = byteArrayOf(
             0x00,
             0xA4.toByte(),
@@ -90,10 +101,6 @@ class PassportEngine(
     }
 
     private fun readPlaceholderData(): ByteArray {
-        // Future:
-        // DG1 -> MRZ
-        // DG2 -> Face
-        // SOD -> Signatures
         return ByteArray(1024) { index ->
             (index % 256).toByte()
         }
@@ -107,5 +114,30 @@ class PassportEngine(
         Thread.sleep(700)
         state = PassportState.DONE
         return ByteArray(1024) { 0xFF.toByte() }
+    }
+
+    // ---------------------------
+    // 🔬 DEBUG SNAPSHOT (READ-ONLY)
+    // ---------------------------
+    private fun debugSnapshot(data: ByteArray) {
+        if (data.isEmpty()) {
+            Log.w(TAG, "DEBUG: Output is EMPTY")
+            return
+        }
+
+        val sha256 = MessageDigest.getInstance("SHA-256")
+            .digest(data)
+            .joinToString("") { "%02x".format(it) }
+
+        val head = data.take(32)
+            .joinToString(" ") { "%02X".format(it) }
+
+        Log.d(TAG, "====== ENGINE DEBUG SNAPSHOT ======")
+        Log.d(TAG, "Mode      : ${mode::class.simpleName}")
+        Log.d(TAG, "State     : $state")
+        Log.d(TAG, "Length    : ${data.size} bytes")
+        Log.d(TAG, "SHA-256   : $sha256")
+        Log.d(TAG, "Head(32)  : $head")
+        Log.d(TAG, "==================================")
     }
 }
