@@ -1,18 +1,8 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.zkpapp-mergeDebugResources-27:/values-v16/values-v16.xml",
+            "outputFile": "com.example.zkpapp-mergeDebugResources-37:/values-v16/values-v16.xml",
             "map": [
-                {
-                    "source": "/home/codespace/.gradle/caches/transforms-3/2d8fd2d3c9dd5ecd8e42fcd6b5b0e3d5/transformed/core-1.9.0/res/values-v16/values-v16.xml",
-                    "from": {
-                        "startLines": "2",
-                        "startColumns": "4",
-                        "startOffsets": "55",
-                        "endColumns": "65",
-                        "endOffsets": "116"
-                    }
-                },
                 {
                     "source": "/home/codespace/.gradle/caches/transforms-3/485f65fe4b5870cdba1c588cba41f536/transformed/appcompat-1.6.1/res/values-v16/values-v16.xml",
                     "from": {
@@ -30,6 +20,16 @@
                         "endLines": "6",
                         "endColumns": "12",
                         "endOffsets": "289"
+                    }
+                },
+                {
+                    "source": "/home/codespace/.gradle/caches/transforms-3/35da4fc1d8efd2d155d782ef63b1b66c/transformed/core-1.10.1/res/values-v16/values-v16.xml",
+                    "from": {
+                        "startLines": "2",
+                        "startColumns": "4",
+                        "startOffsets": "55",
+                        "endColumns": "65",
+                        "endOffsets": "116"
                     }
                 }
             ]

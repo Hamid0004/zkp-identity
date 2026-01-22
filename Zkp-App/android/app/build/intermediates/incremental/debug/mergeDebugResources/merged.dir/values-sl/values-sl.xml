@@ -38,9 +38,34 @@
     <string name="bottomsheet_action_expand_halfway">Razširjanje na pol višine</string>
     <string name="bottomsheet_drag_handle_clicked">Dvakrat dotaknjena ročica za vlečenje</string>
     <string name="bottomsheet_drag_handle_content_description">Ročica za vlečenje</string>
+    <string msgid="881409763997275156" name="call_notification_answer_action">"Sprejmi"</string>
+    <string msgid="8793775615905189152" name="call_notification_answer_video_action">"Video"</string>
+    <string msgid="3229508546291798546" name="call_notification_decline_action">"Zavrni"</string>
+    <string msgid="2659457946726154263" name="call_notification_hang_up_action">"Prekini klic"</string>
+    <string msgid="6107532579223922871" name="call_notification_incoming_text">"Dohodni klic"</string>
+    <string msgid="8623827134497363134" name="call_notification_ongoing_text">"Aktivni klic"</string>
+    <string msgid="59049573811482460" name="call_notification_screening_text">"Preverjanje dohodnega klica"</string>
     <string name="character_counter_content_description">Število vnesenih znakov je %1$d od %2$d</string>
     <string name="character_counter_overflowed_content_description">Omejitev števila znakov je presegla %1$d od %2$d</string>
     <string name="clear_text_end_icon_content_description">Izbris besedila</string>
+    <string msgid="2523291102206661146" name="common_google_play_services_enable_button">Omogoči</string>
+    <string msgid="227660514972886228" name="common_google_play_services_enable_text">Aplikacija %1$s ne bo delovala, če ne omogočite storitev Google Play.</string>
+    <string msgid="5122002158466380389" name="common_google_play_services_enable_title">Omogočanje storitev Google Play</string>
+    <string msgid="7153882981874058840" name="common_google_play_services_install_button">Namesti</string>
+    <string name="common_google_play_services_install_text">Aplikacija %1$s ne deluje brez storitev Google Play, vendar teh ni v napravi.</string>
+    <string msgid="7215213145546190223" name="common_google_play_services_install_title">Namestitev storitev Google Play</string>
+    <string name="common_google_play_services_notification_channel_name">Dostopnost storitev Google Play</string>
+    <string name="common_google_play_services_notification_ticker">Napaka storitev Google Play</string>
+    <string name="common_google_play_services_unknown_issue">Aplikacija %1$s ima težave s storitvami Google Play. Poskusite znova.</string>
+    <string name="common_google_play_services_unsupported_text">Aplikacija %1$s ne deluje brez storitev Google Play, ki jih vaša naprava ne podpira.</string>
+    <string msgid="6556509956452265614" name="common_google_play_services_update_button">Posodobi</string>
+    <string msgid="9053896323427875356" name="common_google_play_services_update_text">Aplikacija %1$s ne bo delovala, če ne posodobite storitev Google Play.</string>
+    <string msgid="6006316683626838685" name="common_google_play_services_update_title">Posodobitev storitev Google Play</string>
+    <string name="common_google_play_services_updating_text">Aplikacija %1$s ne deluje brez storitev Google Play, ki se trenutno posodabljajo.</string>
+    <string name="common_google_play_services_wear_update_text">Potrebujete novo različico storitev Google Play. V kratkem se bodo posodobile.</string>
+    <string name="common_open_on_phone">Odpiranje v telefonu</string>
+    <string name="common_signin_button_text">Prijava</string>
+    <string name="common_signin_button_text_long">Prijava z računom Google</string>
     <string name="error_icon_content_description">Napaka</string>
     <string name="exposed_dropdown_menu_content_description">Prikaz spustnega menija</string>
     <string name="icon_content_description">Ikona pogovornega okna</string>
