@@ -11,25 +11,140 @@ import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.coroutines.*
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class PassportActivity : AppCompatActivity() {
 
-    // NFC Adapter (Hardware Link)
+    // --------------------------------------------------
+    // NFC
+    // --------------------------------------------------
     private var nfcAdapter: NfcAdapter? = null
 
-    // UI Elements
+    // --------------------------------------------------
+    // UI
+    // --------------------------------------------------
     private lateinit var statusText: TextView
     private lateinit var simButton: Button
     private lateinit var progressBar: ProgressBar
 
-    // 🔗 RUST BRIDGE
+    // --------------------------------------------------
+    // JNI (future – Day 69+)
+    // --------------------------------------------------
     external fun processPassportData(data: ByteArray): String
 
+    // --------------------------------------------------
+    // LIFECYCLE
+    // --------------------------------------------------
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        setupUI()
+        checkHardware()
+    }
 
-        // 🏗️ DYNAMIC UI SETUP
+    override fun onResume() {
+        super.onResume()
+        if (nfcAdapter != null) {
+            val intent = Intent(this, javaClass).apply {
+                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+            val pendingIntent = PendingIntent.getActivity(
+                this, 0, intent, PendingIntent.FLAG_MUTABLE
+            )
+            nfcAdapter?.enableForegroundDispatch(
+                this, pendingIntent, null, null
+            )
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        nfcAdapter?.disableForegroundDispatch(this)
+    }
+
+    // --------------------------------------------------
+    // NFC ENTRY (REAL MODE)
+    // --------------------------------------------------
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+
+        if (intent.action != NfcAdapter.ACTION_TECH_DISCOVERED &&
+            intent.action != NfcAdapter.ACTION_TAG_DISCOVERED
+        ) return
+
+        val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        if (tag == null) return
+
+        val isoDep = IsoDep.get(tag)
+        if (isoDep == null) {
+            statusText.text = "❌ NFC tag detected, but not a passport chip"
+            return
+        }
+
+        statusText.text = "🔄 ENGINE STARTING (REAL MODE)..."
+
+        val engine = PassportEngine(
+            mode = PassportMode.REAL,
+            isoDep = isoDep
+        )
+
+        runEngine(engine, "Real Passport")
+    }
+
+    // --------------------------------------------------
+    // SIMULATION MODE
+    // --------------------------------------------------
+    private fun runSimulation() {
+        simButton.isEnabled = false
+        statusText.text = "🧪 ENGINE STARTING (SIMULATION MODE)..."
+
+        val engine = PassportEngine(
+            mode = PassportMode.SIMULATION,
+            isoDep = null
+        )
+
+        runEngine(engine, "Simulation")
+    }
+
+    // --------------------------------------------------
+    // ENGINE RUNNER
+    // --------------------------------------------------
+    private fun runEngine(engine: PassportEngine, source: String) {
+        progressBar.visibility = View.VISIBLE
+
+        lifecycleScope.launch(Dispatchers.IO) {
+            try {
+                // ⚙️ THE MAIN WORK
+                val passportBytes = engine.start()
+
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    statusText.text =
+                        "✅ ENGINE FINISHED ($source)\n\n" +
+                        "State: ${engine.state}\n" +
+                        "Bytes: ${passportBytes.size}"
+                    
+                    simButton.isEnabled = true
+                }
+
+            } catch (e: Exception) {
+                Log.e("PassportActivity", "Engine failure", e)
+
+                withContext(Dispatchers.Main) {
+                    progressBar.visibility = View.GONE
+                    statusText.text = "❌ ENGINE ERROR\n${e.message}"
+                    simButton.isEnabled = true
+                }
+            }
+        }
+    }
+
+    // --------------------------------------------------
+    // HELPER FUNCTIONS (UI & HARDWARE)
+    // --------------------------------------------------
+    private fun setupUI() {
         val layout = LinearLayout(this)
         layout.orientation = LinearLayout.VERTICAL
         layout.setPadding(50, 100, 50, 50)
@@ -46,12 +161,13 @@ class PassportActivity : AppCompatActivity() {
 
         simButton = Button(this)
         simButton.text = "🛠️ SIMULATE SCAN (TEST MODE)"
-        simButton.visibility = View.GONE
+        simButton.setOnClickListener { runSimulation() }
         layout.addView(simButton)
 
         setContentView(layout)
+    }
 
-        // 🔍 CHECK HARDWARE
+    private fun checkHardware() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
 
         if (nfcAdapter != null && nfcAdapter!!.isEnabled) {
@@ -60,88 +176,8 @@ class PassportActivity : AppCompatActivity() {
             simButton.visibility = View.GONE
         } else {
             // ❌ SIMULATION MODE
-            statusText.text = "⚠️ NO NFC DETECTED\n\nSwitched to Simulation Mode.\nClick button below to test Rust logic."
+            statusText.text = "⚠️ NO NFC DETECTED\n\nSwitched to Simulation Mode."
             simButton.visibility = View.VISIBLE
-        }
-
-        // Simulation button click
-        simButton.setOnClickListener {
-            simButton.isEnabled = false // Disable after first click
-            runSimulation()
-        }
-    }
-
-    // ---------------------------------------------------------
-    // 🟢 PATH A: REAL NFC HANDLING
-    // ---------------------------------------------------------
-    override fun onResume() {
-        super.onResume()
-        if (nfcAdapter != null) {
-            val intent = Intent(this, javaClass).apply {
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            val pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_MUTABLE)
-            nfcAdapter?.enableForegroundDispatch(this, pendingIntent, null, null)
-        }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        nfcAdapter?.disableForegroundDispatch(this)
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-
-        if (NfcAdapter.ACTION_TECH_DISCOVERED == intent.action ||
-            NfcAdapter.ACTION_TAG_DISCOVERED == intent.action) {
-
-            val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-            if (tag != null) {
-                val isoDep = IsoDep.get(tag)
-                if (isoDep != null) {
-                    statusText.text = "✅ PASSPORT CHIP DETECTED!\nReading Data..."
-                    // Placeholder bytes until JMRTD integration
-                    val dummyRealBytes = ByteArray(10) { 0xAA.toByte() }
-                    sendToRust(dummyRealBytes, "Real Chip")
-                } else {
-                    statusText.text = "❌ Tag detected, but not a Passport chip."
-                }
-            }
-        }
-    }
-
-    // ---------------------------------------------------------
-    // 🔵 PATH B: SIMULATION HANDLING
-    // ---------------------------------------------------------
-    private fun runSimulation() {
-        statusText.text = "⏳ Generating Fake Passport Data..."
-        val fakeBytes = ByteArray(1024) { 0xFF.toByte() }
-        sendToRust(fakeBytes, "Simulation")
-    }
-
-    // ---------------------------------------------------------
-    // 🔗 SHARED: SEND TO RUST ASYNC
-    // ---------------------------------------------------------
-    private fun sendToRust(dataBytes: ByteArray, source: String) {
-        progressBar.visibility = View.VISIBLE
-        statusText.text = "⏳ Processing $source Data..."
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val result = processPassportData(dataBytes)
-
-                withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
-                    statusText.text = "✅ SUCCESS ($source)\n\nRust Says:\n$result"
-                }
-            } catch (e: Exception) {
-                Log.e("PassportActivity", "Rust processing error", e)
-                withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
-                    statusText.text = "❌ ERROR ($source)\n${e.message}"
-                }
-            }
         }
     }
 }

@@ -5,7 +5,6 @@ plugins {
 
 android {
     namespace 'com.example.zkpapp'
-    namespace "com.example.zkpapp"
     compileSdk 33
 
     defaultConfig {
@@ -23,7 +22,7 @@ android {
         }
     }
     
-    // 👇 THIS IS THE FIX (Force Java 17)
+    // 👇 Java 17 Support (Critical for JMRTD & Coroutines)
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -40,10 +39,21 @@ android {
 }
 
 dependencies {
-    implementation "com.journeyapps:zxing-android-embedded:4.3.0"
-    implementation "com.google.zxing:core:3.4.1"
+    // 📱 Android UI Basics
     implementation 'androidx.core:core-ktx:1.7.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
     implementation 'com.google.android.material:material:1.8.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // ⚡ LIFECYCLE & COROUTINES
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"
+
+    // 📷 QR Code (Phase 1-5)
+    implementation "com.journeyapps:zxing-android-embedded:4.3.0"
+    implementation "com.google.zxing:core:3.4.1"
+
+    // 🛂 NFC Passport / JMRTD (Phase 6)
+    implementation 'org.jmrtd:jmrtd:0.7.18'
+    implementation 'net.sf.scuba:scuba-sc-android:0.0.20'
+    implementation 'com.madgag.spongycastle:prov:1.58.0.0'
 }
