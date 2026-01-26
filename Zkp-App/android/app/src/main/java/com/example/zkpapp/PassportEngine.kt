@@ -8,28 +8,25 @@ import java.security.MessageDigest
 // ---------------------------
 // ENUMS & STATES
 // ---------------------------
-enum class PassportMode {
-    REAL,
-    SIMULATION
-}
+enum class PassportMode { REAL, SIMULATION }
 
 sealed class PassportState {
     object IDLE : PassportState()
     object CONNECTING : PassportState()
-    object ANALYZING_MRZ : PassportState() // New State
-    object BAC_AUTH : PassportState()      // New State (Future)
+    object ANALYZING_MRZ : PassportState()
+    object BAC_AUTH : PassportState()
     object READING : PassportState()
     object DONE : PassportState()
     data class ERROR(val reason: String) : PassportState()
 }
 
 // ---------------------------
-// CORE ENGINE
+// PASSPORT ENGINE
 // ---------------------------
 class PassportEngine(
     private val mode: PassportMode,
     private val isoDep: IsoDep?,
-    private val mrz: String? // ✅ Updated: Accepts MRZ from Activity
+    private val mrz: String?
 ) {
 
     companion object {
@@ -40,7 +37,9 @@ class PassportEngine(
     var state: PassportState = PassportState.IDLE
         private set
 
-    // ✅ Suspend function for Coroutines (No blocking UI)
+    // ---------------------------
+    // START ENGINE (SUSPEND)
+    // ---------------------------
     suspend fun start(): ByteArray {
         state = PassportState.CONNECTING
 
@@ -60,48 +59,42 @@ class PassportEngine(
     }
 
     // ---------------------------
-    // 📲 REAL NFC FLOW
+    // REAL NFC FLOW
     // ---------------------------
     private suspend fun connectRealChip(): ByteArray {
         requireNotNull(isoDep) { "IsoDep required for REAL mode" }
+        requireNotNull(mrz) { throw Exception("MRZ required for REAL mode") }
 
-        // 1. Log MRZ (Masked for privacy)
-        if (mrz != null) {
-            state = PassportState.ANALYZING_MRZ
-            Log.d(TAG, "Using MRZ for BAC: ${maskMrz(mrz)}")
-        } else {
-            Log.w(TAG, "⚠️ No MRZ provided. BAC will fail in production.")
-        }
+        // 1️⃣ Analyze MRZ
+        state = PassportState.ANALYZING_MRZ
+        Log.d(TAG, "Using MRZ for BAC: ${maskMrz(mrz)}")
 
-        // 2. Connect
+        // 2️⃣ Connect to Passport Chip
         isoDep.timeout = 5000
         isoDep.connect()
-        
-        // 3. Ping (Basic Check)
+
+        // 3️⃣ Ping Chip
         if (!pingChip()) {
             isoDep.close()
             throw Exception("Passport chip detected but not responding (APDU failed)")
         }
 
-        // 4. Future: JMRTD BAC Logic goes here
-        // state = PassportState.BAC_AUTH
-        // performBac(isoDep, mrz)
+        // 4️⃣ BAC Authentication Placeholder
+        state = PassportState.BAC_AUTH
+        // TODO: implement BAC using JMRTD library
+        delay(300) // simulate authentication
 
-        // 5. Read Data
+        // 5️⃣ Read Data
         state = PassportState.READING
-        // delay(500) // Small delay to stabilize connection
-        
-        val data = readPlaceholderData() // Currently dummy data
-
+        val data = readDummyData() // Replace with actual passport file reading
         isoDep.close()
         state = PassportState.DONE
         return data
     }
 
     private fun pingChip(): Boolean {
-        // Simple Select Applet Command
         val apdu = byteArrayOf(0x00, 0xA4.toByte(), 0x00, 0x0C, 0x02, 0x3F, 0x00)
-        
+
         return try {
             val response = isoDep!!.transceive(apdu)
             val sw1 = response[response.size - 2]
@@ -113,44 +106,37 @@ class PassportEngine(
         }
     }
 
-    private fun readPlaceholderData(): ByteArray {
-        // Generating 1KB of dummy data representing passport files
-        return ByteArray(1024) { index -> (index % 256).toByte() }
+    private fun readDummyData(): ByteArray {
+        // 1KB dummy data for now
+        return ByteArray(1024) { (it % 256).toByte() }
     }
 
     // ---------------------------
-    // 🧪 SIMULATION FLOW
+    // SIMULATION FLOW
     // ---------------------------
     private suspend fun simulateChip(): ByteArray {
         Log.d(TAG, "Starting Simulation...")
-        
         state = PassportState.ANALYZING_MRZ
-        delay(600) // Simulate processing time
+        delay(600)
 
         state = PassportState.BAC_AUTH
-        delay(800) // Simulate Security Check
+        delay(800)
 
         state = PassportState.READING
-        delay(1000) // Simulate Data Transfer
+        delay(1000)
 
         state = PassportState.DONE
         return ByteArray(1024) { 0xAA.toByte() }
     }
 
     // ---------------------------
-    // 🛡️ UTILS
+    // UTILS
     // ---------------------------
-    private fun maskMrz(raw: String): String {
-        return if (raw.length > 10) {
-            raw.substring(0, 5) + "***" + raw.substring(raw.length - 5)
-        } else {
-            "***"
-        }
-    }
+    private fun maskMrz(raw: String): String =
+        if (raw.length > 10) raw.take(5) + "***" + raw.takeLast(5) else "***"
 
     private fun debugSnapshot(data: ByteArray) {
-        val sha256 = MessageDigest.getInstance("SHA-256")
-            .digest(data)
+        val sha256 = MessageDigest.getInstance("SHA-256").digest(data)
             .joinToString("") { "%02x".format(it) }
 
         Log.d(TAG, "====== SNAPSHOT ======")

@@ -14,6 +14,7 @@ import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.example.zkpapp.security.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -21,10 +22,12 @@ import kotlinx.coroutines.withContext
 class PassportActivity : AppCompatActivity() {
 
     // ============================
-    // STATE & NFC
+    // NFC
     // ============================
     private var nfcAdapter: NfcAdapter? = null
-    private var scannedMrz: String? = null
+
+    // 🔐 Central secure session
+    private var session = PassportSession()
 
     // ============================
     // UI ELEMENTS
@@ -36,27 +39,32 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var simButton: Button
 
     // ============================
-    // MODERN CAMERA RESULT API
+    // CAMERA RESULT (MRZ → SESSION)
     // ============================
     private val cameraLauncher =
         registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            if (result.resultCode == RESULT_OK) {
-                val mrz = result.data?.getStringExtra("MRZ_DATA")
-                if (!mrz.isNullOrBlank()) {
-                    scannedMrz = mrz.trim()
+            if (result.resultCode != RESULT_OK) return@registerForActivityResult
 
-                    Log.d("PassportActivity", "MRZ captured: $mrz")
+            val rawMrz = result.data?.getStringExtra("MRZ_DATA") ?: return@registerForActivityResult
 
-                    mrzInfoText.text = "✅ MRZ CAPTURED\n$mrz"
-                    mrzInfoText.setTextColor(Color.parseColor("#0A7D00")) // Dark Green
-                    mrzInfoText.visibility = View.VISIBLE
+            val mrzInfo = MrzInfo(
+                raw = rawMrz,
+                documentNumber = rawMrz.take(9),
+                dateOfBirth = "UNKNOWN",
+                expiryDate = "UNKNOWN"
+            )
 
-                    statusText.text = "Now hold passport against back of phone (NFC)"
-                    Toast.makeText(this, "MRZ Saved! Ready for NFC.", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(this, "MRZ not detected", Toast.LENGTH_SHORT).show()
-                }
-            }
+            session = PassportSession(
+                mrzInfo = mrzInfo,
+                state = SessionState.NFC_READY
+            )
+
+            mrzInfoText.text = "✅ MRZ CAPTURED\n${mrzInfo.raw}"
+            mrzInfoText.setTextColor(Color.parseColor("#0A7D00"))
+            mrzInfoText.visibility = View.VISIBLE
+
+            statusText.text = "Now hold passport against back of phone (NFC)"
+            Toast.makeText(this, "MRZ validated. NFC unlocked.", Toast.LENGTH_SHORT).show()
         }
 
     // ============================
@@ -69,16 +77,14 @@ class PassportActivity : AppCompatActivity() {
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         if (nfcAdapter == null) {
             statusText.text = "⚠️ NFC not supported (Simulation only)"
-            camButton.isEnabled = false // Disable camera if no NFC (optional)
+            camButton.isEnabled = false
         }
     }
 
     override fun onResume() {
         super.onResume()
         nfcAdapter?.let {
-            val intent = Intent(this, javaClass).apply {
-                addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
+            val intent = Intent(this, javaClass).apply { addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP) }
             val pendingIntent = PendingIntent.getActivity(
                 this,
                 0,
@@ -95,42 +101,46 @@ class PassportActivity : AppCompatActivity() {
     }
 
     // ============================
-    // NFC HANDLING (REAL MODE)
+    // NFC HANDLING (SECURE GATED)
     // ============================
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
 
-        // Rule: MRZ must be scanned first
-        if (scannedMrz == null) {
-            Toast.makeText(this, "⚠️ Please Scan MRZ First!", Toast.LENGTH_LONG).show()
-            statusText.text = "❌ SCAN MRZ FIRST\nPassport logic needs MRZ to unlock chip."
+        if (!SecurityGate.canStartNfc(session)) {
+            Toast.makeText(this, "Scan MRZ first", Toast.LENGTH_LONG).show()
+            statusText.text = "❌ MRZ REQUIRED BEFORE NFC"
             return
         }
 
-        if (intent.action != NfcAdapter.ACTION_TECH_DISCOVERED &&
-            intent.action != NfcAdapter.ACTION_TAG_DISCOVERED
+        if (intent.action !in listOf(
+                NfcAdapter.ACTION_TECH_DISCOVERED,
+                NfcAdapter.ACTION_TAG_DISCOVERED
+            )
         ) return
 
         val tag: Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-        if (tag == null) return
-        
-        val isoDep = IsoDep.get(tag)
+        val isoDep = tag?.let { IsoDep.get(it) }
 
         if (isoDep == null) {
-            statusText.text = "❌ Not a passport chip (IsoDep missing)"
+            statusText.text = "❌ Not a passport chip"
             return
         }
 
-        statusText.text = "🔄 NFC Connected. Starting Engine..."
-        
-        // Pass the scanned MRZ to the engine
+        session = session.copy(state = SessionState.READING)
+        statusText.text = "🔄 NFC Connected. Reading passport..."
         startEngine(PassportMode.REAL, isoDep)
     }
 
     // ============================
-    // SIMULATION
+    // SIMULATION (LOCKED BY GATE)
     // ============================
     private fun runSimulation() {
+        if (!SecurityGate.canSimulate(session)) {
+            Toast.makeText(this, "Simulation disabled after MRZ scan", Toast.LENGTH_LONG).show()
+            return
+        }
+
+        session = PassportSession() // Reset to IDLE
         startEngine(PassportMode.SIMULATION, null)
     }
 
@@ -144,22 +154,20 @@ class PassportActivity : AppCompatActivity() {
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                // Ensure PassportEngine accepts 'mrz' in constructor
                 val engine = PassportEngine(
                     mode = mode,
                     isoDep = isoDep,
-                    mrz = scannedMrz // Passing the MRZ
+                    mrz = session.mrzInfo?.raw
                 )
 
                 val data = engine.start()
 
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
+                    session = session.copy(state = SessionState.DONE)
+
                     statusText.text =
-                        "✅ READ COMPLETE\n" +
-                        "Mode: $mode\n" +
-                        "Bytes Read: ${data.size}\n" +
-                        "State: ${engine.state}"
+                        "✅ READ COMPLETE\nMode: $mode\nBytes Read: ${data.size}\nState: ${engine.state}"
 
                     camButton.isEnabled = true
                     simButton.isEnabled = true
@@ -169,6 +177,8 @@ class PassportActivity : AppCompatActivity() {
                 Log.e("PassportActivity", "Engine error", e)
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
+                    session = session.copy(state = SessionState.ERROR)
+
                     statusText.text = "❌ ERROR: ${e.message}"
                     camButton.isEnabled = true
                     simButton.isEnabled = true
@@ -178,7 +188,7 @@ class PassportActivity : AppCompatActivity() {
     }
 
     // ============================
-    // UI SETUP (PROGRAMMATIC)
+    // UI SETUP
     // ============================
     private fun setupUI() {
         val layout = LinearLayout(this).apply {
@@ -210,27 +220,18 @@ class PassportActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 40)
         }
 
-        progressBar = ProgressBar(this).apply {
-            visibility = View.GONE
-            setPadding(0, 0, 0, 40)
-        }
+        progressBar = ProgressBar(this).apply { visibility = View.GONE }
 
         camButton = Button(this).apply {
             text = "📷 SCAN PASSPORT (MRZ)"
             setBackgroundColor(Color.parseColor("#6200EE"))
             setTextColor(Color.WHITE)
             setOnClickListener {
-                // Launch Camera using new API
-                cameraLauncher.launch(
-                    Intent(this@PassportActivity, CameraActivity::class.java)
-                )
+                cameraLauncher.launch(Intent(this@PassportActivity, CameraActivity::class.java))
             }
         }
 
-        // Spacer
-        val spacer = View(this).apply { 
-            layoutParams = LinearLayout.LayoutParams(1, 40) 
-        }
+        val spacer = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, 40) }
 
         simButton = Button(this).apply {
             text = "🧪 SIMULATE SCAN"
