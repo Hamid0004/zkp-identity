@@ -1,9 +1,13 @@
 package com.example.zkpapp
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.OptIn
@@ -19,13 +23,18 @@ import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class CameraActivity : AppCompatActivity() {
 
     private lateinit var viewFinder: PreviewView
     private lateinit var cameraExecutor: ExecutorService
     private lateinit var recognizer: TextRecognizer
-    private var isScanning = true // Simple boolean lock
+    private var cameraProvider: ProcessCameraProvider? = null
+
+    // ✅ Thread Safety & Throttle
+    private val scanLocked = AtomicBoolean(false)
+    private var lastProcessingTime = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -33,24 +42,32 @@ class CameraActivity : AppCompatActivity() {
 
         viewFinder = findViewById(R.id.viewFinder)
         cameraExecutor = Executors.newSingleThreadExecutor()
+
+        // ✅ Initialize ML Kit
         recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
 
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+        if (hasCameraPermission()) {
             startCamera()
         } else {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 100)
+            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 101)
         }
     }
 
     private fun startCamera() {
-        val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
+        val providerFuture = ProcessCameraProvider.getInstance(this)
 
-        cameraProviderFuture.addListener({
-            val cameraProvider = cameraProviderFuture.get()
-            val preview = Preview.Builder().build().also { it.setSurfaceProvider(viewFinder.surfaceProvider) }
+        providerFuture.addListener({
+            cameraProvider = providerFuture.get()
 
-            val imageAnalyzer = ImageAnalysis.Builder()
+            val preview = Preview.Builder()
+                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
+                .build()
+                .also { it.setSurfaceProvider(viewFinder.surfaceProvider) }
+
+            // ✅ Analysis Setup
+            val analyzer = ImageAnalysis.Builder()
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                 .build()
                 .also {
                     it.setAnalyzer(cameraExecutor) { imageProxy ->
@@ -59,58 +76,126 @@ class CameraActivity : AppCompatActivity() {
                 }
 
             try {
-                cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(this, CameraSelector.DEFAULT_BACK_CAMERA, preview, imageAnalyzer)
+                cameraProvider?.unbindAll()
+                cameraProvider?.bindToLifecycle(
+                    this,
+                    CameraSelector.DEFAULT_BACK_CAMERA,
+                    preview,
+                    analyzer
+                )
             } catch (e: Exception) {
-                Log.e("CameraActivity", "Binding failed", e)
+                Log.e("CameraActivity", "Camera Binding Failed", e)
             }
         }, ContextCompat.getMainExecutor(this))
     }
 
     @OptIn(ExperimentalGetImage::class)
     private fun processImageProxy(imageProxy: ImageProxy) {
-        val mediaImage = imageProxy.image
-        if (mediaImage != null && isScanning) {
-            val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+        val currentTime = System.currentTimeMillis()
 
-            recognizer.process(image)
-                .addOnSuccessListener { visionText ->
-                    val text = visionText.text
-                    
-                    // 👇 SUPER SENSITIVE CHECK (Sirf "P<" dhundega)
-                    if (text.contains("P<")) {
-                        Log.d("CameraActivity", "Potential MRZ Found: $text")
-                        
-                        // Line by line check
-                        val lines = text.split("\n")
-                        for (line in lines) {
-                            // Agar line mein P< hai aur wo thodi lambi hai (20 chars bhi chalega ab)
-                            if (line.contains("P<") && line.length > 20) {
-                                confirmScan(text) // Poora text bhej do
-                                break
-                            }
-                        }
-                    }
-                }
-                .addOnCompleteListener { imageProxy.close() }
-        } else {
+        // ⏱ Throttle: 600ms delay to keep device cool
+        if (scanLocked.get() || (currentTime - lastProcessingTime < 600)) {
             imageProxy.close()
+            return
+        }
+
+        val mediaImage = imageProxy.image ?: return
+        lastProcessingTime = currentTime
+
+        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+
+        recognizer.process(image)
+            .addOnSuccessListener { visionText ->
+                // Extract Logic
+                val mrz = extractAndCleanMrz(visionText.text)
+
+                if (mrz != null && scanLocked.compareAndSet(false, true)) {
+                    performSuccessFeedback() // 📳 Vibrate
+                    deliverFinalResult(mrz)
+                }
+            }
+            .addOnCompleteListener { imageProxy.close() }
+    }
+
+    // --------------------------------------------------
+    // 🧠 SMART MRZ FINDER (Real Passport Logic)
+    // --------------------------------------------------
+    private fun extractAndCleanMrz(text: String): String? {
+        val rawLines = text.uppercase().lines()
+
+        // Step 1: Filter lines that are "Passport-ish" (contain '<' and long enough)
+        val validLines = rawLines.map { line ->
+            line.replace(" ", "").trim()
+        }.filter { it.length > 30 && it.contains("<") }
+
+        if (validLines.size < 2) return null
+
+        // Step 2: Smart Search Loop
+        // Hum "Aakhri 2 lines" par depend nahi karenge. Hum poore text mein dhundenge.
+        for (i in 0 until validLines.size - 1) {
+            val line1 = cleanOcrNoise(validLines[i])
+            val line2 = cleanOcrNoise(validLines[i + 1])
+
+            // ✅ STRICT CHECK:
+            // 1. Line 1 starts with "P<"
+            // 2. Both lines are exactly 44 characters
+            if (line1.startsWith("P<") && line1.length == 44 && line2.length == 44) {
+                Log.d("CameraActivity", "MRZ Found: \n$line1\n$line2")
+                return "$line1\n$line2"
+            }
+        }
+
+        return null
+    }
+
+    // 🧹 Cleaning common OCR mistakes (e.g. '[' instead of '<')
+    private fun cleanOcrNoise(line: String): String {
+        return line.replace("(", "<")
+            .replace("[", "<")
+            .replace("{", "<")
+            .replace("}", "<")
+            .replace("]", "<")
+            .replace("«", "<")
+    }
+
+    // 📳 Haptic Feedback (Vibration)
+    private fun performSuccessFeedback() {
+        try {
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(100, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                v.vibrate(100)
+            }
+        } catch (e: Exception) {
+            // Ignore if vibration fails
         }
     }
 
-    private fun confirmScan(mrzData: String) {
-        isScanning = false
+    private fun deliverFinalResult(mrz: String) {
         runOnUiThread {
-            Toast.makeText(this, "✅ SCAN SUCCESS!", Toast.LENGTH_SHORT).show()
-            val intent = Intent()
-            intent.putExtra("MRZ_DATA", mrzData)
-            setResult(RESULT_OK, intent)
+            Toast.makeText(this, "✅ Passport MRZ Locked", Toast.LENGTH_SHORT).show()
+
+            // Stop camera immediately
+            cameraProvider?.unbindAll()
+
+            val resultIntent = Intent()
+            resultIntent.putExtra("MRZ_DATA", mrz)
+            setResult(RESULT_OK, resultIntent)
             finish()
         }
     }
 
+    // --------------------------------------------------
+    // 🛡️ PERMISSIONS & CLEANUP
+    // --------------------------------------------------
+    private fun hasCameraPermission() = ContextCompat.checkSelfPermission(
+        this, Manifest.permission.CAMERA
+    ) == PackageManager.PERMISSION_GRANTED
+
     override fun onDestroy() {
         super.onDestroy()
         cameraExecutor.shutdown()
+        recognizer.close()
     }
 }
