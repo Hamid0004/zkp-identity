@@ -3,7 +3,13 @@ package com.example.zkpapp
 import android.nfc.tech.IsoDep
 import android.util.Log
 import kotlinx.coroutines.delay
-import java.security.MessageDigest
+import net.sf.scuba.smartcards.CardService
+import org.jmrtd.BACKeySpec
+import org.jmrtd.PassportService
+import org.jmrtd.lds.icao.DG1File
+import java.io.InputStream
+import java.security.Security
+import org.spongycastle.jce.provider.BouncyCastleProvider
 
 // ---------------------------
 // ENUMS & STATES
@@ -21,7 +27,7 @@ sealed class PassportState {
 }
 
 // ---------------------------
-// PASSPORT ENGINE
+// PASSPORT ENGINE (THE BRAIN)
 // ---------------------------
 class PassportEngine(
     private val mode: PassportMode,
@@ -31,26 +37,24 @@ class PassportEngine(
 
     companion object {
         private const val TAG = "PassportEngine"
-        private const val DEBUG = true
+        
+        // ✅ IMPORTANT: Crypto Provider Load karna zaroori hai
+        init {
+            Security.insertProviderAt(BouncyCastleProvider(), 1)
+        }
     }
 
     var state: PassportState = PassportState.IDLE
         private set
 
-    // ---------------------------
-    // START ENGINE (SUSPEND)
-    // ---------------------------
     suspend fun start(): ByteArray {
         state = PassportState.CONNECTING
 
         return try {
-            val output = when (mode) {
+            when (mode) {
                 PassportMode.REAL -> connectRealChip()
                 PassportMode.SIMULATION -> simulateChip()
             }
-
-            if (DEBUG) debugSnapshot(output)
-            output
         } catch (e: Exception) {
             state = PassportState.ERROR(e.message ?: "Unknown error")
             Log.e(TAG, "ENGINE ERROR", e)
@@ -59,63 +63,61 @@ class PassportEngine(
     }
 
     // ---------------------------
-    // REAL NFC FLOW
+    // 📲 REAL NFC FLOW (Asli Passport ke liye)
     // ---------------------------
     private suspend fun connectRealChip(): ByteArray {
         requireNotNull(isoDep) { "IsoDep required for REAL mode" }
-        requireNotNull(mrz) { throw Exception("MRZ required for REAL mode") }
+        requireNotNull(mrz) { "MRZ Data required for keys" }
 
-        // 1️⃣ Analyze MRZ
+        // 1. MRZ se Key banao
         state = PassportState.ANALYZING_MRZ
-        Log.d(TAG, "Using MRZ for BAC: ${maskMrz(mrz)}")
+        // Note: MrzUtil file humne pehle banayi thi, yeh wahan se key le raha hai
+        val bacKey: BACKeySpec = MrzUtil.extractBacKey(mrz) 
+            ?: throw Exception("Invalid MRZ Data. Cannot create key.")
+        
+        // 2. Chip se Connect Karo
+        isoDep.timeout = 10000 // 10 seconds timeout
+        val cardService = CardService.getInstance(isoDep)
+        cardService.open()
 
-        // 2️⃣ Connect to Passport Chip
-        isoDep.timeout = 5000
-        isoDep.connect()
+        // 3. Passport Service Start
+        val service = PassportService(cardService, 256, 224)
+        service.open()
 
-        // 3️⃣ Ping Chip
-        if (!pingChip()) {
-            isoDep.close()
-            throw Exception("Passport chip detected but not responding (APDU failed)")
-        }
-
-        // 4️⃣ BAC Authentication Placeholder
-        state = PassportState.BAC_AUTH
-        // TODO: implement BAC using JMRTD library
-        delay(300) // simulate authentication
-
-        // 5️⃣ Read Data
-        state = PassportState.READING
-        val data = readDummyData() // Replace with actual passport file reading
-        isoDep.close()
-        state = PassportState.DONE
-        return data
-    }
-
-    private fun pingChip(): Boolean {
-        val apdu = byteArrayOf(0x00, 0xA4.toByte(), 0x00, 0x0C, 0x02, 0x3F, 0x00)
-
-        return try {
-            val response = isoDep!!.transceive(apdu)
-            val sw1 = response[response.size - 2]
-            val sw2 = response[response.size - 1]
-            sw1 == 0x90.toByte() && sw2 == 0x00.toByte()
+        var paceSucceeded = false
+        try {
+            // 4. Unlock the Chip (BAC)
+            state = PassportState.BAC_AUTH
+            service.sendSelectApplet(paceSucceeded)
+            service.doBAC(bacKey)
+            Log.d(TAG, "✅ BAC Authentication Success!")
         } catch (e: Exception) {
-            Log.e(TAG, "Ping failed", e)
-            false
+            Log.w(TAG, "BAC Failed", e)
+            throw Exception("Access Denied: Please hold passport still.")
         }
-    }
 
-    private fun readDummyData(): ByteArray {
-        // 1KB dummy data for now
-        return ByteArray(1024) { (it % 256).toByte() }
+        // 5. Data Read (DG1 File - Name/DocNum)
+        state = PassportState.READING
+        
+        var inputStream: InputStream = service.getInputStream(PassportService.EF_DG1)
+        val dg1 = DG1File(inputStream)
+        
+        val name = dg1.mrzInfo.secondaryIdentifier.replace("<", " ").trim()
+        val passportNum = dg1.mrzInfo.documentNumber
+        
+        state = PassportState.DONE
+        
+        // ✅ Return Valid Format
+        return "SUCCESS|$name|$passportNum".toByteArray()
     }
 
     // ---------------------------
-    // SIMULATION FLOW
+    // 🧪 SIMULATION FLOW (Jugaad for Testing)
     // ---------------------------
     private suspend fun simulateChip(): ByteArray {
         Log.d(TAG, "Starting Simulation...")
+        
+        // Fake Delays to mimic real process
         state = PassportState.ANALYZING_MRZ
         delay(600)
 
@@ -126,22 +128,11 @@ class PassportEngine(
         delay(1000)
 
         state = PassportState.DONE
-        return ByteArray(1024) { 0xAA.toByte() }
-    }
-
-    // ---------------------------
-    // UTILS
-    // ---------------------------
-    private fun maskMrz(raw: String): String =
-        if (raw.length > 10) raw.take(5) + "***" + raw.takeLast(5) else "***"
-
-    private fun debugSnapshot(data: ByteArray) {
-        val sha256 = MessageDigest.getInstance("SHA-256").digest(data)
-            .joinToString("") { "%02x".format(it) }
-
-        Log.d(TAG, "====== SNAPSHOT ======")
-        Log.d(TAG, "State   : $state")
-        Log.d(TAG, "SHA-256 : $sha256")
-        Log.d(TAG, "======================")
+        
+        // ✅ THE FIX: Yahan ab hum SAHI FORMAT bhej rahe hain
+        // Pehle yahan '0xAA' bytes they jo error de rahe they.
+        val fakeData = "SIMULATION|TEST USER|PK1234567"
+        
+        return fakeData.toByteArray()
     }
 }
