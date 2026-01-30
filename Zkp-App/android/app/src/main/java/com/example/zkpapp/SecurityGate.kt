@@ -1,49 +1,36 @@
-package com.example.zkpapp.security
+package com.example.zkpapp
 
-import android.util.Log
-import com.example.zkpapp.PassportData
-import com.example.zkpapp.PassportSession
-import com.example.zkpapp.SessionState
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
 
-object SecurityGate {
-
-    // ---------------------------
-    // Can user start camera?
-    // ---------------------------
-    fun canScanMrz(session: PassportSession): Boolean {
-        return session.state == SessionState.IDLE
-    }
-
-    // ---------------------------
-    // Can NFC start?
-    // Requires MRZ first
-    // ---------------------------
-    fun canStartNfc(session: PassportSession): Boolean {
-        return session.state == SessionState.NFC_READY &&
-               session.mrzInfo != null
-    }
-
-    // ---------------------------
-    // Can simulation run?
-    // Only allowed before MRZ scan
-    // ---------------------------
-    fun canSimulate(session: PassportSession): Boolean {
-        return session.state == SessionState.IDLE
-    }
-
-    // ---------------------------
-    // Can reading begin?
-    // ---------------------------
-    fun canReadPassport(session: PassportSession): Boolean {
-        return session.state == SessionState.NFC_READY
-    }
-
-    // ---------------------------
-    // ✅ FIX 2: Send Data to Rust (Placeholder)
-    // ---------------------------
-    fun sendToRustForProof(data: PassportData) {
-        Log.d("SecurityGate", "🚀 Sending Passport Data to Rust Layer...")
-        Log.d("SecurityGate", "Doc: ${data.documentNumber}, Name: ${data.firstName}")
-        // Phase 7 mein yahan asli JNI call aayegi
-    }
+// ---------------------------
+// 1️⃣ SESSION STATES (STRICT FLOW)
+// ---------------------------
+enum class SessionState {
+    IDLE,           // App abhi khuli hai
+    MRZ_SCANNED,    // Camera ne MRZ scan kar liya
+    NFC_READY,      // Chip scan ke liye taiyar
+    READING,        // Chip se data padha ja raha hai
+    DONE,           // Sab kuch mukammal ho gaya
+    ERROR           // Koi galti ho gayi
 }
+
+// ---------------------------
+// 2️⃣ MRZ DATA HOLDER (Parcelable)
+// ---------------------------
+@Parcelize
+data class MrzInfo(
+    val raw: String,
+    val documentNumber: String,
+    val dateOfBirth: String,
+    val expiryDate: String
+) : Parcelable
+
+// ---------------------------
+// 3️⃣ SESSION CONTAINER (Parcelable)
+// ---------------------------
+@Parcelize
+data class PassportSession(
+    val mrzInfo: MrzInfo? = null,
+    val state: SessionState = SessionState.IDLE
+) : Parcelable
