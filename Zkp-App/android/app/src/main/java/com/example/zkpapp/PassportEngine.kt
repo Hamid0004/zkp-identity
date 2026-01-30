@@ -11,9 +11,6 @@ import java.io.InputStream
 import java.security.Security
 import org.spongycastle.jce.provider.BouncyCastleProvider
 
-// ---------------------------
-// ENUMS & STATES
-// ---------------------------
 enum class PassportMode { REAL, SIMULATION }
 
 sealed class PassportState {
@@ -26,9 +23,6 @@ sealed class PassportState {
     data class ERROR(val reason: String) : PassportState()
 }
 
-// ---------------------------
-// PASSPORT ENGINE (THE BRAIN)
-// ---------------------------
 class PassportEngine(
     private val mode: PassportMode,
     private val isoDep: IsoDep?,
@@ -37,8 +31,7 @@ class PassportEngine(
 
     companion object {
         private const val TAG = "PassportEngine"
-        
-        // ✅ IMPORTANT: Crypto Provider Load karna zaroori hai
+
         init {
             Security.insertProviderAt(BouncyCastleProvider(), 1)
         }
@@ -62,77 +55,78 @@ class PassportEngine(
         }
     }
 
-    // ---------------------------
-    // 📲 REAL NFC FLOW (Asli Passport ke liye)
-    // ---------------------------
+    // =====================================================
+    // 🛂 REAL NFC PASSPORT FLOW
+    // =====================================================
     private suspend fun connectRealChip(): ByteArray {
         requireNotNull(isoDep) { "IsoDep required for REAL mode" }
-        requireNotNull(mrz) { "MRZ Data required for keys" }
+        requireNotNull(mrz) { "MRZ Data required for BAC keys" }
 
-        // 1. MRZ se Key banao
         state = PassportState.ANALYZING_MRZ
-        // Note: MrzUtil file humne pehle banayi thi, yeh wahan se key le raha hai
-        val bacKey: BACKeySpec = MrzUtil.extractBacKey(mrz) 
-            ?: throw Exception("Invalid MRZ Data. Cannot create key.")
-        
-        // 2. Chip se Connect Karo
-        isoDep.timeout = 10000 // 10 seconds timeout
+        val bacKey: BACKeySpec = MrzUtil.extractBacKey(mrz)
+            ?: throw Exception("Invalid MRZ → Cannot derive BAC key")
+
+        isoDep.timeout = 10_000
+
         val cardService = CardService.getInstance(isoDep)
-        cardService.open()
+        val service = PassportService(
+            cardService,
+            PassportService.NORMAL_MAX_TRANCEIVE_LENGTH,
+            PassportService.DEFAULT_MAX_BLOCKSIZE,
+            false,
+            false
+        )
 
-        // 3. Passport Service Start
-        val service = PassportService(cardService, 256, 224)
-        service.open()
-
-        var paceSucceeded = false
         try {
-            // 4. Unlock the Chip (BAC)
-            state = PassportState.BAC_AUTH
-            service.sendSelectApplet(paceSucceeded)
-            service.doBAC(bacKey)
-            Log.d(TAG, "✅ BAC Authentication Success!")
-        } catch (e: Exception) {
-            Log.w(TAG, "BAC Failed", e)
-            throw Exception("Access Denied: Please hold passport still.")
-        }
+            // 📡 Open connection layers
+            cardService.open()
+            service.open()
 
-        // 5. Data Read (DG1 File - Name/DocNum)
-        state = PassportState.READING
-        
-        var inputStream: InputStream = service.getInputStream(PassportService.EF_DG1)
-        val dg1 = DG1File(inputStream)
-        
-        val name = dg1.mrzInfo.secondaryIdentifier.replace("<", " ").trim()
-        val passportNum = dg1.mrzInfo.documentNumber
-        
-        state = PassportState.DONE
-        
-        // ✅ Return Valid Format
-        return "SUCCESS|$name|$passportNum".toByteArray()
+            // 🔐 BAC Authentication
+            state = PassportState.BAC_AUTH
+            service.sendSelectApplet(false)
+            service.doBAC(bacKey)
+            Log.d(TAG, "✅ BAC Authentication Success")
+
+            // 📖 Read DG1 (MRZ info stored on chip)
+            state = PassportState.READING
+            val dg1Stream: InputStream = service.getInputStream(PassportService.EF_DG1)
+            val dg1 = DG1File(dg1Stream)
+
+            val name = dg1.mrzInfo.secondaryIdentifier.replace("<", " ").trim()
+            val passportNum = dg1.mrzInfo.documentNumber
+
+            state = PassportState.DONE
+
+            return "SUCCESS|$name|$passportNum".toByteArray(Charsets.UTF_8)
+
+        } catch (e: Exception) {
+            Log.e(TAG, "❌ NFC/BAC Failure", e)
+            throw Exception("Access Denied: Keep passport steady on phone.")
+        } finally {
+            try { service.close() } catch (_: Exception) {}
+            try { cardService.close() } catch (_: Exception) {}
+            try { isoDep.close() } catch (_: Exception) {}
+        }
     }
 
-    // ---------------------------
-    // 🧪 SIMULATION FLOW (Jugaad for Testing)
-    // ---------------------------
+    // =====================================================
+    // 🧪 SIMULATION MODE
+    // =====================================================
     private suspend fun simulateChip(): ByteArray {
-        Log.d(TAG, "Starting Simulation...")
-        
-        // Fake Delays to mimic real process
+        Log.d(TAG, "Starting Simulation Flow")
+
         state = PassportState.ANALYZING_MRZ
-        delay(600)
+        delay(500)
 
         state = PassportState.BAC_AUTH
-        delay(800)
+        delay(700)
 
         state = PassportState.READING
-        delay(1000)
+        delay(900)
 
         state = PassportState.DONE
-        
-        // ✅ THE FIX: Yahan ab hum SAHI FORMAT bhej rahe hain
-        // Pehle yahan '0xAA' bytes they jo error de rahe they.
-        val fakeData = "SIMULATION|TEST USER|PK1234567"
-        
-        return fakeData.toByteArray()
+
+        return "SIMULATION|TEST USER|PK1234567".toByteArray(Charsets.UTF_8)
     }
 }
