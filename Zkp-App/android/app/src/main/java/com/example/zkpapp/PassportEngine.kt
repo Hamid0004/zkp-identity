@@ -1,5 +1,6 @@
 package com.example.zkpapp
 
+import android.graphics.*
 import android.nfc.tech.IsoDep
 import android.util.Log
 import kotlinx.coroutines.delay
@@ -7,9 +8,10 @@ import net.sf.scuba.smartcards.CardService
 import org.jmrtd.BACKeySpec
 import org.jmrtd.PassportService
 import org.jmrtd.lds.icao.DG1File
-import java.io.InputStream
-import java.security.Security
+import org.jmrtd.lds.icao.DG2File
 import org.spongycastle.jce.provider.BouncyCastleProvider
+import java.io.ByteArrayOutputStream
+import java.security.Security
 
 enum class PassportMode { REAL, SIMULATION }
 
@@ -33,6 +35,7 @@ class PassportEngine(
         private const val TAG = "PassportEngine"
 
         init {
+            Security.removeProvider("BC")
             Security.insertProviderAt(BouncyCastleProvider(), 1)
         }
     }
@@ -40,7 +43,7 @@ class PassportEngine(
     var state: PassportState = PassportState.IDLE
         private set
 
-    suspend fun start(): ByteArray {
+    suspend fun start(): PassportData {
         state = PassportState.CONNECTING
 
         return try {
@@ -50,23 +53,24 @@ class PassportEngine(
             }
         } catch (e: Exception) {
             state = PassportState.ERROR(e.message ?: "Unknown error")
-            Log.e(TAG, "ENGINE ERROR", e)
+            Log.e(TAG, "❌ ENGINE FAILURE", e)
             throw e
         }
     }
 
     // =====================================================
-    // 🛂 REAL NFC PASSPORT FLOW
+    // 🛂 REAL PASSPORT NFC FLOW
     // =====================================================
-    private suspend fun connectRealChip(): ByteArray {
-        requireNotNull(isoDep) { "IsoDep required for REAL mode" }
-        requireNotNull(mrz) { "MRZ Data required for BAC keys" }
+    private suspend fun connectRealChip(): PassportData {
+        requireNotNull(isoDep) { "IsoDep missing" }
+        require(!mrz.isNullOrBlank()) { "MRZ missing" }
 
         state = PassportState.ANALYZING_MRZ
-        val bacKey: BACKeySpec = MrzUtil.extractBacKey(mrz)
-            ?: throw Exception("Invalid MRZ → Cannot derive BAC key")
+        val bacKey: BACKeySpec = MrzUtil.extractBacKey(mrz!!)
+            ?: throw Exception("MRZ parsing failed")
 
-        isoDep.timeout = 10_000
+        isoDep.timeout = 8000
+        if (!isoDep.isConnected) isoDep.connect()
 
         val cardService = CardService.getInstance(isoDep)
         val service = PassportService(
@@ -78,55 +82,104 @@ class PassportEngine(
         )
 
         try {
-            // 📡 Open connection layers
             cardService.open()
             service.open()
 
-            // 🔐 BAC Authentication
             state = PassportState.BAC_AUTH
             service.sendSelectApplet(false)
-            service.doBAC(bacKey)
-            Log.d(TAG, "✅ BAC Authentication Success")
 
-            // 📖 Read DG1 (MRZ info stored on chip)
+            try {
+                service.doBAC(bacKey)
+                Log.d(TAG, "✅ BAC success")
+            } catch (e: Exception) {
+                throw Exception("BAC authentication failed — wrong MRZ or weak NFC signal")
+            }
+
             state = PassportState.READING
-            val dg1Stream: InputStream = service.getInputStream(PassportService.EF_DG1)
-            val dg1 = DG1File(dg1Stream)
 
-            val name = dg1.mrzInfo.secondaryIdentifier.replace("<", " ").trim()
-            val passportNum = dg1.mrzInfo.documentNumber
+            // ---------- DG1 TEXT ----------
+            val dg1 = DG1File(service.getInputStream(PassportService.EF_DG1))
+            val info = dg1.mrzInfo
+
+            val firstName = info.secondaryIdentifier.replace("<", " ").trim()
+            val lastName = info.primaryIdentifier.replace("<", " ").trim()
+
+            // ---------- DG2 PHOTO ----------
+            var faceBitmap: Bitmap? = null
+            try {
+                val dg2 = DG2File(service.getInputStream(PassportService.EF_DG2))
+                val faceInfos = dg2.faceInfos
+
+                if (faceInfos.isNotEmpty()) {
+                    val imageStream = faceInfos[0].imageInputStream
+                    val rawBytes = imageStream.readBytes()
+
+                    // Memory safe decode
+                    val options = BitmapFactory.Options().apply {
+                        inPreferredConfig = Bitmap.Config.RGB_565
+                        inSampleSize = 2
+                    }
+                    faceBitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, options)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ Photo read failed: ${e.message}")
+            }
 
             state = PassportState.DONE
 
-            return "SUCCESS|$name|$passportNum".toByteArray(Charsets.UTF_8)
+            return PassportData(
+                firstName = firstName,
+                lastName = lastName,
+                gender = info.gender.toString(),
+                documentNumber = info.documentNumber,
+                dateOfBirth = info.dateOfBirth,
+                expiryDate = info.dateOfExpiry,
+                facePhoto = faceBitmap
+            )
 
-        } catch (e: Exception) {
-            Log.e(TAG, "❌ NFC/BAC Failure", e)
-            throw Exception("Access Denied: Keep passport steady on phone.")
         } finally {
             try { service.close() } catch (_: Exception) {}
             try { cardService.close() } catch (_: Exception) {}
-            try { isoDep.close() } catch (_: Exception) {}
+            try { if (isoDep.isConnected) isoDep.close() } catch (_: Exception) {}
         }
     }
 
     // =====================================================
     // 🧪 SIMULATION MODE
     // =====================================================
-    private suspend fun simulateChip(): ByteArray {
-        Log.d(TAG, "Starting Simulation Flow")
-
+    private suspend fun simulateChip(): PassportData {
         state = PassportState.ANALYZING_MRZ
-        delay(500)
-
+        delay(400)
         state = PassportState.BAC_AUTH
-        delay(700)
-
+        delay(600)
         state = PassportState.READING
-        delay(900)
+        delay(800)
+
+        val width = 300
+        val height = 400
+        val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bmp)
+        canvas.drawColor(Color.LTGRAY)
+
+        val paint = Paint().apply {
+            color = Color.BLUE
+            textSize = 60f
+            textAlign = Paint.Align.CENTER
+            isAntiAlias = true
+        }
+
+        canvas.drawText("SIM USER", width / 2f, height / 2f, paint)
 
         state = PassportState.DONE
 
-        return "SIMULATION|TEST USER|PK1234567".toByteArray(Charsets.UTF_8)
+        return PassportData(
+            firstName = "TEST",
+            lastName = "USER",
+            gender = "M",
+            documentNumber = "PK1234567",
+            dateOfBirth = "950101",
+            expiryDate = "300101",
+            facePhoto = bmp
+        )
     }
 }
