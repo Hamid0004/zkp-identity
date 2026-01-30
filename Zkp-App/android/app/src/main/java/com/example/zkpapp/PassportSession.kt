@@ -1,4 +1,4 @@
-package com.example.zkpapp.security
+package com.example.zkpapp
 
 // ---------------------------
 // SESSION STATES (STRICT FLOW)
