@@ -1,31 +1,30 @@
 package com.example.zkpapp
 
-// ---------------------------
-// SESSION STATES (STRICT FLOW)
-// ---------------------------
+import android.os.Parcelable
+import kotlinx.parcelize.Parcelize
+
+// 1️⃣ Session State Enum
 enum class SessionState {
-    IDLE,           // App opened, nothing scanned
-    MRZ_SCANNED,    // Camera captured MRZ
-    NFC_READY,      // MRZ validated, ready for NFC
-    READING,        // Passport chip being read
-    DONE,           // Read + verification finished
-    ERROR           // Any failure
+    IDLE,
+    MRZ_SCANNED,
+    NFC_READY,
+    READING,
+    DONE,
+    ERROR
 }
 
-// ---------------------------
-// MRZ DATA HOLDER
-// ---------------------------
+// 2️⃣ MRZ Info Holder
+@Parcelize
 data class MrzInfo(
     val raw: String,
     val documentNumber: String,
     val dateOfBirth: String,
     val expiryDate: String
-)
+) : Parcelable
 
-// ---------------------------
-// SESSION CONTAINER
-// ---------------------------
+// 3️⃣ Main Session Holder
+@Parcelize
 data class PassportSession(
     val mrzInfo: MrzInfo? = null,
     val state: SessionState = SessionState.IDLE
-)
+) : Parcelable
