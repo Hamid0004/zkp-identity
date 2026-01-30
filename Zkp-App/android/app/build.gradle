@@ -1,19 +1,20 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
+    id 'kotlin-parcelize' // ✅ FIX 1: Parcelize Plugin Added
 }
 
 android {
     namespace 'com.example.zkpapp'
-    compileSdk 33 // ✅ Safe: Android 13
+    compileSdk 33
 
     defaultConfig {
         applicationId "com.example.zkpapp"
         minSdk 24
-        targetSdk 33 // ✅ Safe: Android 13
+        targetSdk 33
         versionCode 1
         versionName "1.0"
-        
+
         multiDexEnabled true
     }
 
@@ -23,7 +24,7 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
@@ -48,7 +49,7 @@ dependencies {
     implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"
     implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 
-    // 📷 CameraX (Downgraded to 1.2.3 to match SDK 33)
+    // 📷 CameraX
     implementation "androidx.camera:camera-core:1.2.3"
     implementation "androidx.camera:camera-camera2:1.2.3"
     implementation "androidx.camera:camera-lifecycle:1.2.3"
@@ -62,7 +63,7 @@ dependencies {
     implementation "com.google.zxing:core:3.4.1"
 
     // NFC Passport
-    implementation 'org.jmrtd:jmrtd:0.7.18'
+    implementation 'org.jmrtd:jmrtd:0.7.18' // ✅ Stable version
     implementation 'net.sf.scuba:scuba-sc-android:0.0.20'
     implementation 'com.madgag.spongycastle:prov:1.58.0.0'
 

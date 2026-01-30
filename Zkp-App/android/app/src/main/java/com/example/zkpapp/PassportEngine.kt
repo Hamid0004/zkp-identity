@@ -9,8 +9,8 @@ import org.jmrtd.BACKeySpec
 import org.jmrtd.PassportService
 import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
+import org.jmrtd.lds.iso19794.FaceImageInfo // ✅ Important Import
 import org.spongycastle.jce.provider.BouncyCastleProvider
-import java.io.ByteArrayOutputStream
 import java.security.Security
 
 enum class PassportMode { REAL, SIMULATION }
@@ -111,15 +111,12 @@ class PassportEngine(
                 val faceInfos = dg2.faceInfos
 
                 if (faceInfos.isNotEmpty()) {
-                    val imageStream = faceInfos[0].imageInputStream
-                    val rawBytes = imageStream.readBytes()
-
-                    // Memory safe decode
-                    val options = BitmapFactory.Options().apply {
-                        inPreferredConfig = Bitmap.Config.RGB_565
-                        inSampleSize = 2
-                    }
-                    faceBitmap = BitmapFactory.decodeByteArray(rawBytes, 0, rawBytes.size, options)
+                    // ✅ FIX 3: Correct Cast for Image Stream
+                    val faceInfo = faceInfos[0] as FaceImageInfo
+                    val imageLength = faceInfo.imageLength
+                    val dataInputStream = faceInfo.imageInputStream
+                    
+                    faceBitmap = BitmapFactory.decodeStream(dataInputStream)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ Photo read failed: ${e.message}")
