@@ -151,7 +151,7 @@ class PassportActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ SUCCESS
+    // ✅ SUCCESS (DAY 69 LOGIC ADDED)
     private fun handleSuccess(data: PassportData) {
         progressBar.visibility = View.GONE
         camButton.isEnabled = true
@@ -161,13 +161,21 @@ class PassportActivity : AppCompatActivity() {
 
         updateStatus("✅ PASSPORT VERIFIED", Color.parseColor("#006400"))
 
+        // 👇 GENERATE RUST JSON
+        val rustJson = data.toRustJson()
+
+        // 👇 DISPLAY ON SCREEN (DEBUGGING)
         detailsText.text = """
             Name: ${data.firstName} ${data.lastName}
             Gender: ${data.gender}
             DOB: ${data.dateOfBirth}
             Doc: ${data.documentNumber}
             Exp: ${data.expiryDate}
+            
+            👇 RUST PAYLOAD (HIDDEN):
+            $rustJson
         """.trimIndent()
+        
         detailsText.visibility = View.VISIBLE
 
         data.facePhoto?.let { bitmap ->
@@ -176,9 +184,9 @@ class PassportActivity : AppCompatActivity() {
             photoView.visibility = View.VISIBLE
         }
 
-        // 🔐 Auto wipe sensitive session after 4s
+        // 🔐 Auto wipe sensitive session after 10s (Time increased for reading)
         lifecycleScope.launch {
-            delay(4000)
+            delay(10000)
             session = PassportSession()
         }
 
