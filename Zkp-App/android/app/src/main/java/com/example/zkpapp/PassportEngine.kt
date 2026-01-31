@@ -11,7 +11,7 @@ import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
 import org.jmrtd.lds.iso19794.FaceImageInfo
 import org.spongycastle.jce.provider.BouncyCastleProvider
-import java.io.ByteArrayInputStream // ✅ Needed for stream conversion
+import java.io.ByteArrayInputStream
 import java.security.Security
 
 enum class PassportMode { REAL, SIMULATION }
@@ -60,7 +60,7 @@ class PassportEngine(
     }
 
     // =====================================================
-    // 🛂 REAL PASSPORT NFC FLOW (Day 69 Updated)
+    // 🛂 REAL PASSPORT NFC FLOW (Day 70 Updated)
     // =====================================================
     private suspend fun connectRealChip(): PassportData {
         requireNotNull(isoDep) { "IsoDep missing" }
@@ -98,38 +98,45 @@ class PassportEngine(
 
             state = PassportState.READING
 
-            // ---------- DG1 TEXT & BYTES (Day 69) ----------
-            // ZKP ke liye humein 'Raw Bytes' chahiye.
-            // Isliye hum stream ko direct parse karne ke bajaye pehle bytes mein padhenge.
-            
+            // ---------- 1. READ DG1 (DATA) ----------
             val dg1Stream = service.getInputStream(PassportService.EF_DG1)
-            val dg1RawBytes = dg1Stream.readBytes() // 🔐 RAW DATA CAPTURED HERE
-
-            // Ab in bytes se JMRTD file banayenge parsing ke liye
+            val dg1RawBytes = dg1Stream.readBytes() // 🔐 Save Raw DG1
+            
             val dg1 = DG1File(ByteArrayInputStream(dg1RawBytes))
             val info = dg1.mrzInfo
 
             val firstName = info.secondaryIdentifier.replace("<", " ").trim()
             val lastName = info.primaryIdentifier.replace("<", " ").trim()
 
-            // ---------- DG2 PHOTO ----------
+            // ---------- 2. READ DG2 (PHOTO) ----------
             var faceBitmap: Bitmap? = null
             try {
                 val dg2 = DG2File(service.getInputStream(PassportService.EF_DG2))
                 val faceInfos = dg2.faceInfos
-
                 if (faceInfos.isNotEmpty()) {
                     val faceInfo = faceInfos[0] as FaceImageInfo
-                    val dataInputStream = faceInfo.imageInputStream
-                    faceBitmap = BitmapFactory.decodeStream(dataInputStream)
+                    faceBitmap = BitmapFactory.decodeStream(faceInfo.imageInputStream)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "⚠️ Photo read failed: ${e.message}")
             }
 
+            // ---------- 3. READ SOD (SIGNATURE) - Day 70 ----------
+            // Yeh file chip mein "EF_SOD" ke naam se hoti hai.
+            // Iske andar Government ka digital signature hota hai.
+            var sodRawBytes: ByteArray? = null
+            try {
+                val sodStream = service.getInputStream(PassportService.EF_SOD)
+                sodRawBytes = sodStream.readBytes() // 🔐 Save Raw SOD
+                Log.d(TAG, "✅ SOD Read Success: ${sodRawBytes.size} bytes")
+            } catch (e: Exception) {
+                Log.w(TAG, "⚠️ SOD read failed: ${e.message}")
+                // Note: Agar SOD fail ho, tab bhi hum data return kar sakte hain,
+                // lekin ZKP proof fail ho jayega.
+            }
+
             state = PassportState.DONE
 
-            // 📦 Return Data + RAW BYTES
             return PassportData(
                 firstName = firstName,
                 lastName = lastName,
@@ -138,7 +145,8 @@ class PassportEngine(
                 dateOfBirth = info.dateOfBirth,
                 expiryDate = info.dateOfExpiry,
                 facePhoto = faceBitmap,
-                dg1Raw = dg1RawBytes // ✅ Passing Real Raw Bytes
+                dg1Raw = dg1RawBytes,
+                sodRaw = sodRawBytes // 👈 PASSING REAL SOD
             )
 
         } finally {
@@ -149,7 +157,7 @@ class PassportEngine(
     }
 
     // =====================================================
-    // 🧪 SIMULATION MODE (Day 69 Updated)
+    // 🧪 SIMULATION MODE (Day 70 Updated)
     // =====================================================
     private suspend fun simulateChip(): PassportData {
         state = PassportState.ANALYZING_MRZ
@@ -173,13 +181,18 @@ class PassportEngine(
         }
         canvas.drawText("SIM USER", width / 2f, height / 2f, paint)
 
-        // 🔐 Fake Raw Bytes (Mocking DG1 Data)
-        // Real DG1 starts with tag 0x61, length, then tag 0x5F1F...
-        // Hum bas random bytes bhej rahe hain test ke liye.
+        // 🔐 Fake DG1 Bytes
         val fakeDg1Bytes = byteArrayOf(
-            0x61.toByte(), 0x10.toByte(), // Tag + Length
-            0x5F.toByte(), 0x1F.toByte(), 0x05.toByte(), // Mock Content
-            0x48.toByte(), 0x45.toByte(), 0x4C.toByte(), 0x4C.toByte(), 0x4F.toByte() // HELLO
+            0x61.toByte(), 0x10.toByte(),
+            0x5F.toByte(), 0x1F.toByte(), 0x05.toByte(),
+            0x48.toByte(), 0x45.toByte(), 0x4C.toByte(), 0x4C.toByte(), 0x4F.toByte()
+        )
+        
+        // 🔐 Fake SOD Bytes (Mocking Signature) - Day 70
+        // Real SOD file usually starts with tag 0x77
+        val fakeSodBytes = byteArrayOf(
+            0x77.toByte(), 0x05.toByte(), // Tag + Length
+            0xAA.toByte(), 0xBB.toByte(), 0xCC.toByte(), 0xDD.toByte(), 0xEE.toByte() // Fake Signature
         )
 
         state = PassportState.DONE
@@ -192,7 +205,8 @@ class PassportEngine(
             dateOfBirth = "950101",
             expiryDate = "300101",
             facePhoto = bmp,
-            dg1Raw = fakeDg1Bytes // ✅ Passing Fake Raw Bytes
+            dg1Raw = fakeDg1Bytes,
+            sodRaw = fakeSodBytes // 👈 PASSING FAKE SOD
         )
     }
 }

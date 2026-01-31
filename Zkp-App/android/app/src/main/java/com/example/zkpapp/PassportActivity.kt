@@ -151,7 +151,7 @@ class PassportActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ SUCCESS (DAY 69 LOGIC ADDED)
+    // ✅ SUCCESS (DAY 70 UPDATE: SHOW SOD STATUS)
     private fun handleSuccess(data: PassportData) {
         progressBar.visibility = View.GONE
         camButton.isEnabled = true
@@ -161,21 +161,22 @@ class PassportActivity : AppCompatActivity() {
 
         updateStatus("✅ PASSPORT VERIFIED", Color.parseColor("#006400"))
 
-        // 👇 GENERATE RUST JSON
+        // 👇 Get JSON & SOD Size
         val rustJson = data.toRustJson()
+        val sodSize = data.sodRaw?.size ?: 0
+        val sodStatus = if (sodSize > 0) "✅ FOUND ($sodSize bytes)" else "❌ MISSING"
 
         // 👇 DISPLAY ON SCREEN (DEBUGGING)
         detailsText.text = """
             Name: ${data.firstName} ${data.lastName}
             Gender: ${data.gender}
             DOB: ${data.dateOfBirth}
-            Doc: ${data.documentNumber}
-            Exp: ${data.expiryDate}
+            SOD: $sodStatus
             
             👇 RUST PAYLOAD (HIDDEN):
             $rustJson
         """.trimIndent()
-        
+
         detailsText.visibility = View.VISIBLE
 
         data.facePhoto?.let { bitmap ->
@@ -184,7 +185,7 @@ class PassportActivity : AppCompatActivity() {
             photoView.visibility = View.VISIBLE
         }
 
-        // 🔐 Auto wipe sensitive session after 10s (Time increased for reading)
+        // 🔐 Auto wipe sensitive session after 10s
         lifecycleScope.launch {
             delay(10000)
             session = PassportSession()
