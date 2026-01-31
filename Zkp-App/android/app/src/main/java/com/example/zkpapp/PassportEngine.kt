@@ -9,8 +9,9 @@ import org.jmrtd.BACKeySpec
 import org.jmrtd.PassportService
 import org.jmrtd.lds.icao.DG1File
 import org.jmrtd.lds.icao.DG2File
-import org.jmrtd.lds.iso19794.FaceImageInfo // ✅ Important Import
+import org.jmrtd.lds.iso19794.FaceImageInfo
 import org.spongycastle.jce.provider.BouncyCastleProvider
+import java.io.ByteArrayInputStream // ✅ Needed for stream conversion
 import java.security.Security
 
 enum class PassportMode { REAL, SIMULATION }
@@ -59,7 +60,7 @@ class PassportEngine(
     }
 
     // =====================================================
-    // 🛂 REAL PASSPORT NFC FLOW
+    // 🛂 REAL PASSPORT NFC FLOW (Day 69 Updated)
     // =====================================================
     private suspend fun connectRealChip(): PassportData {
         requireNotNull(isoDep) { "IsoDep missing" }
@@ -97,8 +98,15 @@ class PassportEngine(
 
             state = PassportState.READING
 
-            // ---------- DG1 TEXT ----------
-            val dg1 = DG1File(service.getInputStream(PassportService.EF_DG1))
+            // ---------- DG1 TEXT & BYTES (Day 69) ----------
+            // ZKP ke liye humein 'Raw Bytes' chahiye.
+            // Isliye hum stream ko direct parse karne ke bajaye pehle bytes mein padhenge.
+            
+            val dg1Stream = service.getInputStream(PassportService.EF_DG1)
+            val dg1RawBytes = dg1Stream.readBytes() // 🔐 RAW DATA CAPTURED HERE
+
+            // Ab in bytes se JMRTD file banayenge parsing ke liye
+            val dg1 = DG1File(ByteArrayInputStream(dg1RawBytes))
             val info = dg1.mrzInfo
 
             val firstName = info.secondaryIdentifier.replace("<", " ").trim()
@@ -111,11 +119,8 @@ class PassportEngine(
                 val faceInfos = dg2.faceInfos
 
                 if (faceInfos.isNotEmpty()) {
-                    // ✅ FIX 3: Correct Cast for Image Stream
                     val faceInfo = faceInfos[0] as FaceImageInfo
-                    val imageLength = faceInfo.imageLength
                     val dataInputStream = faceInfo.imageInputStream
-                    
                     faceBitmap = BitmapFactory.decodeStream(dataInputStream)
                 }
             } catch (e: Exception) {
@@ -124,6 +129,7 @@ class PassportEngine(
 
             state = PassportState.DONE
 
+            // 📦 Return Data + RAW BYTES
             return PassportData(
                 firstName = firstName,
                 lastName = lastName,
@@ -131,7 +137,8 @@ class PassportEngine(
                 documentNumber = info.documentNumber,
                 dateOfBirth = info.dateOfBirth,
                 expiryDate = info.dateOfExpiry,
-                facePhoto = faceBitmap
+                facePhoto = faceBitmap,
+                dg1Raw = dg1RawBytes // ✅ Passing Real Raw Bytes
             )
 
         } finally {
@@ -142,7 +149,7 @@ class PassportEngine(
     }
 
     // =====================================================
-    // 🧪 SIMULATION MODE
+    // 🧪 SIMULATION MODE (Day 69 Updated)
     // =====================================================
     private suspend fun simulateChip(): PassportData {
         state = PassportState.ANALYZING_MRZ
@@ -152,20 +159,28 @@ class PassportEngine(
         state = PassportState.READING
         delay(800)
 
+        // 🖼️ Fake Photo
         val width = 300
         val height = 400
         val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bmp)
         canvas.drawColor(Color.LTGRAY)
-
         val paint = Paint().apply {
             color = Color.BLUE
             textSize = 60f
             textAlign = Paint.Align.CENTER
             isAntiAlias = true
         }
-
         canvas.drawText("SIM USER", width / 2f, height / 2f, paint)
+
+        // 🔐 Fake Raw Bytes (Mocking DG1 Data)
+        // Real DG1 starts with tag 0x61, length, then tag 0x5F1F...
+        // Hum bas random bytes bhej rahe hain test ke liye.
+        val fakeDg1Bytes = byteArrayOf(
+            0x61.toByte(), 0x10.toByte(), // Tag + Length
+            0x5F.toByte(), 0x1F.toByte(), 0x05.toByte(), // Mock Content
+            0x48.toByte(), 0x45.toByte(), 0x4C.toByte(), 0x4C.toByte(), 0x4F.toByte() // HELLO
+        )
 
         state = PassportState.DONE
 
@@ -176,7 +191,8 @@ class PassportEngine(
             documentNumber = "PK1234567",
             dateOfBirth = "950101",
             expiryDate = "300101",
-            facePhoto = bmp
+            facePhoto = bmp,
+            dg1Raw = fakeDg1Bytes // ✅ Passing Fake Raw Bytes
         )
     }
 }

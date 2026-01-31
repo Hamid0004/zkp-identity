@@ -34,10 +34,15 @@ object SecurityGate {
     }
 
     // ---------------------------
-    // Send Data to Rust
+    // Send Data to Rust (Day 69 Final Logic)
     // ---------------------------
     fun sendToRustForProof(data: PassportData) {
-        Log.d("SecurityGate", "🚀 Sending Passport Data to Rust Layer...")
-        Log.d("SecurityGate", "Doc: ${data.documentNumber}, Name: ${data.firstName}")
+        Log.d("SecurityGate", "🚀 PREPARING DATA FOR RUST...")
+
+        // ✅ Convert Kotlin Object to Rust-Friendly JSON
+        val rustJson = data.toRustJson()
+
+        Log.d("SecurityGate", "✅ RAW BYTES CAPTURED: ${data.dg1Raw?.size ?: 0} bytes")
+        Log.d("SecurityGate", "📦 PAYLOAD TO RUST: $rustJson")
     }
 }
