@@ -1,48 +1,50 @@
 package com.example.zkpapp
 
 import android.util.Log
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 object SecurityGate {
+    private const val TAG = "SecurityGate"
 
-    // ---------------------------
-    // Can user start camera?
-    // ---------------------------
-    fun canScanMrz(session: PassportSession): Boolean {
-        return session.state == SessionState.IDLE
+    // 1️⃣ Load Rust Library
+    init {
+        try {
+            System.loadLibrary("zkp_mobile")
+            Log.d(TAG, "✅ Rust Library Loaded Successfully")
+        } catch (e: UnsatisfiedLinkError) {
+            Log.e(TAG, "❌ Failed to load Rust library", e)
+        }
     }
 
-    // ---------------------------
-    // Can NFC start?
-    // ---------------------------
-    fun canStartNfc(session: PassportSession): Boolean {
-        return session.state == SessionState.NFC_READY &&
-               session.mrzInfo != null
-    }
+    // 2️⃣ Bridge Declaration
+    private external fun generateProof(jsonPayload: String): String
 
-    // ---------------------------
-    // Can simulation run?
-    // ---------------------------
-    fun canSimulate(session: PassportSession): Boolean {
-        return session.state == SessionState.IDLE
-    }
+    // 3️⃣ Permission Checks (One-Liners for clean code)
+    fun canScanMrz(session: PassportSession): Boolean = session.state == SessionState.IDLE
+    
+    fun canStartNfc(session: PassportSession): Boolean = 
+        session.state == SessionState.NFC_READY && session.mrzInfo != null
 
-    // ---------------------------
-    // Can reading begin?
-    // ---------------------------
-    fun canReadPassport(session: PassportSession): Boolean {
-        return session.state == SessionState.NFC_READY
-    }
+    fun canSimulate(session: PassportSession): Boolean = true 
+    
+    fun canReadPassport(session: PassportSession): Boolean = session.state == SessionState.NFC_READY
 
-    // ---------------------------
-    // Send Data to Rust (Day 69 Final Logic)
-    // ---------------------------
-    fun sendToRustForProof(data: PassportData) {
-        Log.d("SecurityGate", "🚀 PREPARING DATA FOR RUST...")
-
-        // ✅ Convert Kotlin Object to Rust-Friendly JSON
-        val rustJson = data.toRustJson()
-
-        Log.d("SecurityGate", "✅ RAW BYTES CAPTURED: ${data.dg1Raw?.size ?: 0} bytes")
-        Log.d("SecurityGate", "📦 PAYLOAD TO RUST: $rustJson")
+    // 4️⃣ Send to Rust & RETURN Result (Important for Codespace)
+    suspend fun sendToRustForProof(data: PassportData): String {
+        return withContext(Dispatchers.Default) {
+            try {
+                Log.d(TAG, "🚀 Sending to Rust...")
+                val rustJson = data.toRustJson()
+                
+                // Rust ko call kiya aur Jawab pakad liya
+                val response = generateProof(rustJson) 
+                
+                // Jawab wapis bhej diya taaki screen par dikh sake
+                response 
+            } catch (e: Exception) {
+                "❌ Rust Error: ${e.message}"
+            }
+        }
     }
 }

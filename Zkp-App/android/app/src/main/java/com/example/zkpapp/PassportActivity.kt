@@ -151,7 +151,7 @@ class PassportActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ SUCCESS (DAY 70 UPDATE: SHOW SOD STATUS)
+    // ✅ SUCCESS: Show Data + Rust Response on Screen (Day 71 Final)
     private fun handleSuccess(data: PassportData) {
         progressBar.visibility = View.GONE
         camButton.isEnabled = true
@@ -161,22 +161,17 @@ class PassportActivity : AppCompatActivity() {
 
         updateStatus("✅ PASSPORT VERIFIED", Color.parseColor("#006400"))
 
-        // 👇 Get JSON & SOD Size
-        val rustJson = data.toRustJson()
         val sodSize = data.sodRaw?.size ?: 0
         val sodStatus = if (sodSize > 0) "✅ FOUND ($sodSize bytes)" else "❌ MISSING"
 
-        // 👇 DISPLAY ON SCREEN (DEBUGGING)
+        // Initial Display
         detailsText.text = """
             Name: ${data.firstName} ${data.lastName}
-            Gender: ${data.gender}
-            DOB: ${data.dateOfBirth}
             SOD: $sodStatus
             
-            👇 RUST PAYLOAD (HIDDEN):
-            $rustJson
+            ⏳ CONTACTING RUST ENGINE...
         """.trimIndent()
-
+        
         detailsText.visibility = View.VISIBLE
 
         data.facePhoto?.let { bitmap ->
@@ -185,14 +180,27 @@ class PassportActivity : AppCompatActivity() {
             photoView.visibility = View.VISIBLE
         }
 
-        // 🔐 Auto wipe sensitive session after 10s
+        // 🚀 CALL RUST & UPDATE SCREEN
+        // Yeh Code ab Rust ka jawab screen par dikhayega
         lifecycleScope.launch {
-            delay(10000)
-            session = PassportSession()
+            // 1. Rust ko call karo
+            val rustResponse = SecurityGate.sendToRustForProof(data)
+
+            // 2. Screen update karo
+            detailsText.text = """
+                Name: ${data.firstName} ${data.lastName}
+                SOD: $sodStatus
+                
+                🦁 RUST SAYS:
+                $rustResponse
+            """.trimIndent()
         }
 
-        // 🧠 Future ZKP hook
-        SecurityGate.sendToRustForProof(data)
+        // Auto reset
+        lifecycleScope.launch {
+            delay(15000)
+            session = PassportSession()
+        }
     }
 
     // ❌ ERROR
