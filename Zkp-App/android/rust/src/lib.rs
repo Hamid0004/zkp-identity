@@ -9,6 +9,9 @@ use log::{info, debug, error, LevelFilter}; // 📝 LOGGING MACROS
 use serde::{Deserialize, Serialize}; // 📦 NEW FOR JSON
 use anyhow::Result;
 
+// 👇 NEW DAY 72 IMPORT: SHA-256 Hashing
+use sha2::{Sha256, Digest};
+
 // Plonky2 Imports
 use plonky2::field::types::Field;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
@@ -135,7 +138,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
 }
 
 // =========================================================================
-// 🆕 PART 2: DAY 71 LOGIC (Passport ZKP Architecture)
+// 🆕 PART 2: DAY 72 LOGIC (SHA-256 Hashing)
 // =========================================================================
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -148,31 +151,41 @@ struct PassportData {
 }
 
 fn prove_passport_logic(data: PassportData) -> Result<String, anyhow::Error> {
-    info!("🏗️ Building Passport ZKP Circuit...");
+    info!("🏗️ Rust: Processing Passport Data for Day 72...");
     
-    // Step A: Validate Hex Encoding
+    // 1. Decode Hex to Bytes (Android sent us Hex strings)
     let dg1_bytes = hex::decode(&data.dg1_hex).map_err(|e| anyhow::anyhow!("Invalid DG1 Hex: {}", e))?;
-    let sod_bytes = hex::decode(&data.sod_hex).map_err(|e| anyhow::anyhow!("Invalid SOD Hex: {}", e))?;
+    
+    // 2. 🔥 CALCULATE SHA-256 HASH (The Fingerprint)
+    let mut hasher = Sha256::new();
+    hasher.update(&dg1_bytes);
+    let result_hash = hasher.finalize();
+    
+    // 3. Encode Hash back to Hex String for display
+    let hash_hex = hex::encode(result_hash);
+    
+    info!("✅ DG1 HASH CALCULATED: {}", hash_hex);
 
-    info!("📝 Inputs Verified Successfully:");
-    info!("   - User: {} {}", data.first_name, data.last_name);
-    info!("   - DG1 Size: {} bytes (Data)", dg1_bytes.len());
-    info!("   - SOD Size: {} bytes (Signature)", sod_bytes.len());
+    // 4. Return result to Android Screen
+    let response = format!(
+        "👤 User: {} {}\n📜 Doc: {}\n🔒 DG1 Hash (SHA-256):\n{}",
+        data.first_name, data.last_name, data.document_number, hash_hex
+    );
 
-    Ok(format!("PROOF_PLACEHOLDER_DAY71_FOR_{}", data.document_number))
+    Ok(response)
 }
 
 // 3️⃣ New Entry Point for SecurityGate
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
-    mut env: JNIEnv, // ✅ Fixed: 'mut' preserved
+    mut env: JNIEnv, // 'mut' is required for env.get_string
     _class: JClass,
     json_payload: JString,
 ) -> jstring {
     
     init_logger(); 
 
-    // env.get_string requires mutable reference
+    // Get the JSON string from Java
     let input: String = match env.get_string(&json_payload) {
         Ok(s) => s.into(),
         Err(e) => {
@@ -181,8 +194,9 @@ pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
         }
     };
 
-    debug!("🚀 Rust received Passport Payload: {}", input);
+    debug!("🚀 Rust received Payload: {}", input);
 
+    // Parse JSON
     let passport_data: PassportData = match serde_json::from_str(&input) {
         Ok(data) => data,
         Err(e) => {
@@ -191,9 +205,10 @@ pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
         }
     };
 
+    // Run Logic (Hashing)
     match prove_passport_logic(passport_data) {
         Ok(proof) => {
-            info!("✅ Day 71 Logic Passed!");
+            info!("✅ Day 72 Logic Passed!");
             env.new_string(proof).unwrap().into_raw()
         },
         Err(e) => {
