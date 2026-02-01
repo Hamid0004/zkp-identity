@@ -22,6 +22,9 @@ hex = "0.4"     # For Day 71 (Passport)
 bincode = "1.3" # ✅ Added back for Old Logic
 base64 = "0.21" # ✅ Added back for Old Logic
 
+# 🔐 NEW (Day 72): Standard Hashing for Passport
+sha2 = "0.10"
+
 # 📝 Logging
 log = "0.4"
 android_logger = "0.13"

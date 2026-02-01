@@ -74,7 +74,7 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
         let proof_bytes = bincode::serialize(&proof)?;
         let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
         
-        // Chunking Logic
+        // Chunking Logic (Preserved)
         let chunk_size = 500;
         let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
         let mut json_array = String::from("[");
@@ -165,7 +165,7 @@ fn prove_passport_logic(data: PassportData) -> Result<String, anyhow::Error> {
 // 3️⃣ New Entry Point for SecurityGate
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
-    mut env: JNIEnv, // ✅ Fixed: 'mut' added back because get_string needs it
+    mut env: JNIEnv, // ✅ Fixed: 'mut' preserved
     _class: JClass,
     json_payload: JString,
 ) -> jstring {
