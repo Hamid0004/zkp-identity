@@ -151,7 +151,7 @@ class PassportActivity : AppCompatActivity() {
         }
     }
 
-    // ✅ SUCCESS: Show Data + Rust Response on Screen (Day 71 Final)
+    // ✅ SUCCESS: Show Data + Rust Response on Screen (Day 72 Logic Updated)
     private fun handleSuccess(data: PassportData) {
         progressBar.visibility = View.GONE
         camButton.isEnabled = true
@@ -159,17 +159,17 @@ class PassportActivity : AppCompatActivity() {
         session = session.copy(state = SessionState.DONE)
         performHapticFeedback()
 
-        updateStatus("✅ PASSPORT VERIFIED", Color.parseColor("#006400"))
+        updateStatus("✅ DATA EXTRACTED", Color.parseColor("#006400"))
 
         val sodSize = data.sodRaw?.size ?: 0
         val sodStatus = if (sodSize > 0) "✅ FOUND ($sodSize bytes)" else "❌ MISSING"
 
-        // Initial Display
+        // Initial Display (While waiting for Rust)
         detailsText.text = """
             Name: ${data.firstName} ${data.lastName}
             SOD: $sodStatus
             
-            ⏳ CONTACTING RUST ENGINE...
+            ⏳ GENERATING SHA-256 HASH...
         """.trimIndent()
         
         detailsText.visibility = View.VISIBLE
@@ -180,10 +180,9 @@ class PassportActivity : AppCompatActivity() {
             photoView.visibility = View.VISIBLE
         }
 
-        // 🚀 CALL RUST & UPDATE SCREEN
-        // Yeh Code ab Rust ka jawab screen par dikhayega
+        // 🚀 CALL RUST (Day 72: Hashing)
         lifecycleScope.launch {
-            // 1. Rust ko call karo
+            // 1. Rust ko data bhejo aur Hash mangwao
             val rustResponse = SecurityGate.sendToRustForProof(data)
 
             // 2. Screen update karo
@@ -191,7 +190,7 @@ class PassportActivity : AppCompatActivity() {
                 Name: ${data.firstName} ${data.lastName}
                 SOD: $sodStatus
                 
-                🦁 RUST SAYS:
+                🦁 RUST INTEGRITY REPORT:
                 $rustResponse
             """.trimIndent()
         }
