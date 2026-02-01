@@ -25,6 +25,14 @@ base64 = "0.21" # ✅ Added back for Old Logic
 # 🔐 NEW (Day 72): Standard Hashing for Passport
 sha2 = "0.10"
 
+# 👇 NEW (Day 74): RSA Cryptography
+# 👇 FIX: Enable "sha2" feature inside rsa
+rsa = { version = "0.9", features = ["sha2"] }
+rand = "0.8"
+
+# 🛠️ FIX: Force older version of base64ct to avoid 'edition2024' error
+base64ct = "=1.6.0"
+
 # 📝 Logging
 log = "0.4"
 android_logger = "0.13"

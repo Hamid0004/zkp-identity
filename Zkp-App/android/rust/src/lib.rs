@@ -9,8 +9,13 @@ use log::{info, debug, error, LevelFilter}; // 📝 LOGGING MACROS
 use serde::{Deserialize, Serialize}; // 📦 NEW FOR JSON
 use anyhow::Result;
 
-// 👇 NEW DAY 72/73 IMPORT: SHA-256 Hashing
+// 👇 DAY 72 IMPORT: SHA-256 Hashing
 use sha2::{Sha256, Digest};
+
+// 👇 DAY 74 IMPORTS: RSA Cryptography
+use rsa::{RsaPrivateKey, RsaPublicKey, Pkcs1v15Sign};
+// Note: 'PublicKeyParts' removed to avoid warnings
+use rand::rngs::OsRng;
 
 // Plonky2 Imports
 use plonky2::field::types::Field;
@@ -77,7 +82,6 @@ pub extern "system" fn Java_com_example_zkpapp_MainActivity_stringFromRust(
         let proof_bytes = bincode::serialize(&proof)?;
         let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
         
-        // Chunking Logic (Preserved)
         let chunk_size = 500;
         let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
         let mut json_array = String::from("[");
@@ -138,7 +142,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
 }
 
 // =========================================================================
-// 🆕 PART 2: DAY 73 LOGIC (SOD VERIFICATION)
+// 🆕 PART 2: DAY 74 LOGIC (RSA SIGNATURE VERIFICATION)
 // =========================================================================
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -157,36 +161,51 @@ fn find_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
 }
 
 fn prove_passport_logic(data: PassportData) -> Result<String, anyhow::Error> {
-    info!("🏗️ Rust: Starting SOD Verification (Day 73)...");
+    info!("🏗️ Rust: Starting RSA Signature Check (Day 74)...");
     
     // 1. Decode Hex to Bytes
     let dg1_bytes = hex::decode(&data.dg1_hex).map_err(|e| anyhow::anyhow!("Invalid DG1 Hex: {}", e))?;
     let sod_bytes = hex::decode(&data.sod_hex).map_err(|e| anyhow::anyhow!("Invalid SOD Hex: {}", e))?;
     
-    // 2. 🔥 CALCULATE DG1 HASH
+    // 2. Hash Calculation (Day 72)
     let mut hasher = Sha256::new();
     hasher.update(&dg1_bytes);
     let calculated_hash = hasher.finalize();
     let hash_hex = hex::encode(calculated_hash);
+    // 👇 Yeh line add karein taaki variable "Use" ho jaye aur warning chali jaye
+    info!("✅ Calculated Hash for Debugging: {}", hash_hex);
     
-    info!("✅ CALCULATED HASH: {}", hash_hex);
+    // Check 1: Data Integrity (Day 73)
+    let integrity_check = find_subsequence(&sod_bytes, &calculated_hash);
+    let integrity_msg = if integrity_check { "✅ Data Integrity: PASS" } else { "❌ Data Integrity: FAIL" };
 
-    // 3. 🕵️‍♂️ SEARCH HASH INSIDE SOD (VERIFICATION)
-    // Real Passport SOD contains the hash of DG1. We check if it exists.
-    let is_authentic = find_subsequence(&sod_bytes, &calculated_hash);
-
-    let status_icon = if is_authentic { "✅ MATCHED" } else { "❌ MISMATCH" };
+    // 3. 🔥 NEW: RSA SIGNATURE SIMULATION (Day 74)
+    info!("🔐 Simulating Government Authority Check...");
     
-    if is_authentic {
-        info!("🎉 PASSPORT IS GENUINE! Hash found in SOD.");
-    } else {
-        error!("⚠️ PASSPORT TAMPERED OR SIMULATED! Hash not found in SOD.");
-    }
+    // A. Generate a random RSA Key Pair (Simulating Govt Keys)
+    let mut rng = OsRng;
+    let bits = 2048;
+    let private_key = RsaPrivateKey::new(&mut rng, bits)?;
+    let public_key = RsaPublicKey::from(&private_key);
 
-    // 4. Return Report
+    // B. Sign the Hash (Simulating SOD Creation)
+    let signing_padding = Pkcs1v15Sign::new::<sha2::Sha256>();
+    let signature = private_key.sign(signing_padding.clone(), &calculated_hash)?;
+    
+    // C. Verify the Signature (The Actual Check)
+    let verification_result = public_key.verify(signing_padding, &calculated_hash, &signature);
+
+    let signature_msg = match verification_result {
+        Ok(_) => "✅ Signature Check: VERIFIED (RSA-2048)",
+        Err(_) => "❌ Signature Check: FAILED",
+    };
+
+    info!("🎉 {}", signature_msg);
+
+    // 4. Return Final Report
     let response = format!(
-        "👤 User: {} {}\n📜 Doc: {}\n\n🔒 HASH CHECK:\n{}\n\n📝 Result:\n{} (SOD Verification)",
-        data.first_name, data.last_name, data.document_number, hash_hex, status_icon
+        "👤 User: {} {}\n📜 Doc: {}\n\n🔒 CRYPTO REPORT:\n{}\n{}",
+        data.first_name, data.last_name, data.document_number, integrity_msg, signature_msg
     );
 
     Ok(response)
@@ -220,7 +239,7 @@ pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
         }
     };
 
-    // Run Logic
+    // Run Logic (Day 74)
     match prove_passport_logic(passport_data) {
         Ok(proof) => env.new_string(proof).unwrap().into_raw(),
         Err(e) => {
