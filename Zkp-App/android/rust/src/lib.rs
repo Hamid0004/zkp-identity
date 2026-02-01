@@ -9,7 +9,7 @@ use log::{info, debug, error, LevelFilter}; // 📝 LOGGING MACROS
 use serde::{Deserialize, Serialize}; // 📦 NEW FOR JSON
 use anyhow::Result;
 
-// 👇 NEW DAY 72 IMPORT: SHA-256 Hashing
+// 👇 NEW DAY 72/73 IMPORT: SHA-256 Hashing
 use sha2::{Sha256, Digest};
 
 // Plonky2 Imports
@@ -138,7 +138,7 @@ pub extern "system" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromR
 }
 
 // =========================================================================
-// 🆕 PART 2: DAY 72 LOGIC (SHA-256 Hashing)
+// 🆕 PART 2: DAY 73 LOGIC (SOD VERIFICATION)
 // =========================================================================
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -150,42 +150,57 @@ struct PassportData {
     sod_hex: String, 
 }
 
+// 🔍 Helper: Search for bytes inside another byte array (The "Find" function)
+fn find_subsequence(haystack: &[u8], needle: &[u8]) -> bool {
+    if needle.is_empty() { return false; }
+    haystack.windows(needle.len()).any(|window| window == needle)
+}
+
 fn prove_passport_logic(data: PassportData) -> Result<String, anyhow::Error> {
-    info!("🏗️ Rust: Processing Passport Data for Day 72...");
+    info!("🏗️ Rust: Starting SOD Verification (Day 73)...");
     
-    // 1. Decode Hex to Bytes (Android sent us Hex strings)
+    // 1. Decode Hex to Bytes
     let dg1_bytes = hex::decode(&data.dg1_hex).map_err(|e| anyhow::anyhow!("Invalid DG1 Hex: {}", e))?;
+    let sod_bytes = hex::decode(&data.sod_hex).map_err(|e| anyhow::anyhow!("Invalid SOD Hex: {}", e))?;
     
-    // 2. 🔥 CALCULATE SHA-256 HASH (The Fingerprint)
+    // 2. 🔥 CALCULATE DG1 HASH
     let mut hasher = Sha256::new();
     hasher.update(&dg1_bytes);
-    let result_hash = hasher.finalize();
+    let calculated_hash = hasher.finalize();
+    let hash_hex = hex::encode(calculated_hash);
     
-    // 3. Encode Hash back to Hex String for display
-    let hash_hex = hex::encode(result_hash);
-    
-    info!("✅ DG1 HASH CALCULATED: {}", hash_hex);
+    info!("✅ CALCULATED HASH: {}", hash_hex);
 
-    // 4. Return result to Android Screen
+    // 3. 🕵️‍♂️ SEARCH HASH INSIDE SOD (VERIFICATION)
+    // Real Passport SOD contains the hash of DG1. We check if it exists.
+    let is_authentic = find_subsequence(&sod_bytes, &calculated_hash);
+
+    let status_icon = if is_authentic { "✅ MATCHED" } else { "❌ MISMATCH" };
+    
+    if is_authentic {
+        info!("🎉 PASSPORT IS GENUINE! Hash found in SOD.");
+    } else {
+        error!("⚠️ PASSPORT TAMPERED OR SIMULATED! Hash not found in SOD.");
+    }
+
+    // 4. Return Report
     let response = format!(
-        "👤 User: {} {}\n📜 Doc: {}\n🔒 DG1 Hash (SHA-256):\n{}",
-        data.first_name, data.last_name, data.document_number, hash_hex
+        "👤 User: {} {}\n📜 Doc: {}\n\n🔒 HASH CHECK:\n{}\n\n📝 Result:\n{} (SOD Verification)",
+        data.first_name, data.last_name, data.document_number, hash_hex, status_icon
     );
 
     Ok(response)
 }
 
-// 3️⃣ New Entry Point for SecurityGate
 #[no_mangle]
 pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
-    mut env: JNIEnv, // 'mut' is required for env.get_string
+    mut env: JNIEnv,
     _class: JClass,
     json_payload: JString,
 ) -> jstring {
-    
     init_logger(); 
-
-    // Get the JSON string from Java
+    
+    // Get JSON from Java
     let input: String = match env.get_string(&json_payload) {
         Ok(s) => s.into(),
         Err(e) => {
@@ -205,15 +220,12 @@ pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(
         }
     };
 
-    // Run Logic (Hashing)
+    // Run Logic
     match prove_passport_logic(passport_data) {
-        Ok(proof) => {
-            info!("✅ Day 72 Logic Passed!");
-            env.new_string(proof).unwrap().into_raw()
-        },
+        Ok(proof) => env.new_string(proof).unwrap().into_raw(),
         Err(e) => {
-            error!("❌ Circuit Error: {:?}", e);
-            env.new_string(format!("ERROR_CIRCUIT: {}", e)).unwrap().into_raw()
+             error!("❌ Logic Error: {:?}", e);
+             env.new_string(format!("ERROR_LOGIC: {}", e)).unwrap().into_raw()
         }
     }
 }
