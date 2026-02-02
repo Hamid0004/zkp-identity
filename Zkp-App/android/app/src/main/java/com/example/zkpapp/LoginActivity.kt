@@ -11,27 +11,37 @@ import androidx.appcompat.app.AppCompatActivity
 class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_login) // Iska layout XML banana padega
+        setContentView(R.layout.activity_login)
 
-        // UI Elements dhoondein
-        // (Filhal assume kar rahe hain ke XML mein ye IDs hongi)
-        // val btnLogin = findViewById<Button>(R.id.btnLogin)
-        // val txtResult = findViewById<TextView>(R.id.txtResult)
+        // UI Elements (Make sure IDs match your XML)
+        // XML mein: btnGenerate, txtStatus hone chahiye.
+        // Agar XML basic hai, toh hum temporary testing kar rahe hain:
 
-        // 🦁 TESTING DAY 76 (Console Test)
-        // Jab tak XML ready nahi hai, hum Logcat mein test karte hain:
+        val statusText = findViewById<TextView>(R.id.txtStatus) // From XML
         
-        val testSecret = "Hamid_Passport_Secret_Key"
-        val testWebsite = "facebook.com"
+        // 🦁 REAL TEST LOGIC
+        // Maan lein user ne ye type kiya:
+        val mySecret = "User_Passport_Hash_123"
+        val website = "google.com" 
 
-        Log.d("ZkAuth", "Generating Nullifier for $testWebsite...")
-        
-        // 👇 ASLI JAADU YAHAN HAI
-        val nullifier = ZkAuth.generateNullifier(testSecret, testWebsite)
-        
-        Log.d("ZkAuth", "🦁 RESULT: $nullifier")
-        
-        // Screen par dikhane ke liye Toast
-        Toast.makeText(this, "Nullifier Generated! Check Logs", Toast.LENGTH_LONG).show()
+        Log.d("ZkAuth", "🚀 Sending Request to Rust...")
+        statusText.text = "⏳ Processing..."
+
+        // 👇 SAFE CALL (Crash Proof)
+        val result = ZkAuth.safeGenerateNullifier(mySecret, website)
+
+        // Result handle karna
+        if (result.contains("⚠️") || result.contains("🔥")) {
+            // Error handling
+            statusText.text = result
+            statusText.setTextColor(android.graphics.Color.RED)
+            Log.e("ZkAuth", "Failed: $result")
+        } else {
+            // Success
+            statusText.text = "✅ $result"
+            statusText.setTextColor(android.graphics.Color.GREEN)
+            Log.d("ZkAuth", "Success: $result")
+            Toast.makeText(this, "Nullifier Generated!", Toast.LENGTH_SHORT).show()
+        }
     }
 }

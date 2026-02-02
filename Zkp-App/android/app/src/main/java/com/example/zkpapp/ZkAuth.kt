@@ -3,16 +3,31 @@ package com.example.zkpapp
 import android.util.Log
 
 object ZkAuth {
-    // Library Load karna (Agar pehle se loaded nahi hai)
+    // 1. Library Load karna (Safe Mode)
     init {
         try {
             System.loadLibrary("zkp_mobile")
         } catch (e: UnsatisfiedLinkError) {
-            Log.e("ZkAuth", "Error loading Rust library: ${e.message}")
+            Log.e("ZkAuth", "❌ CRITICAL: Rust Library NOT Found! ${e.message}")
+        } catch (e: Exception) {
+            Log.e("ZkAuth", "❌ Error loading library: ${e.message}")
         }
     }
 
-    // 🦁 Rust Function Declaration
-    // Yeh function Rust ke 'generateNullifier' ko call karega
-    external fun generateNullifier(secret: String, domain: String): String
+    // 2. 🔒 ASLI RUST FUNCTION (Private)
+    private external fun generateNullifier(secret: String, domain: String): String
+
+    // 3. 🛡️ PUBLIC SAFETY WRAPPER
+    // UI sirf isay call karega. Ye guarantee deta hai ke Crash nahi hoga.
+    fun safeGenerateNullifier(secret: String, domain: String): String {
+        return try {
+            generateNullifier(secret, domain)
+        } catch (e: UnsatisfiedLinkError) {
+            "⚠️ Error: Bridge Broken (Rebuild Rust & Clean Project)"
+        } catch (e: Exception) {
+            "⚠️ Error: Java Exception - ${e.message}"
+        } catch (e: Throwable) {
+            "⚠️ Critical Error: Unknown Crash prevented"
+        }
+    }
 }
