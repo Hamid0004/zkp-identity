@@ -1,9 +1,9 @@
 -- Merging decision tree log ---
 manifest
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
 MERGED from [com.google.android.material:material:1.9.0] /home/codespace/.gradle/caches/transforms-3/c008aa989e21ebd94301b829972459ed/transformed/material-1.9.0/AndroidManifest.xml:17:1-26:12
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] /home/codespace/.gradle/caches/transforms-3/de9708b0b0919687ce85ccc24f2a8d4f/transformed/constraintlayout-2.1.4/AndroidManifest.xml:2:1-11:12
 MERGED from [androidx.camera:camera-view:1.2.3] /home/codespace/.gradle/caches/transforms-3/9d00d85a9e7d94b4ca9f851a60698e2d/transformed/jetified-camera-view-1.2.3/AndroidManifest.xml:17:1-22:12
@@ -70,69 +70,69 @@ MERGED from [androidx.documentfile:documentfile:1.0.0] /home/codespace/.gradle/c
 MERGED from [androidx.localbroadcastmanager:localbroadcastmanager:1.0.0] /home/codespace/.gradle/caches/transforms-3/24700bb9ba9dd342c5d40edf3e457f40/transformed/localbroadcastmanager-1.0.0/AndroidManifest.xml:17:1-22:12
 MERGED from [androidx.print:print:1.0.0] /home/codespace/.gradle/caches/transforms-3/511851cdf4ee9ec72da754d99dae6055/transformed/print-1.0.0/AndroidManifest.xml:17:1-22:12
 MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/codespace/.gradle/caches/transforms-3/1a662590562b1b29149bca096440f1c2/transformed/jetified-image-1.0.0-beta1/AndroidManifest.xml:2:1-9:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
-INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
+INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
 	package
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:5-33
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
 	android:versionName
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
 	android:versionCode
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-57:12
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:1-64:12
 		INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
 	xmlns:android
 		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:2:11-69
 uses-permission#android.permission.INTERNET
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:5-67
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:5-67
 MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/codespace/.gradle/caches/transforms-3/bebf6cdfc2e46865d28eda858af63f7a/transformed/jetified-transport-backend-cct-2.3.3/AndroidManifest.xml:26:5-67
 MERGED from [com.google.android.datatransport:transport-backend-cct:2.3.3] /home/codespace/.gradle/caches/transforms-3/bebf6cdfc2e46865d28eda858af63f7a/transformed/jetified-transport-backend-cct-2.3.3/AndroidManifest.xml:26:5-67
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:22-64
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:22-64
 uses-permission#android.permission.CAMERA
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:4:5-65
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:5-65
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:22:5-65
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:22:5-65
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:4:22-62
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:22-62
 uses-permission#android.permission.NFC
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:5-62
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:7:5-62
 MERGED from [net.sf.scuba:scuba-sc-android:0.0.20] /home/codespace/.gradle/caches/transforms-3/5365fc00386a5cfa01c8bb14b1ecd8a0/transformed/jetified-scuba-sc-android-0.0.20/AndroidManifest.xml:11:5-62
 MERGED from [net.sf.scuba:scuba-sc-android:0.0.20] /home/codespace/.gradle/caches/transforms-3/5365fc00386a5cfa01c8bb14b1ecd8a0/transformed/jetified-scuba-sc-android-0.0.20/AndroidManifest.xml:11:5-62
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:5:22-59
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:7:22-59
 uses-permission#android.permission.VIBRATE
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:5-66
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:8:5-66
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:6:22-63
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:8:22-63
 uses-feature#android.hardware.nfc
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:8:5-82
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:5-81
 	android:required
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:8:55-79
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:55-78
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:8:19-54
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:19-54
 uses-feature#android.hardware.camera
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:5-84
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:11:5-84
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:25:5-27:36
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:25:5-27:36
 	android:required
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:58-81
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:11:58-81
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:9:19-57
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:11:19-57
 uses-feature#android.hardware.camera.autofocus
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:5-95
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:12:5-95
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:33:5-35:36
 MERGED from [com.journeyapps:zxing-android-embedded:4.3.0] /home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/AndroidManifest.xml:33:5-35:36
 	android:required
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:68-92
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:12:68-92
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:10:19-67
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:12:19-67
 application
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:12:5-55:19
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:14:5-62:19
 MERGED from [com.google.android.material:material:1.9.0] /home/codespace/.gradle/caches/transforms-3/c008aa989e21ebd94301b829972459ed/transformed/material-1.9.0/AndroidManifest.xml:24:5-20
 MERGED from [com.google.android.material:material:1.9.0] /home/codespace/.gradle/caches/transforms-3/c008aa989e21ebd94301b829972459ed/transformed/material-1.9.0/AndroidManifest.xml:24:5-20
 MERGED from [androidx.constraintlayout:constraintlayout:2.1.4] /home/codespace/.gradle/caches/transforms-3/de9708b0b0919687ce85ccc24f2a8d4f/transformed/constraintlayout-2.1.4/AndroidManifest.xml:9:5-20
@@ -176,75 +176,83 @@ MERGED from [com.google.android.odml:image:1.0.0-beta1] /home/codespace/.gradle/
 	android:appComponentFactory
 		ADDED from [androidx.core:core:1.10.1] /home/codespace/.gradle/caches/transforms-3/35da4fc1d8efd2d155d782ef63b1b66c/transformed/core-1.10.1/AndroidManifest.xml:28:18-86
 	android:supportsRtl
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:15:9-35
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:17:9-35
 	android:label
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:14:9-35
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:16:9-35
 	android:allowBackup
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:13:9-35
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:15:9-35
 	android:theme
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:16:9-67
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:18:9-67
 activity#com.example.zkpapp.MainActivity
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:18:9-25:20
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:20:9-27:20
 	android:exported
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:20:13-36
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:13-36
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:19:13-41
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:13-41
 intent-filter#action:name:android.intent.action.MAIN+category:name:android.intent.category.LAUNCHER
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:13-24:29
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:23:13-26:29
 action#android.intent.action.MAIN
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:17-69
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:24:17-69
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:25-66
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:24:25-66
 category#android.intent.category.LAUNCHER
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:23:17-77
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:25:17-77
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:23:27-74
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:25:27-74
+activity#com.example.zkpapp.LoginActivity
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:29:9-32:52
+	android:screenOrientation
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:32:13-49
+	android:exported
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:31:13-37
+	android:name
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:30:13-42
 activity#com.example.zkpapp.PassportActivity
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:27:9-41:20
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:34:9-48:20
 	android:label
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:31:13-45
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:38:13-45
 	android:launchMode
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:30:13-43
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:37:13-43
 	android:exported
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:29:13-36
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:36:13-36
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:28:13-45
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:35:13-45
 intent-filter#action:name:android.nfc.action.TECH_DISCOVERED+category:name:android.intent.category.DEFAULT
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:33:13-36:29
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:40:13-43:29
 action#android.nfc.action.TECH_DISCOVERED
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:34:17-77
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:41:17-77
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:34:25-74
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:41:25-74
 category#android.intent.category.DEFAULT
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:35:17-76
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:42:17-76
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:35:27-73
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:42:27-73
 meta-data#android.nfc.action.TECH_DISCOVERED
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:38:13-40:59
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:45:13-47:59
 	android:resource
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:40:17-56
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:47:17-56
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:39:17-66
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:46:17-66
 activity#com.example.zkpapp.CameraActivity
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:43:9-47:66
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:50:9-54:66
 	android:screenOrientation
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:46:13-49
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:53:13-49
 	android:exported
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:45:13-37
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:52:13-37
 	android:theme
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:47:13-63
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:54:13-63
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:44:13-43
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:51:13-43
 activity#com.example.zkpapp.VerifierActivity
-ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:49:9-53:66
+ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:56:9-60:66
 	android:screenOrientation
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:52:13-49
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:59:13-49
 	android:exported
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:51:13-37
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:58:13-37
 	android:theme
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:53:13-63
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:60:13-63
 	android:name
-		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:50:13-45
+		ADDED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:57:13-45
 uses-sdk
 INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml reason: use-sdk injection requested
 INJECTED from /workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml

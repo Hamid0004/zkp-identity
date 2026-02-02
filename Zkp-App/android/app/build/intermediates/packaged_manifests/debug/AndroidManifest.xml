@@ -15,7 +15,7 @@
 
     <uses-feature
         android:name="android.hardware.nfc"
-        android:required="false" />
+        android:required="true" />
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
@@ -61,6 +61,10 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <activity
+            android:name="com.example.zkpapp.LoginActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
         <activity
             android:name="com.example.zkpapp.PassportActivity"
             android:exported="true"
