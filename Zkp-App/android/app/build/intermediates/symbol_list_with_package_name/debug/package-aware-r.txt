@@ -3176,6 +3176,7 @@ id bounceStart
 id btn_magic
 id btn_scan
 id btn_scan_passport
+id btn_zk_auth
 id buttonPanel
 id cache_measures
 id callMeasure
@@ -3314,6 +3315,7 @@ id jumpToEnd
 id jumpToStart
 id labeled
 id layout
+id lblTitle
 id left
 id leftToRight
 id legacy
@@ -3323,6 +3325,7 @@ id line3
 id linear
 id listMode
 id list_item
+id loader
 id m3_side_sheet
 id marquee
 id masked
@@ -3561,6 +3564,7 @@ id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
 id triangle
+id txtStatus
 id unchecked
 id uniform
 id unlabeled
@@ -3714,6 +3718,7 @@ layout abc_search_view
 layout abc_select_dialog_material
 layout abc_tooltip
 layout activity_camera
+layout activity_login
 layout activity_main
 layout activity_verifier
 layout custom_dialog

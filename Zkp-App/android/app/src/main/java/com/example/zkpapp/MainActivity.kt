@@ -36,8 +36,12 @@ class MainActivity : AppCompatActivity() {
         val btnMagic: Button = findViewById(R.id.btn_magic) // QR Sender
         val btnScan: Button = findViewById(R.id.btn_scan)   // QR Receiver
         
-        // 🆕 NEW: PASSPORT BUTTON (Phase 6)
+        // 🛂 Phase 6: Passport Button
         val btnPassport: Button = findViewById(R.id.btn_scan_passport) 
+
+        // 🦁 NEW PHASE 7: LOGIN BUTTON
+        // Make sure aapke XML mein ek button ho jiski ID 'btn_zk_auth' ho
+        val btnLogin: Button = findViewById(R.id.btn_zk_auth)
 
         // ---------------------------------------------------------
         // 🟢 LOGIC 1: QR SENDER (Your Sandwich Strategy)
@@ -89,11 +93,19 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ---------------------------------------------------------
-        // 🛂 LOGIC 4: PASSPORT SCANNER (New for Day 62)
+        // 🛂 LOGIC 4: PASSPORT SCANNER (Phase 6)
         // ---------------------------------------------------------
         btnPassport.setOnClickListener {
-            // Opens the new PassportActivity we just created
             val intent = Intent(this, PassportActivity::class.java)
+            startActivity(intent)
+        }
+
+        // ---------------------------------------------------------
+        // 🦁 LOGIC 5: ZK AUTH LOGIN (Phase 7 - NEW)
+        // ---------------------------------------------------------
+        btnLogin.setOnClickListener {
+            // Yeh aapko nayi Login Screen par le jayega
+            val intent = Intent(this, LoginActivity::class.java)
             startActivity(intent)
         }
     }

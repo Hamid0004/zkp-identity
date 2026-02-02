@@ -11,7 +11,7 @@
         android:id="@+id/sample_text"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Ready to Project"
+        android:text="Ready for ZKP Action"
         android:textSize="18sp"
         android:textColor="#333333"
         android:gravity="center"
@@ -19,34 +19,54 @@
 
     <ImageView
         android:id="@+id/qr_image"
-        android:layout_width="300dp"
-        android:layout_height="300dp"
+        android:layout_width="250dp"
+        android:layout_height="250dp"
         android:background="#EEEEEE"
         android:scaleType="fitCenter"/>
 
-    <Button
-        android:id="@+id/btn_magic"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Transmission 📡"
-        android:layout_marginTop="30dp"/>
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:layout_marginTop="20dp">
 
-    <Button
-        android:id="@+id/btn_scan"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="🕵️ Scan &amp; Verify Mode"
-        android:backgroundTint="#FF5722"
-        android:layout_marginTop="20dp"/>
+        <Button
+            android:id="@+id/btn_magic"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="📡 Transmit"
+            android:layout_marginEnd="5dp"/>
+
+        <Button
+            android:id="@+id/btn_scan"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🕵️ Verify"
+            android:backgroundTint="#FF5722"
+            android:layout_marginStart="5dp"/>
+    </LinearLayout>
 
     <Button
         android:id="@+id/btn_scan_passport"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:layout_marginTop="20dp"
+        android:layout_marginTop="15dp"
         android:text="📷 Scan NFC Passport"
         android:textSize="18sp"
         android:backgroundTint="#009688"
+        android:textColor="#FFFFFF" />
+
+    <Button
+        android:id="@+id/btn_zk_auth"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:layout_marginTop="15dp"
+        android:text="🦁 ZK Login (Phase 7)"
+        android:textSize="18sp"
+        android:backgroundTint="#6200EE"
         android:textColor="#FFFFFF" />
 
 </LinearLayout>

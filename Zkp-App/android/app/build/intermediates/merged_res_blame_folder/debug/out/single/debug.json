@@ -1,5 +1,9 @@
 [
     {
+        "merged": "com.example.zkpapp-merged_res-39:/layout_activity_login.xml.flat",
+        "source": "com.example.zkpapp-main-41:/layout/activity_login.xml"
+    },
+    {
         "merged": "com.example.zkpapp-merged_res-39:/layout_activity_main.xml.flat",
         "source": "com.example.zkpapp-main-41:/layout/activity_main.xml"
     },
