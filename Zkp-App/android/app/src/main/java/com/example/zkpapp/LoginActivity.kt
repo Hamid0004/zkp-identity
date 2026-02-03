@@ -10,6 +10,7 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.util.UUID // 🆕 Day 77: Random ID Generator
 
 class LoginActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -17,30 +18,33 @@ class LoginActivity : AppCompatActivity() {
         setContentView(R.layout.activity_login)
 
         // 1. Initialize UI Elements
-        // Make sure IDs match activity_login.xml
         val statusText = findViewById<TextView>(R.id.txtStatus)
         val progressBar = findViewById<ProgressBar>(R.id.loader)
         val titleText = findViewById<TextView>(R.id.lblTitle) 
 
-        // 2. Test Inputs (Simulation)
+        // 2. User Data (Simulation)
         val mySecret = "User_Passport_Hash_123"
         val website = "google.com"
 
-        Log.d("ZkAuth", "🚀 Sending Request to Rust...")
+        // 🆕 DAY 77 SECURITY: Generate Random Challenge
+        // Yeh har baar alag hoga, isliye hacker purana hash copy nahi kar sakta.
+        val serverChallenge = UUID.randomUUID().toString().substring(0, 8)
+
+        Log.d("ZkAuth", "🎲 Challenge Created: $serverChallenge")
 
         // 3. UI Start State (Show Loading)
-        statusText.text = "⏳ Generating Zero-Knowledge Proof..."
+        // User ko dikhao ke hum challenge ke sath bind kar rahe hain
+        statusText.text = "🔒 Binding Identity to Challenge: $serverChallenge..."
         statusText.setTextColor(Color.DKGRAY)
         progressBar.visibility = View.VISIBLE 
 
-        // 4. Background Simulation (Handler)
-        // Hum 1 second ka delay dete hain taaki 'Loading' feel aaye aur phir result dikhaye
+        // 4. Background Simulation
         Handler(Looper.getMainLooper()).postDelayed({
 
-            // 👇 SAFE CALL (Crash Proof)
-            val result = ZkAuth.safeGenerateNullifier(mySecret, website)
+            // 👇 DAY 77 UPDATE: Pass 3 Arguments (Secret, Domain, Challenge)
+            val result = ZkAuth.safeGenerateNullifier(mySecret, website, serverChallenge)
 
-            // 🛑 Stop Loading (Hide Spinner)
+            // 🛑 Stop Loading
             progressBar.visibility = View.GONE
 
             // 5. Result Handling
@@ -51,18 +55,16 @@ class LoginActivity : AppCompatActivity() {
                 Log.e("ZkAuth", "Failed: $result")
             } else {
                 // Success Case
-                // Result text thoda saaf dikhate hain
-                
-                statusText.text = "✅ $result"
-                statusText.setTextColor(Color.parseColor("#4CAF50")) // Nice Green Color
-                
-                // Title update for feedback
-                titleText?.text = "Identity Verified! 🎉"
-                
+                statusText.text = "✅ Secure Hash:\n$result"
+                statusText.setTextColor(Color.parseColor("#4CAF50")) // Green
+
+                // Update Title
+                titleText?.text = "Identity Verified! 🛡️"
+
                 Log.d("ZkAuth", "Success: $result")
-                Toast.makeText(this, "Login Successful!", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Secure Login Verified!", Toast.LENGTH_SHORT).show()
             }
 
-        }, 1000) // 1000ms = 1 Second delay
+        }, 1000) // 1 Second delay
     }
 }

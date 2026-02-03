@@ -15,13 +15,15 @@ object ZkAuth {
     }
 
     // 2. 🔒 ASLI RUST FUNCTION (Private)
-    private external fun generateNullifier(secret: String, domain: String): String
+    // Day 77 Update: Naam change kiya aur 'challenge' parameter add kiya
+    private external fun generateSecureNullifier(secret: String, domain: String, challenge: String): String
 
     // 3. 🛡️ PUBLIC SAFETY WRAPPER
     // UI sirf isay call karega. Ye guarantee deta hai ke Crash nahi hoga.
-    fun safeGenerateNullifier(secret: String, domain: String): String {
+    fun safeGenerateNullifier(secret: String, domain: String, challenge: String): String {
         return try {
-            generateNullifier(secret, domain)
+            // Updated call to new Rust function
+            generateSecureNullifier(secret, domain, challenge)
         } catch (e: UnsatisfiedLinkError) {
             "⚠️ Error: Bridge Broken (Rebuild Rust & Clean Project)"
         } catch (e: Exception) {
