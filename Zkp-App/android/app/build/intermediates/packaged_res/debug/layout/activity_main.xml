@@ -4,69 +4,68 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:gravity="center"
-    android:padding="20dp"
-    android:background="#FFFFFF">
-
-    <TextView
-        android:id="@+id/sample_text"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Ready for ZKP Action"
-        android:textSize="18sp"
-        android:textColor="#333333"
-        android:gravity="center"
-        android:layout_marginBottom="20dp"/>
+    android:padding="30dp"
+    android:background="#F8F9FA">
 
     <ImageView
-        android:id="@+id/qr_image"
-        android:layout_width="250dp"
-        android:layout_height="250dp"
-        android:background="#EEEEEE"
-        android:scaleType="fitCenter"/>
+        android:id="@+id/app_logo"
+        android:layout_width="120dp"
+        android:layout_height="120dp"
+        android:src="@android:drawable/sym_def_app_icon" 
+        android:layout_marginBottom="20dp"
+        android:elevation="10dp"/>
 
-    <LinearLayout
-        android:layout_width="match_parent"
+    <TextView
+        android:id="@+id/app_title"
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center"
-        android:layout_marginTop="20dp">
-
-        <Button
-            android:id="@+id/btn_magic"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="📡 Transmit"
-            android:layout_marginEnd="5dp"/>
-
-        <Button
-            android:id="@+id/btn_scan"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:text="🕵️ Verify"
-            android:backgroundTint="#FF5722"
-            android:layout_marginStart="5dp"/>
-    </LinearLayout>
+        android:text="ZKP Identity"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:textColor="#212121"
+        android:letterSpacing="0.05"
+        android:layout_marginBottom="50dp"/>
 
     <Button
-        android:id="@+id/btn_scan_passport"
+        android:id="@+id/btnWebLogin"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:layout_marginTop="15dp"
-        android:text="📷 Scan NFC Passport"
+        android:layout_height="65dp"
+        android:text="📷 Scan QR to Login"
         android:textSize="18sp"
-        android:backgroundTint="#009688"
-        android:textColor="#FFFFFF" />
+        android:textStyle="bold"
+        android:backgroundTint="#2196F3"
+        android:textColor="#FFFFFF"
+        android:elevation="5dp"
+        android:layout_marginBottom="20dp"/>
 
     <Button
-        android:id="@+id/btn_zk_auth"
+        android:id="@+id/btnPassport"
+        android:layout_width="match_parent"
+        android:layout_height="65dp"
+        android:text="🛂 Scan Passport (Create ID)"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:backgroundTint="#FF9800"
+        android:textColor="#FFFFFF"
+        android:elevation="5dp"
+        android:layout_marginBottom="20dp"/>
+
+    <Button
+        android:id="@+id/btnTest"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:layout_marginTop="15dp"
-        android:text="🦁 ZK Login (Phase 7)"
-        android:textSize="18sp"
-        android:backgroundTint="#6200EE"
-        android:textColor="#FFFFFF" />
+        android:text="🧪 Test Proof (Offline)"
+        android:textSize="16sp"
+        android:backgroundTint="#607D8B"
+        android:textColor="#FFFFFF"
+        android:elevation="2dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Powered by Rust + Plonky2 🦁"
+        android:textSize="12sp"
+        android:textColor="#9E9E9E"
+        android:layout_marginTop="40dp"/>
 
 </LinearLayout>

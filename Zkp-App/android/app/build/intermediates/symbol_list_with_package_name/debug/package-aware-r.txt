@@ -3154,6 +3154,8 @@ id animateToEnd
 id animateToStart
 id antiClockwise
 id anticipate
+id app_logo
+id app_title
 id arc
 id asConfigured
 id async
@@ -3173,10 +3175,9 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
-id btn_magic
-id btn_scan
-id btn_scan_passport
-id btn_zk_auth
+id btnPassport
+id btnTest
+id btnWebLogin
 id buttonPanel
 id cache_measures
 id callMeasure
@@ -3430,7 +3431,6 @@ id pressed
 id progress_bar
 id progress_circular
 id progress_horizontal
-id qr_image
 id radio
 id ratio
 id rectangles
@@ -3441,7 +3441,6 @@ id right_icon
 id right_side
 id rounded
 id row_index_key
-id sample_text
 id save_non_transition_alpha
 id save_overlay_view
 id sawtooth
