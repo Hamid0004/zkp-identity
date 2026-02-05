@@ -99,9 +99,12 @@ class CameraActivity : AppCompatActivity() {
             return
         }
 
-        val mediaImage = imageProxy.image ?: return
+        val mediaImage = imageProxy.image ?: run {
+            imageProxy.close()
+            return
+        }
+        
         lastProcessingTime = currentTime
-
         val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
         recognizer.process(image)
@@ -113,6 +116,9 @@ class CameraActivity : AppCompatActivity() {
                     performSuccessFeedback() // 📳 Vibrate
                     deliverFinalResult(mrz)
                 }
+            }
+            .addOnFailureListener { e ->
+                Log.w("CameraActivity", "ML Kit failed", e)
             }
             .addOnCompleteListener { imageProxy.close() }
     }
@@ -131,14 +137,13 @@ class CameraActivity : AppCompatActivity() {
         if (validLines.size < 2) return null
 
         // Step 2: Smart Search Loop
-        // Hum "Aakhri 2 lines" par depend nahi karenge. Hum poore text mein dhundenge.
         for (i in 0 until validLines.size - 1) {
             val line1 = cleanOcrNoise(validLines[i])
             val line2 = cleanOcrNoise(validLines[i + 1])
 
             // ✅ STRICT CHECK:
-            // 1. Line 1 starts with "P<"
-            // 2. Both lines are exactly 44 characters
+            // 1. Line 1 starts with "P<" (Standard Passport)
+            // 2. Both lines are exactly 44 characters (ICAO 9303 Standard)
             if (line1.startsWith("P<") && line1.length == 44 && line2.length == 44) {
                 Log.d("CameraActivity", "MRZ Found: \n$line1\n$line2")
                 return "$line1\n$line2"
@@ -155,7 +160,7 @@ class CameraActivity : AppCompatActivity() {
             .replace("{", "<")
             .replace("}", "<")
             .replace("]", "<")
-            .replace("«", "<")
+            .replace("«", "<") // Common OCR error for <<
             .replace(" ", "")
     }
 
@@ -181,6 +186,7 @@ class CameraActivity : AppCompatActivity() {
             cameraProvider?.unbindAll()
 
             val resultIntent = Intent()
+            // 🦁 Note: Ensure PassportActivity expects "MRZ_DATA"
             resultIntent.putExtra("MRZ_DATA", mrz)
             setResult(RESULT_OK, resultIntent)
             finish()
@@ -193,6 +199,16 @@ class CameraActivity : AppCompatActivity() {
     private fun hasCameraPermission() = ContextCompat.checkSelfPermission(
         this, Manifest.permission.CAMERA
     ) == PackageManager.PERMISSION_GRANTED
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == 101 && grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startCamera()
+        } else {
+            Toast.makeText(this, "Camera permission needed", Toast.LENGTH_SHORT).show()
+            finish()
+        }
+    }
 
     override fun onDestroy() {
         super.onDestroy()
