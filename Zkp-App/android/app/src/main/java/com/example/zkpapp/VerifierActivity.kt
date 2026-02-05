@@ -8,6 +8,8 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.os.Build
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.widget.ProgressBar
@@ -18,7 +20,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.zkpapp.models.ProofRequest
 import com.example.zkpapp.network.RelayApi
-import com.google.zxing.ResultPoint
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
@@ -36,11 +37,15 @@ class VerifierActivity : AppCompatActivity() {
 
     companion object {
         init {
-            System.loadLibrary("zkp_mobile")
+            try {
+                System.loadLibrary("zkp_mobile")
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 
-    // 🦁 CONFIG: Aapka Server URL
+    // 🦁 CONFIG: Server URL
     private val BASE_URL = "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
 
     // JNI Function (For Offline Verification)
@@ -90,9 +95,12 @@ class VerifierActivity : AppCompatActivity() {
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
                 if (isRelayProcessRunning) return 
-                result?.text?.let { processQrData(it) }
+                
+                result?.text?.let { rawData ->
+                    processQrData(rawData)
+                }
             }
-            override fun possibleResultPoints(resultPoints: MutableList<ResultPoint>?) {}
+            override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
         })
     }
 
@@ -102,14 +110,21 @@ class VerifierActivity : AppCompatActivity() {
              processAnimatedChunk(data)
              return
         }
-        // CASE 2: New Logic (UUID)
+        // CASE 2: New Logic (UUID) - 🦁 Strict Check Added
         if (!isRelayProcessRunning && data.length > 20 && !data.contains("|")) {
             handleRelayLogin(data)
         }
     }
 
-    // 🦁 MAIN LOGIC: LOGIN TO WEB
+    // 🦁 MAIN LOGIC: LOGIN TO WEB (Robust Version)
     private fun handleRelayLogin(sessionId: String) {
+        
+        // 1. 🛡️ Check Internet First!
+        if (!NetworkUtils.isInternetAvailable(this)) {
+            showError("❌ No Internet Connection!")
+            return
+        }
+
         isRelayProcessRunning = true
         barcodeView.pause() 
 
@@ -121,24 +136,29 @@ class VerifierActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Generate Proof (Heavy Math)
+                // 2. Generate Proof
+                // Note: Using 'generateSecureNullifier' directly via ZkAuth wrapper if available, 
+                // or direct JNI call. Assuming ZkAuth object exists from Day 81.
                 val proofOutput = ZkAuth.generateSecureNullifier("123456", "zk_login", sessionId)
-                if (proofOutput.startsWith("🔥")) throw Exception("Proof Gen Failed")
+                
+                if (proofOutput.startsWith("🔥") || proofOutput.startsWith("Error")) {
+                    throw Exception("Proof Gen Failed")
+                }
 
-                // 2. Upload to Relay Server
-                withContext(Dispatchers.Main) { statusText.text = "☁️ Uploading to Web..." }
+                // 3. Upload to Relay Server
+                withContext(Dispatchers.Main) { statusText.text = "☁️ Verifying with Server..." }
 
-                // 👇 FIX: Force HTTP/1.1 to prevent "Stream Reset" errors
+                // 👇 Force HTTP/1.1 to prevent Stream Reset
                 val client = OkHttpClient.Builder()
                     .protocols(listOf(Protocol.HTTP_1_1))
-                    .connectTimeout(60, TimeUnit.SECONDS)
-                    .readTimeout(60, TimeUnit.SECONDS)
-                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .connectTimeout(30, TimeUnit.SECONDS)
+                    .readTimeout(30, TimeUnit.SECONDS)
+                    .writeTimeout(30, TimeUnit.SECONDS)
                     .build()
 
                 val retrofit = Retrofit.Builder()
                     .baseUrl(BASE_URL)
-                    .client(client) // Attach custom client
+                    .client(client)
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
 
@@ -149,25 +169,52 @@ class VerifierActivity : AppCompatActivity() {
 
                 withContext(Dispatchers.Main) {
                     if (response.isSuccessful) {
+                        // ✅ SUCCESS
                         statusText.text = "✅ LOGIN SUCCESSFUL!\nCheck Laptop Screen"
                         statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
                         triggerSuccessFeedback()
+                        
+                        // Auto-Reset Scanner after 4 seconds
+                        Handler(Looper.getMainLooper()).postDelayed({ resetScanner() }, 4000)
                     } else {
-                        statusText.text = "❌ Server Error: ${response.code()}"
-                        statusText.setBackgroundColor(Color.RED)
-                        isRelayProcessRunning = false 
-                        barcodeView.resume()
+                        // ❌ SERVER ERROR HANDLING
+                        val code = response.code()
+                        val msg = when(code) {
+                            404 -> "❌ Session Expired"
+                            502 -> "❌ Invalid QR Code"
+                            else -> "❌ Server Error ($code)"
+                        }
+                        showError(msg)
                     }
                 }
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    statusText.text = "🔥 Net Error: ${e.message}"
-                    isRelayProcessRunning = false
-                    barcodeView.resume()
+                    showError("⚠️ Network Error: ${e.message}")
                 }
             }
         }
+    }
+
+    // 🔄 Helper: Reset Scanner UI
+    private fun resetScanner() {
+        if (isDestroyed || isFinishing) return
+        isRelayProcessRunning = false
+        statusText.text = "🔍 Ready to Scan"
+        statusText.setBackgroundColor(Color.TRANSPARENT)
+        progressBar.isIndeterminate = false
+        barcodeView.resume()
+    }
+
+    // ❌ Helper: Show Error & Auto Reset
+    private fun showError(msg: String) {
+        statusText.text = msg
+        statusText.setBackgroundColor(Color.RED)
+        progressBar.isIndeterminate = false
+        triggerErrorFeedback()
+        
+        // Retry allow karein 2.5 seconds baad
+        Handler(Looper.getMainLooper()).postDelayed({ resetScanner() }, 2500)
     }
 
     // 🏛️ OLD LOGIC: ANIMATED CHUNK PROCESSING (Offline)
@@ -241,6 +288,7 @@ class VerifierActivity : AppCompatActivity() {
         }.start()
     }
 
+    // 📳 Feedback Logic
     private fun triggerSuccessFeedback() {
         try {
             val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
@@ -250,6 +298,18 @@ class VerifierActivity : AppCompatActivity() {
                 v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
             } else {
                 v.vibrate(150)
+            }
+        } catch (e: Exception) { }
+    }
+
+    private fun triggerErrorFeedback() {
+        try {
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                // Double Vibration for Error
+                v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), -1))
+            } else {
+                v.vibrate(200)
             }
         } catch (e: Exception) { }
     }
