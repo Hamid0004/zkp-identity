@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
+const path = require('path');
 
 const app = express();
 const PORT = 3000;
@@ -8,6 +9,7 @@ const PORT = 3000;
 // Middleware
 app.use(cors()); // Allow Websites to talk to us
 app.use(bodyParser.json({ limit: '50mb' })); // ⚠️ Important: Allow Big Proofs (50MB limit)
+app.use(express.static('public')); // NEW LINE fronted file 
 
 // 🧠 IN-MEMORY DATABASE (Temporary Storage)
 // Format: { "session_id": { status: "pending", proof: null } }

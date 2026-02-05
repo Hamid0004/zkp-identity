@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKP Secure Login</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; background-color: #f4f4f9; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; width: 350px; }
+        h2 { color: #333; margin-bottom: 10px; }
+        p { color: #666; font-size: 14px; }
+        #qr-container { margin: 20px auto; padding: 10px; border: 2px dashed #ddd; display: inline-block; }
+        .status { margin-top: 20px; font-weight: bold; color: #888; }
+        .success { color: #2ecc71; }
+        .hidden { display: none; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body>
+
+    <div class="card" id="login-card">
+        <h2>🦁 ZK Login</h2>
+        <p>Scan this QR with your ZKP Mobile App</p>
+        
+        <div id="qr-container"></div>
+        
+        <div class="status" id="status-text">
+            <div class="loader"></div> Waiting for Scan...
+        </div>
+    </div>
+
+    <div class="card hidden" id="success-card">
+        <h1 style="font-size: 50px;">✅</h1>
+        <h2 class="success">Identity Verified!</h2>
+        <p>You have securely logged in without password.</p>
+        <div style="background: #eee; padding: 10px; border-radius: 5px; margin-top: 20px; word-break: break-all; font-family: monospace; font-size: 12px;">
+            <strong>Nullifier:</strong><br>
+            <span id="nullifier-val">...</span>
+        </div>
+    </div>
+
+    <script>
+        // 🦁 CONFIGURATION
+        const API_URL = window.location.origin + "/api"; // Auto-detect server URL
+        let sessionId = null;
+        let pollInterval = null;
+
+        // 1. Start Session (On Load)
+        async function startSession() {
+            try {
+                const res = await fetch(`${API_URL}/start-session`);
+                const data = await res.json();
+                sessionId = data.session_id;
+
+                console.log("🦁 Session ID:", sessionId);
+
+                // Generate QR Code
+                // QR Data Format: Just the Session ID string
+                new QRCode(document.getElementById("qr-container"), {
+                    text: sessionId,
+                    width: 180,
+                    height: 180
+                });
+
+                // Start Listening (Polling)
+                pollInterval = setInterval(checkStatus, 2000); // Check every 2 seconds
+
+            } catch (err) {
+                console.error("Setup Failed:", err);
+                document.getElementById("status-text").innerText = "❌ Server Error. Is Backend running?";
+            }
+        }
+
+        // 2. Poll Status (Loop)
+        async function checkStatus() {
+            if (!sessionId) return;
+
+            try {
+                const res = await fetch(`${API_URL}/poll-status/${sessionId}`);
+                // Agar 404 aaye (Session not found) to ignore karein, wait karein
+                if (!res.ok) return; 
+
+                const data = await res.json();
+
+                if (data.status === 'completed') {
+                    // 🎉 SUCCESS!
+                    clearInterval(pollInterval); // Stop checking
+                    showSuccess(data.proof);
+                }
+            } catch (err) {
+                console.error("Polling Error:", err);
+            }
+        }
+
+        // 3. Update UI on Success
+        function showSuccess(proofData) {
+            // Proof format: "Nullifier | ProofString"
+            // Hum isay tod kar sirf Nullifier dikhayenge UI par
+            const parts = proofData.split("|");
+            const nullifier = parts[0] || "Unknown";
+
+            document.getElementById("login-card").classList.add("hidden");
+            document.getElementById("success-card").classList.remove("hidden");
+            document.getElementById("nullifier-val").innerText = nullifier;
+        }
+
+        // Start everything
+        startSession();
+    </script>
+</body>
+</html>
