@@ -10,9 +10,10 @@ import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import java.util.UUID // 🆕 Day 77: Random ID Generator
+import java.util.UUID 
 
 class LoginActivity : AppCompatActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
@@ -26,45 +27,58 @@ class LoginActivity : AppCompatActivity() {
         val mySecret = "User_Passport_Hash_123"
         val website = "google.com"
 
-        // 🆕 DAY 77 SECURITY: Generate Random Challenge
-        // Yeh har baar alag hoga, isliye hacker purana hash copy nahi kar sakta.
+        // 🎲 DAY 77/81 SECURITY: Random Challenge
+        // Yeh confirm karta hai ke har baar Proof naya banta hai (Replay Attack Protection)
         val serverChallenge = UUID.randomUUID().toString().substring(0, 8)
-
         Log.d("ZkAuth", "🎲 Challenge Created: $serverChallenge")
 
-        // 3. UI Start State (Show Loading)
-        // User ko dikhao ke hum challenge ke sath bind kar rahe hain
-        statusText.text = "🔒 Binding Identity to Challenge: $serverChallenge..."
+        // 3. UI Start State
+        statusText.text = "🔒 Generating ZK Proof for Challenge:\n$serverChallenge..."
         statusText.setTextColor(Color.DKGRAY)
         progressBar.visibility = View.VISIBLE 
 
-        // 4. Background Simulation
+        // 4. Background Simulation (Run Rust Logic)
         Handler(Looper.getMainLooper()).postDelayed({
 
-            // 👇 DAY 77 UPDATE: Pass 3 Arguments (Secret, Domain, Challenge)
-            val result = ZkAuth.safeGenerateNullifier(mySecret, website, serverChallenge)
+            try {
+                // 🦁 CALLING NEW RUST LOGIC (Day 78+)
+                // Ab ye return karega: "NullifierHash | Base64ProofString"
+                val rawResult = ZkAuth.generateSecureNullifier(mySecret, website, serverChallenge)
 
-            // 🛑 Stop Loading
-            progressBar.visibility = View.GONE
+                // 🛑 Stop Loading
+                progressBar.visibility = View.GONE
 
-            // 5. Result Handling
-            if (result.contains("⚠️") || result.contains("🔥")) {
-                // Error Case
-                statusText.text = result
+                // 5. Result Parsing (Split Nullifier & Proof)
+                if (rawResult.contains("|")) {
+                    val parts = rawResult.split("|")
+                    val nullifier = parts[0] // Chota Hash (Display ke liye)
+                    val proof = parts[1]     // Bada Proof (Server ke liye)
+
+                    // Success UI
+                    statusText.text = "✅ Secure Nullifier Generated:\n$nullifier\n\n(Proof Size: ${proof.length} chars)"
+                    statusText.setTextColor(Color.parseColor("#2E7D32")) // Dark Green
+
+                    titleText?.text = "Identity Verified! 🛡️"
+                    
+                    Log.d("ZkAuth", "✅ Full Proof Generated. Size: ${proof.length}")
+                    Toast.makeText(this, "Proof Generation Success!", Toast.LENGTH_SHORT).show()
+
+                } else if (rawResult.startsWith("🔥") || rawResult.contains("Error")) {
+                    // Error Case
+                    statusText.text = "❌ Error: $rawResult"
+                    statusText.setTextColor(Color.RED)
+                } else {
+                    // Unexpected Format
+                    statusText.text = "⚠️ Unknown Format:\n$rawResult"
+                    statusText.setTextColor(Color.MAGENTA)
+                }
+
+            } catch (e: Exception) {
+                progressBar.visibility = View.GONE
+                statusText.text = "🔥 Crash: ${e.message}"
                 statusText.setTextColor(Color.RED)
-                Log.e("ZkAuth", "Failed: $result")
-            } else {
-                // Success Case
-                statusText.text = "✅ Secure Hash:\n$result"
-                statusText.setTextColor(Color.parseColor("#4CAF50")) // Green
-
-                // Update Title
-                titleText?.text = "Identity Verified! 🛡️"
-
-                Log.d("ZkAuth", "Success: $result")
-                Toast.makeText(this, "Secure Login Verified!", Toast.LENGTH_SHORT).show()
             }
 
-        }, 1000) // 1 Second delay
+        }, 500) // Fast Response
     }
 }

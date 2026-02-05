@@ -16,10 +16,18 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.zkpapp.models.ProofRequest
+import com.example.zkpapp.network.RelayApi
 import com.google.zxing.ResultPoint
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 
 class VerifierActivity : AppCompatActivity() {
 
@@ -29,16 +37,22 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
+    // 🦁 DAY 81: RELAY SERVER CONFIGURATION
+    // Aapka Codespace URL (Make sure last mein '/' ho)
+    private val BASE_URL = "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
+
+    // JNI Function (For Old Logic: Verification)
     external fun verifyProofFromRust(proof: String): String
 
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // Logic Variables
+    // 🏛️ OLD LOGIC VARIABLES (Animated QR)
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
     private var lastVerifiedProofString: String? = null 
+    private var isRelayProcessRunning = false // Flag to prevent double scanning
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,11 +62,12 @@ class VerifierActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
+        // Permission Check
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
         
-        // 🔋 Hidden Stress Test (Long Press)
+        // 🔋 Hidden Stress Test (Old Logic Feature)
         statusText.setOnLongClickListener {
             if (lastVerifiedProofString != null) {
                 runBatteryStressTest(lastVerifiedProofString!!)
@@ -62,12 +77,20 @@ class VerifierActivity : AppCompatActivity() {
             true
         }
 
-        startScanning()
+        // Check if started via Intent (from CameraActivity)
+        val sessionFromIntent = intent.getStringExtra("SESSION_ID")
+        if (sessionFromIntent != null) {
+            handleRelayLogin(sessionFromIntent) // Direct Relay Login
+        } else {
+            startScanning() // Start Camera
+        }
     }
 
     private fun startScanning() {
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
+                if (isRelayProcessRunning) return // Busy processing
+
                 result?.text?.let { rawData ->
                     processQrData(rawData)
                 }
@@ -76,10 +99,81 @@ class VerifierActivity : AppCompatActivity() {
         })
     }
 
+    // 🧠 THE SMART BRAIN: Decides Old vs New Logic
     private fun processQrData(data: String) {
-        try {
-            if (!data.contains("|") || !data.contains("/")) return
+        
+        // CASE 1: 🏛️ OLD LOGIC (Animated QR)
+        // Format looks like: "1/20|Base64..."
+        if (data.contains("|") && data.contains("/")) {
+             processAnimatedChunk(data)
+             return
+        }
 
+        // CASE 2: 🦁 NEW LOGIC (Day 81 Relay Login)
+        // Format looks like UUID: "59f92686-ffc3..." (No pipes)
+        if (!isRelayProcessRunning && data.length > 20 && !data.contains("|")) {
+            handleRelayLogin(data)
+        }
+    }
+
+    // 🦁 DAY 81 LOGIC: GENERATE & UPLOAD
+    private fun handleRelayLogin(sessionId: String) {
+        isRelayProcessRunning = true
+        barcodeView.pause() // Stop camera
+
+        runOnUiThread {
+            statusText.text = "🦁 ID Detected!\nGenerating Proof..."
+            statusText.setBackgroundColor(Color.parseColor("#FF9800")) // Orange
+            progressBar.isIndeterminate = true
+        }
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 1. Generate Proof (Using ZkAuth JNI from Day 78)
+                // Note: Using hardcoded secret for Demo binding
+                val proofOutput = ZkAuth.generateSecureNullifier("123456", "zk_login", sessionId)
+
+                if (proofOutput.startsWith("🔥")) throw Exception("Proof Gen Failed")
+
+                // 2. Upload to Relay Server
+                withContext(Dispatchers.Main) { statusText.text = "☁️ Uploading to Web..." }
+
+                val retrofit = Retrofit.Builder()
+                    .baseUrl(BASE_URL)
+                    .addConverterFactory(GsonConverterFactory.create())
+                    .build()
+
+                val api = retrofit.create(RelayApi::class.java)
+                val request = ProofRequest(session_id = sessionId, proof_data = proofOutput)
+                
+                val response = api.uploadProof(request)
+
+                withContext(Dispatchers.Main) {
+                    if (response.isSuccessful) {
+                        statusText.text = "✅ LOGIN SUCCESSFUL!\nCheck Laptop Screen"
+                        statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
+                        triggerSuccessFeedback()
+                    } else {
+                        statusText.text = "❌ Upload Failed: ${response.code()}"
+                        statusText.setBackgroundColor(Color.RED)
+                        isRelayProcessRunning = false // Allow retry
+                        barcodeView.resume()
+                    }
+                }
+
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) {
+                    statusText.text = "🔥 Error: ${e.message}"
+                    isRelayProcessRunning = false
+                    barcodeView.resume()
+                }
+            }
+        }
+    }
+
+    // 🏛️ OLD LOGIC: ANIMATED CHUNK PROCESSING
+    private fun processAnimatedChunk(data: String) {
+        try {
             val parts = data.split("|", limit = 2)
             val header = parts[0] 
             val payload = parts[1] 
@@ -88,7 +182,7 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // 🔄 SMART SESSION RESET
+            // Reset Logic
             if (currentIndex == 1 && receivedChunks.containsKey(1)) {
                 val oldPayload = receivedChunks[1]
                 if (oldPayload != payload) {
@@ -97,9 +191,8 @@ class VerifierActivity : AppCompatActivity() {
                     lastVerifiedProofString = null
                     runOnUiThread {
                         statusText.text = "🔄 Scanning New Identity..."
-                        statusText.setTextColor(Color.WHITE)
-                        statusText.setBackgroundColor(Color.TRANSPARENT) // Reset BG
                         progressBar.progress = 0
+                        progressBar.isIndeterminate = false
                     }
                 }
             }
@@ -113,76 +206,19 @@ class VerifierActivity : AppCompatActivity() {
                 receivedChunks[currentIndex] = payload
 
                 runOnUiThread {
-                    // Cleaner Progress Text
                     val percent = (receivedChunks.size * 100) / totalChunksExpected
                     statusText.text = "📥 Receiving... $percent%"
                     progressBar.progress = receivedChunks.size
 
                     if (receivedChunks.size == totalChunksExpected) {
-                        finishScanning() 
+                        finishAnimatedScanning() 
                     }
                 }
             }
         } catch (e: Exception) { }
     }
 
-    // 👇 SENSORY FEEDBACK: Sound & Vibrate 📳🔊
-    private fun triggerSuccessFeedback() {
-        try {
-            // 1. Sound (Beep)
-            val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP)
-
-            // 2. Vibration (Haptic)
-            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                v.vibrate(150)
-            }
-        } catch (e: Exception) { }
-    }
-
-    private fun getMemoryUsage(): Long {
-        val runtime = Runtime.getRuntime()
-        val usedMemInBytes = runtime.totalMemory() - runtime.freeMemory()
-        return usedMemInBytes / (1024 * 1024) 
-    }
-
-    private fun getBatteryLevel(): Int {
-        val bm = getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
-        return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
-    }
-
-    private fun runBatteryStressTest(proofData: String) {
-        statusText.text = "🔥 Stress Testing (100x)..."
-        statusText.setTextColor(Color.YELLOW)
-        
-        Thread {
-            val startBattery = getBatteryLevel()
-            val startTime = System.currentTimeMillis()
-            
-            for (i in 1..100) {
-                 verifyProofFromRust(proofData)
-            }
-            
-            val endTime = System.currentTimeMillis()
-            val endBattery = getBatteryLevel()
-            val batteryDrop = startBattery - endBattery
-            val totalTime = endTime - startTime
-
-            runOnUiThread {
-                val report = "🔋 EFFICIENCY REPORT\n" +
-                             "Loops: 100 | Drop: $batteryDrop%\n" +
-                             "Total Time: ${totalTime}ms"
-                statusText.text = report
-                statusText.setTextColor(Color.CYAN)
-                triggerSuccessFeedback() // Beep on finish
-            }
-        }.start()
-    }
-
-    private fun finishScanning() {
+    private fun finishAnimatedScanning() {
         barcodeView.pause()
         statusText.text = "🔐 Verifying Cryptography..."
 
@@ -196,36 +232,48 @@ class VerifierActivity : AppCompatActivity() {
         lastVerifiedProofString = fullProofString
 
         Thread {
-            try {
-                val ramBefore = getMemoryUsage()
-                val resultReport = verifyProofFromRust(fullProofString)
-                val ramAfter = getMemoryUsage()
-                val ramPeak = if(ramAfter > ramBefore) ramAfter else ramBefore
-
-                runOnUiThread {
-                    if (resultReport.contains("Verified")) {
-                        // ✨ SUCCESS UI POLISH ✨
-                        triggerSuccessFeedback() // 🔊 + 📳
-                        
-                        statusText.text = "🎉 IDENTITY VERIFIED!\n" +
-                                          "⚡ Speed: Fast | 💾 RAM: ${ramPeak}MB"
-                        
-                        // Green Background for clear visual cue
-                        statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Dark Green
-                        statusText.setTextColor(Color.WHITE)
-                        statusText.setPadding(20, 20, 20, 20)
-                        
-                        progressBar.progressDrawable.setColorFilter(Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
-                        
-                    } else {
-                        // ❌ FAILURE UI
-                        statusText.text = "⛔ INVALID PROOF DETECTED"
-                        statusText.setBackgroundColor(Color.parseColor("#C62828")) // Red
-                        statusText.setTextColor(Color.WHITE)
-                    }
+            val resultReport = verifyProofFromRust(fullProofString)
+            runOnUiThread {
+                if (resultReport.contains("Verified")) {
+                    triggerSuccessFeedback()
+                    statusText.text = "🎉 PROOF VERIFIED (OFFLINE)"
+                    statusText.setBackgroundColor(Color.parseColor("#2E7D32"))
+                } else {
+                    statusText.text = "⛔ INVALID PROOF"
+                    statusText.setBackgroundColor(Color.RED)
                 }
-            } catch (e: Throwable) {
-                runOnUiThread { statusText.text = "Error" }
+            }
+        }.start()
+    }
+
+    // 👇 SHARED HELPERS (Battery, Sound, Vibrate)
+    private fun triggerSuccessFeedback() {
+        try {
+            val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+            toneGen.startTone(ToneGenerator.TONE_PROP_BEEP)
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
+            } else {
+                v.vibrate(150)
+            }
+        } catch (e: Exception) { }
+    }
+
+    private fun getBatteryLevel(): Int {
+        val bm = getSystemService(Context.BATTERY_SERVICE) as android.os.BatteryManager
+        return bm.getIntProperty(android.os.BatteryManager.BATTERY_PROPERTY_CAPACITY)
+    }
+
+    private fun runBatteryStressTest(proofData: String) {
+        statusText.text = "🔥 Stress Testing (100x)..."
+        Thread {
+            val startBattery = getBatteryLevel()
+            for (i in 1..100) verifyProofFromRust(proofData)
+            val endBattery = getBatteryLevel()
+            runOnUiThread {
+                statusText.text = "🔋 Drop: ${startBattery - endBattery}%"
+                triggerSuccessFeedback()
             }
         }.start()
     }

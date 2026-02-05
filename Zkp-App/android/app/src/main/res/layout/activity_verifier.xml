@@ -40,6 +40,7 @@
             android:max="100"
             android:progress="0"
             android:progressTint="#00E676" />
-            </LinearLayout>
+            
+    </LinearLayout>
 
 </RelativeLayout>

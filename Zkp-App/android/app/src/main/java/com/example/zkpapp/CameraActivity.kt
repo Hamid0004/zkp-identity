@@ -156,6 +156,7 @@ class CameraActivity : AppCompatActivity() {
             .replace("}", "<")
             .replace("]", "<")
             .replace("«", "<")
+            .replace(" ", "")
     }
 
     // 📳 Haptic Feedback (Vibration)
