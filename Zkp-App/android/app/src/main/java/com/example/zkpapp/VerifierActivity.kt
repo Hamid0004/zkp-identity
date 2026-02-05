@@ -26,33 +26,35 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.util.concurrent.TimeUnit
 
 class VerifierActivity : AppCompatActivity() {
 
     companion object {
         init {
-            System.loadLibrary("zkp_mobile") 
+            System.loadLibrary("zkp_mobile")
         }
     }
 
-    // 🦁 DAY 81: RELAY SERVER CONFIGURATION
-    // Aapka Codespace URL (Make sure last mein '/' ho)
+    // 🦁 CONFIG: Aapka Server URL
     private val BASE_URL = "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
 
-    // JNI Function (For Old Logic: Verification)
+    // JNI Function (For Offline Verification)
     external fun verifyProofFromRust(proof: String): String
 
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // 🏛️ OLD LOGIC VARIABLES (Animated QR)
+    // 🏛️ OLD LOGIC VARIABLES
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
     private var lastVerifiedProofString: String? = null 
-    private var isRelayProcessRunning = false // Flag to prevent double scanning
+    private var isRelayProcessRunning = false 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -62,12 +64,11 @@ class VerifierActivity : AppCompatActivity() {
         statusText = findViewById(R.id.status_text)
         progressBar = findViewById(R.id.progress_bar)
 
-        // Permission Check
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), 1)
         }
         
-        // 🔋 Hidden Stress Test (Old Logic Feature)
+        // 🔋 Stress Test Listener
         statusText.setOnLongClickListener {
             if (lastVerifiedProofString != null) {
                 runBatteryStressTest(lastVerifiedProofString!!)
@@ -77,49 +78,40 @@ class VerifierActivity : AppCompatActivity() {
             true
         }
 
-        // Check if started via Intent (from CameraActivity)
         val sessionFromIntent = intent.getStringExtra("SESSION_ID")
         if (sessionFromIntent != null) {
-            handleRelayLogin(sessionFromIntent) // Direct Relay Login
+            handleRelayLogin(sessionFromIntent) 
         } else {
-            startScanning() // Start Camera
+            startScanning() 
         }
     }
 
     private fun startScanning() {
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
-                if (isRelayProcessRunning) return // Busy processing
-
-                result?.text?.let { rawData ->
-                    processQrData(rawData)
-                }
+                if (isRelayProcessRunning) return 
+                result?.text?.let { processQrData(it) }
             }
             override fun possibleResultPoints(resultPoints: MutableList<ResultPoint>?) {}
         })
     }
 
-    // 🧠 THE SMART BRAIN: Decides Old vs New Logic
     private fun processQrData(data: String) {
-        
-        // CASE 1: 🏛️ OLD LOGIC (Animated QR)
-        // Format looks like: "1/20|Base64..."
+        // CASE 1: Old Logic (Pipes)
         if (data.contains("|") && data.contains("/")) {
              processAnimatedChunk(data)
              return
         }
-
-        // CASE 2: 🦁 NEW LOGIC (Day 81 Relay Login)
-        // Format looks like UUID: "59f92686-ffc3..." (No pipes)
+        // CASE 2: New Logic (UUID)
         if (!isRelayProcessRunning && data.length > 20 && !data.contains("|")) {
             handleRelayLogin(data)
         }
     }
 
-    // 🦁 DAY 81 LOGIC: GENERATE & UPLOAD
+    // 🦁 MAIN LOGIC: LOGIN TO WEB
     private fun handleRelayLogin(sessionId: String) {
         isRelayProcessRunning = true
-        barcodeView.pause() // Stop camera
+        barcodeView.pause() 
 
         runOnUiThread {
             statusText.text = "🦁 ID Detected!\nGenerating Proof..."
@@ -129,17 +121,24 @@ class VerifierActivity : AppCompatActivity() {
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 1. Generate Proof (Using ZkAuth JNI from Day 78)
-                // Note: Using hardcoded secret for Demo binding
+                // 1. Generate Proof (Heavy Math)
                 val proofOutput = ZkAuth.generateSecureNullifier("123456", "zk_login", sessionId)
-
                 if (proofOutput.startsWith("🔥")) throw Exception("Proof Gen Failed")
 
                 // 2. Upload to Relay Server
                 withContext(Dispatchers.Main) { statusText.text = "☁️ Uploading to Web..." }
 
+                // 👇 FIX: Force HTTP/1.1 to prevent "Stream Reset" errors
+                val client = OkHttpClient.Builder()
+                    .protocols(listOf(Protocol.HTTP_1_1))
+                    .connectTimeout(60, TimeUnit.SECONDS)
+                    .readTimeout(60, TimeUnit.SECONDS)
+                    .writeTimeout(60, TimeUnit.SECONDS)
+                    .build()
+
                 val retrofit = Retrofit.Builder()
                     .baseUrl(BASE_URL)
+                    .client(client) // Attach custom client
                     .addConverterFactory(GsonConverterFactory.create())
                     .build()
 
@@ -154,16 +153,16 @@ class VerifierActivity : AppCompatActivity() {
                         statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
                         triggerSuccessFeedback()
                     } else {
-                        statusText.text = "❌ Upload Failed: ${response.code()}"
+                        statusText.text = "❌ Server Error: ${response.code()}"
                         statusText.setBackgroundColor(Color.RED)
-                        isRelayProcessRunning = false // Allow retry
+                        isRelayProcessRunning = false 
                         barcodeView.resume()
                     }
                 }
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    statusText.text = "🔥 Error: ${e.message}"
+                    statusText.text = "🔥 Net Error: ${e.message}"
                     isRelayProcessRunning = false
                     barcodeView.resume()
                 }
@@ -171,7 +170,7 @@ class VerifierActivity : AppCompatActivity() {
         }
     }
 
-    // 🏛️ OLD LOGIC: ANIMATED CHUNK PROCESSING
+    // 🏛️ OLD LOGIC: ANIMATED CHUNK PROCESSING (Offline)
     private fun processAnimatedChunk(data: String) {
         try {
             val parts = data.split("|", limit = 2)
@@ -182,7 +181,6 @@ class VerifierActivity : AppCompatActivity() {
             val currentIndex = headerParts[0].toInt()
             val total = headerParts[1].toInt()
 
-            // Reset Logic
             if (currentIndex == 1 && receivedChunks.containsKey(1)) {
                 val oldPayload = receivedChunks[1]
                 if (oldPayload != payload) {
@@ -204,12 +202,10 @@ class VerifierActivity : AppCompatActivity() {
 
             if (!receivedChunks.containsKey(currentIndex)) {
                 receivedChunks[currentIndex] = payload
-
                 runOnUiThread {
                     val percent = (receivedChunks.size * 100) / totalChunksExpected
                     statusText.text = "📥 Receiving... $percent%"
                     progressBar.progress = receivedChunks.size
-
                     if (receivedChunks.size == totalChunksExpected) {
                         finishAnimatedScanning() 
                     }
@@ -224,9 +220,8 @@ class VerifierActivity : AppCompatActivity() {
 
         val fullProofBuilder = StringBuilder()
         for (i in 1..totalChunksExpected) {
-            if (receivedChunks.containsKey(i)) {
-                fullProofBuilder.append(receivedChunks[i])
-            } else { return }
+            if (receivedChunks.containsKey(i)) fullProofBuilder.append(receivedChunks[i])
+            else return 
         }
         val fullProofString = fullProofBuilder.toString()
         lastVerifiedProofString = fullProofString
@@ -246,7 +241,6 @@ class VerifierActivity : AppCompatActivity() {
         }.start()
     }
 
-    // 👇 SHARED HELPERS (Battery, Sound, Vibrate)
     private fun triggerSuccessFeedback() {
         try {
             val toneGen = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
