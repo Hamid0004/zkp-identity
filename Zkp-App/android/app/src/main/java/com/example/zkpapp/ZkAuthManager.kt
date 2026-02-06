@@ -3,7 +3,7 @@ package com.example.zkpapp.auth
 import android.content.Context
 import android.util.Log
 import com.example.zkpapp.NetworkUtils
-import com.example.zkpapp.ZkAuth // 🦁 Import ZkAuth Wrapper
+import com.example.zkpapp.ZkAuth
 import com.example.zkpapp.models.ProofRequest
 import com.example.zkpapp.network.RelayApi
 import kotlinx.coroutines.Dispatchers
@@ -16,16 +16,15 @@ import java.util.concurrent.TimeUnit
 
 object ZkAuthManager {
 
-    private const val TAG = "ZkAuthManager"
-    private const val BASE_URL = "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
-    
-    @Volatile
-    private var isRunning = false
+    private const val BASE_URL =
+        "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
 
-    // 🦁 API Client Setup (HTTP/1.1 Fix Included)
+    @Volatile
+    private var running = false
+
     private val api: RelayApi by lazy {
         val client = OkHttpClient.Builder()
-            .protocols(listOf(Protocol.HTTP_1_1)) // Stream Reset Fix
+            .protocols(listOf(Protocol.HTTP_1_1))
             .connectTimeout(30, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .writeTimeout(30, TimeUnit.SECONDS)
@@ -39,69 +38,58 @@ object ZkAuthManager {
             .create(RelayApi::class.java)
     }
 
-    // 🦁 Main Login Logic
     suspend fun startUniversalLogin(
         context: Context,
         sessionId: String,
         onStatus: (String) -> Unit,
         onSuccess: () -> Unit,
-        onError: (String) -> Unit
+        onError: (String) -> Unit,
     ) {
-        if (isRunning) return
-        isRunning = true
+        if (running) return
+        running = true
 
         try {
-            // 1. Internet Check
             if (!NetworkUtils.isInternetAvailable(context)) {
-                onError("❌ No Internet Connection")
+                onError("❌ No Internet")
                 return
             }
 
-            // 2. Proof Generation (Via ZkAuth Wrapper)
-            onStatus("🦁 Generating ZK Proof...")
+            onStatus("🦁 Generating ZK Proof…")
+
             val proof = withContext(Dispatchers.Default) {
-                // 🦁 CRITICAL: Call the wrapper, don't define JNI here
-                ZkAuth.safeGenerateNullifier(
+                ZkAuth.generateSecureNullifier(
                     secret = "123456",
                     domain = "zk_login",
-                    challenge = sessionId 
+                    challenge = sessionId
                 )
             }
 
-            // Proof Validation
-            if (proof.startsWith("🔥") || proof.startsWith("Error")) {
-                throw Exception("Proof Failed: $proof")
+            if (proof.startsWith("Error")) {
+                onError(proof)
+                return
             }
 
-            // 3. Upload to Server
-            onStatus("☁️ Verifying with Server...")
+            onStatus("☁️ Verifying with Server…")
+
             val response = withContext(Dispatchers.IO) {
-                api.uploadProof(
-                    ProofRequest(session_id = sessionId, proof_data = proof)
-                )
+                api.uploadProof(ProofRequest(sessionId, proof))
             }
 
-            // 4. Handle Response
-            if (response.isSuccessful) {
-                onSuccess()
-            } else {
-                onError(mapServerError(response.code()))
-            }
+            if (response.isSuccessful) onSuccess()
+            else onError(mapError(response.code()))
 
         } catch (e: Exception) {
-            Log.e(TAG, "Login Flow Error", e)
-            onError("⚠️ Error: ${e.message}")
+            Log.e("ZkAuthManager", "Login failed", e)
+            onError("⚠️ ${e.message}")
         } finally {
-            isRunning = false
+            running = false
         }
     }
 
-    private fun mapServerError(code: Int): String {
-        return when (code) {
-            401 -> "❌ Server Private (Check Port Visibility)"
-            404 -> "❌ Session Expired"
-            502 -> "❌ Invalid / Fake QR"
-            else -> "❌ Server Error ($code)"
-        }
+    private fun mapError(code: Int) = when (code) {
+        401 -> "❌ Server Private"
+        404 -> "❌ Session Expired"
+        502 -> "❌ Invalid QR"
+        else -> "❌ Server Error ($code)"
     }
 }

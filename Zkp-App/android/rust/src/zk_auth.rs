@@ -5,7 +5,6 @@ use std::panic;
 use android_logger::Config;
 use log::{info, LevelFilter};
 
-// Plonky2 Imports
 use plonky2::field::types::Field;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
@@ -13,80 +12,95 @@ use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
 use plonky2::hash::poseidon::PoseidonHash;
 use plonky2::plonk::config::Hasher;
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
-use base64::{Engine as _, engine::general_purpose}; 
 
-fn init_logger() {
-    let _ = android_logger::init_once(
-        Config::default().with_max_level(LevelFilter::Info).with_tag("RustZKP_Auth"),
-    );
-}
+use base64::{Engine as _, engine::general_purpose};
 
 const D: usize = 2;
 type C = PoseidonGoldilocksConfig;
 type F = <C as GenericConfig<D>>::F;
 
-fn string_to_field(input: &str) -> Vec<F> {
-    input.bytes().map(|b| F::from_canonical_u8(b)).collect()
+// Public input order (DO NOT CHANGE)
+const PI_DOMAIN: usize = 0;
+const PI_CHALLENGE: usize = 1;
+const PI_NULLIFIER: usize = 2;
+
+fn init_logger() {
+    let _ = android_logger::init_once(
+        Config::default()
+            .with_max_level(LevelFilter::Info)
+            .with_tag("RustZKP_Auth"),
+    );
 }
 
-// 🦁 CRITICAL FIX: Function Name matches 'com.example.zkpapp.ZkAuth'
+fn string_to_field(input: &str) -> Vec<F> {
+    input.bytes().map(F::from_canonical_u8).collect()
+}
+
 #[no_mangle]
-pub extern "system" fn Java_com_example_zkpapp_ZkAuth_generateSecureNullifier(
+pub extern "system" fn Java_com_example_zkpapp_auth_ZkAuthManager_generateSecureNullifier(
     mut env: JNIEnv,
     _class: JClass,
     secret_input: JString,
     domain_input: JString,
-    challenge_input: JString
+    challenge_input: JString,
 ) -> jstring {
     init_logger();
 
-    let secret_str: String = env.get_string(&secret_input).expect("Invalid Secret").into();
-    let domain_str: String = env.get_string(&domain_input).expect("Invalid Domain").into();
-    let challenge_str: String = env.get_string(&challenge_input).expect("Invalid Challenge").into();
+    let read = |s: JString| -> Result<String, ()> {
+        env.get_string(&s).map(|v| v.into()).map_err(|_| ())
+    };
 
-    info!("🚀 Rust Generating Proof for: {}", challenge_str);
+    let secret = match read(secret_input) {
+        Ok(v) => v,
+        Err(_) => return env.new_string("Error: Invalid Secret").unwrap().into_raw(),
+    };
+    let domain = match read(domain_input) {
+        Ok(v) => v,
+        Err(_) => return env.new_string("Error: Invalid Domain").unwrap().into_raw(),
+    };
+    let challenge = match read(challenge_input) {
+        Ok(v) => v,
+        Err(_) => return env.new_string("Error: Invalid Challenge").unwrap().into_raw(),
+    };
 
     let result = panic::catch_unwind(|| {
-        let secret_fels = string_to_field(&secret_str);
-        let domain_fels = string_to_field(&domain_str);
-        let challenge_fels = string_to_field(&challenge_str);
-
-        let secret_hash = PoseidonHash::hash_no_pad(&secret_fels);
-        let domain_hash = PoseidonHash::hash_no_pad(&domain_fels);
-        let challenge_hash = PoseidonHash::hash_no_pad(&challenge_fels);
+        let secret_f = PoseidonHash::hash_no_pad(&string_to_field(&secret)).elements[0];
+        let domain_f = PoseidonHash::hash_no_pad(&string_to_field(&domain)).elements[0];
+        let challenge_f = PoseidonHash::hash_no_pad(&string_to_field(&challenge)).elements[0];
 
         let config = CircuitConfig::standard_recursion_config();
         let mut builder = CircuitBuilder::<F, D>::new(config);
 
-        let secret_target = builder.add_virtual_target();
-        let domain_target = builder.add_virtual_target();
-        let challenge_target = builder.add_virtual_target();
+        let t_secret = builder.add_virtual_target();
+        let t_domain = builder.add_virtual_target();
+        let t_challenge = builder.add_virtual_target();
 
-        let inputs = vec![secret_target, domain_target, challenge_target];
-        let nullifier_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(inputs);
+        let hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(
+            vec![t_secret, t_domain, t_challenge],
+        );
 
-        builder.register_public_input(domain_target);
-        builder.register_public_input(challenge_target);
-        builder.register_public_input(nullifier_hash.elements[0]); 
+        builder.register_public_input(t_domain);
+        builder.register_public_input(t_challenge);
+        builder.register_public_input(hash.elements[0]);
 
-        let circuit_data = builder.build::<C>();
+        let data = builder.build::<C>();
 
         let mut pw = PartialWitness::new();
-        pw.set_target(secret_target, secret_hash.elements[0]);
-        pw.set_target(domain_target, domain_hash.elements[0]);
-        pw.set_target(challenge_target, challenge_hash.elements[0]);
+        pw.set_target(t_secret, secret_f);
+        pw.set_target(t_domain, domain_f);
+        pw.set_target(t_challenge, challenge_f);
 
-        let proof = circuit_data.prove(pw).expect("Proving Failed");
+        let proof = data.prove(pw).map_err(|_| "Error: Proving Failed")?;
+        let proof_b64 = general_purpose::STANDARD.encode(
+            bincode::serialize(&proof).map_err(|_| "Error: Serialize Failed")?,
+        );
 
-        let proof_bytes = bincode::serialize(&proof).expect("Serialization Failed");
-        let proof_b64 = general_purpose::STANDARD.encode(proof_bytes);
-        let nullifier_val = proof.public_inputs[2]; 
-        
-        format!("{}|{}", nullifier_val, proof_b64)
+        let nullifier = proof.public_inputs[PI_NULLIFIER];
+        Ok(format!("{}|{}", nullifier, proof_b64))
     });
 
     match result {
-        Ok(output) => env.new_string(output).unwrap().into_raw(),
-        Err(_) => env.new_string("Error: Rust ZKP Panic").unwrap().into_raw()
+        Ok(Ok(v)) => env.new_string(v).unwrap().into_raw(),
+        _ => env.new_string("Error: Rust Panic").unwrap().into_raw(),
     }
 }
