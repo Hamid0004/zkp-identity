@@ -18,44 +18,26 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.example.zkpapp.models.ProofRequest
-import com.example.zkpapp.network.RelayApi
+import com.example.zkpapp.auth.ZkAuthManager
 import com.journeyapps.barcodescanner.BarcodeCallback
 import com.journeyapps.barcodescanner.BarcodeResult
 import com.journeyapps.barcodescanner.DecoratedBarcodeView
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import okhttp3.OkHttpClient
-import okhttp3.Protocol
-import retrofit2.Retrofit
-import retrofit2.converter.gson.GsonConverterFactory
-import java.util.concurrent.TimeUnit
 
 class VerifierActivity : AppCompatActivity() {
 
-    companion object {
-        init {
-            try {
-                System.loadLibrary("zkp_mobile")
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }
-    }
-
-    // 🦁 CONFIG: Server URL
-    private val BASE_URL = "https://crispy-dollop-97xj7vjgx4ph9pgg-3000.app.github.dev/"
-
-    // JNI Function (For Offline Verification)
+    // 🦁 NOTE: Raw Rust loading ab ZkAuthManager handle karta hai.
+    
+    // JNI Function (For Old Offline Verification only)
     external fun verifyProofFromRust(proof: String): String
 
     private lateinit var barcodeView: DecoratedBarcodeView
     private lateinit var statusText: TextView
     private lateinit var progressBar: ProgressBar
 
-    // 🏛️ OLD LOGIC VARIABLES
+    // Variables
     private val receivedChunks = HashMap<Int, String>()
     private var totalChunksExpected = -1 
     private var lastVerifiedProofString: String? = null 
@@ -95,104 +77,55 @@ class VerifierActivity : AppCompatActivity() {
         barcodeView.decodeContinuous(object : BarcodeCallback {
             override fun barcodeResult(result: BarcodeResult?) {
                 if (isRelayProcessRunning) return 
-                
-                result?.text?.let { rawData ->
-                    processQrData(rawData)
-                }
+                result?.text?.let { rawData -> processQrData(rawData) }
             }
             override fun possibleResultPoints(resultPoints: MutableList<com.google.zxing.ResultPoint>?) {}
         })
     }
 
     private fun processQrData(data: String) {
-        // CASE 1: Old Logic (Pipes)
+        // CASE 1: Old Logic (Pipes for Offline)
         if (data.contains("|") && data.contains("/")) {
              processAnimatedChunk(data)
              return
         }
-        // CASE 2: New Logic (UUID) - 🦁 Strict Check Added
-        if (!isRelayProcessRunning && data.length > 20 && !data.contains("|")) {
+        // CASE 2: New Logic (UUID for Relay)
+        if (!isRelayProcessRunning && data.length == 36 && !data.contains("|")) {
             handleRelayLogin(data)
+        } else if (!isRelayProcessRunning && data.length > 10 && !data.contains("|")) {
+            showError("❌ Invalid QR Format")
         }
     }
 
-    // 🦁 MAIN LOGIC: LOGIN TO WEB (Robust Version)
+    // 🦁 MAIN LOGIC: LOGIN TO WEB (CLEANED using Manager)
     private fun handleRelayLogin(sessionId: String) {
-        
-        // 1. 🛡️ Check Internet First!
-        if (!NetworkUtils.isInternetAvailable(this)) {
-            showError("❌ No Internet Connection!")
-            return
-        }
-
+        // Stop Camera
         isRelayProcessRunning = true
         barcodeView.pause() 
+        progressBar.isIndeterminate = true
 
-        runOnUiThread {
-            statusText.text = "🦁 ID Detected!\nGenerating Proof..."
-            statusText.setBackgroundColor(Color.parseColor("#FF9800")) // Orange
-            progressBar.isIndeterminate = true
-        }
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                // 2. Generate Proof
-                // Note: Using 'generateSecureNullifier' directly via ZkAuth wrapper if available, 
-                // or direct JNI call. Assuming ZkAuth object exists from Day 81.
-                val proofOutput = ZkAuth.generateSecureNullifier("123456", "zk_login", sessionId)
-                
-                if (proofOutput.startsWith("🔥") || proofOutput.startsWith("Error")) {
-                    throw Exception("Proof Gen Failed")
+        // 🦁 Call the Manager (One-Liner Magic)
+        CoroutineScope(Dispatchers.Main).launch {
+            ZkAuthManager.startUniversalLogin(
+                context = this@VerifierActivity,
+                sessionId = sessionId,
+                onStatus = { msg ->
+                    // Update UI Status
+                    statusText.text = msg
+                    statusText.setBackgroundColor(Color.parseColor("#FF9800")) // Orange
+                },
+                onSuccess = {
+                    // ✅ Success Handling
+                    statusText.text = "✅ LOGIN SUCCESSFUL!"
+                    statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
+                    triggerSuccessFeedback()
+                    Handler(Looper.getMainLooper()).postDelayed({ resetScanner() }, 4000)
+                },
+                onError = { errorMsg ->
+                    // ❌ Error Handling
+                    showError(errorMsg)
                 }
-
-                // 3. Upload to Relay Server
-                withContext(Dispatchers.Main) { statusText.text = "☁️ Verifying with Server..." }
-
-                // 👇 Force HTTP/1.1 to prevent Stream Reset
-                val client = OkHttpClient.Builder()
-                    .protocols(listOf(Protocol.HTTP_1_1))
-                    .connectTimeout(30, TimeUnit.SECONDS)
-                    .readTimeout(30, TimeUnit.SECONDS)
-                    .writeTimeout(30, TimeUnit.SECONDS)
-                    .build()
-
-                val retrofit = Retrofit.Builder()
-                    .baseUrl(BASE_URL)
-                    .client(client)
-                    .addConverterFactory(GsonConverterFactory.create())
-                    .build()
-
-                val api = retrofit.create(RelayApi::class.java)
-                val request = ProofRequest(session_id = sessionId, proof_data = proofOutput)
-                
-                val response = api.uploadProof(request)
-
-                withContext(Dispatchers.Main) {
-                    if (response.isSuccessful) {
-                        // ✅ SUCCESS
-                        statusText.text = "✅ LOGIN SUCCESSFUL!\nCheck Laptop Screen"
-                        statusText.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
-                        triggerSuccessFeedback()
-                        
-                        // Auto-Reset Scanner after 4 seconds
-                        Handler(Looper.getMainLooper()).postDelayed({ resetScanner() }, 4000)
-                    } else {
-                        // ❌ SERVER ERROR HANDLING
-                        val code = response.code()
-                        val msg = when(code) {
-                            404 -> "❌ Session Expired"
-                            502 -> "❌ Invalid QR Code"
-                            else -> "❌ Server Error ($code)"
-                        }
-                        showError(msg)
-                    }
-                }
-
-            } catch (e: Exception) {
-                withContext(Dispatchers.Main) {
-                    showError("⚠️ Network Error: ${e.message}")
-                }
-            }
+            )
         }
     }
 
@@ -212,12 +145,13 @@ class VerifierActivity : AppCompatActivity() {
         statusText.setBackgroundColor(Color.RED)
         progressBar.isIndeterminate = false
         triggerErrorFeedback()
-        
-        // Retry allow karein 2.5 seconds baad
         Handler(Looper.getMainLooper()).postDelayed({ resetScanner() }, 2500)
     }
 
-    // 🏛️ OLD LOGIC: ANIMATED CHUNK PROCESSING (Offline)
+    // =========================================================
+    // 🏛️ OLD LOGIC (Keep as is for Offline Demo)
+    // =========================================================
+
     private fun processAnimatedChunk(data: String) {
         try {
             val parts = data.split("|", limit = 2)
@@ -296,9 +230,7 @@ class VerifierActivity : AppCompatActivity() {
             val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 v.vibrate(VibrationEffect.createOneShot(150, VibrationEffect.DEFAULT_AMPLITUDE))
-            } else {
-                v.vibrate(150)
-            }
+            } else { v.vibrate(150) }
         } catch (e: Exception) { }
     }
 
@@ -306,11 +238,8 @@ class VerifierActivity : AppCompatActivity() {
         try {
             val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // Double Vibration for Error
                 v.vibrate(VibrationEffect.createWaveform(longArrayOf(0, 50, 50, 50), -1))
-            } else {
-                v.vibrate(200)
-            }
+            } else { v.vibrate(200) }
         } catch (e: Exception) { }
     }
 
