@@ -2,8 +2,9 @@ use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
 use std::panic;
+
 use android_logger::Config;
-use log::{info, LevelFilter};
+use log::LevelFilter;
 
 use plonky2::field::types::Field;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
@@ -46,24 +47,24 @@ pub extern "system" fn Java_com_example_zkpapp_auth_ZkAuthManager_generateSecure
 ) -> jstring {
     init_logger();
 
-    let read = |s: JString| -> Result<String, ()> {
-        env.get_string(&s).map(|v| v.into()).map_err(|_| ())
-    };
-
-    let secret = match read(secret_input) {
-        Ok(v) => v,
+    // Read JNI strings safely
+    let secret: String = match env.get_string(&secret_input) {
+        Ok(v) => v.into(),
         Err(_) => return env.new_string("Error: Invalid Secret").unwrap().into_raw(),
     };
-    let domain = match read(domain_input) {
-        Ok(v) => v,
+
+    let domain: String = match env.get_string(&domain_input) {
+        Ok(v) => v.into(),
         Err(_) => return env.new_string("Error: Invalid Domain").unwrap().into_raw(),
     };
-    let challenge = match read(challenge_input) {
-        Ok(v) => v,
+
+    let challenge: String = match env.get_string(&challenge_input) {
+        Ok(v) => v.into(),
         Err(_) => return env.new_string("Error: Invalid Challenge").unwrap().into_raw(),
     };
 
-    let result = panic::catch_unwind(|| {
+    // Panic-safe ZKP computation
+    let result: Result<String, String> = panic::catch_unwind(|| {
         let secret_f = PoseidonHash::hash_no_pad(&string_to_field(&secret)).elements[0];
         let domain_f = PoseidonHash::hash_no_pad(&string_to_field(&domain)).elements[0];
         let challenge_f = PoseidonHash::hash_no_pad(&string_to_field(&challenge)).elements[0];
@@ -90,17 +91,23 @@ pub extern "system" fn Java_com_example_zkpapp_auth_ZkAuthManager_generateSecure
         pw.set_target(t_domain, domain_f);
         pw.set_target(t_challenge, challenge_f);
 
-        let proof = data.prove(pw).map_err(|_| "Error: Proving Failed")?;
+        let proof = data
+            .prove(pw)
+            .map_err(|_| "Error: Proving Failed".to_string())?;
+
         let proof_b64 = general_purpose::STANDARD.encode(
-            bincode::serialize(&proof).map_err(|_| "Error: Serialize Failed")?,
+            bincode::serialize(&proof)
+                .map_err(|_| "Error: Serialize Failed".to_string())?,
         );
 
         let nullifier = proof.public_inputs[PI_NULLIFIER];
+
         Ok(format!("{}|{}", nullifier, proof_b64))
-    });
+    })
+    .unwrap_or_else(|_| Err("Error: Rust Panic".to_string()));
 
     match result {
-        Ok(Ok(v)) => env.new_string(v).unwrap().into_raw(),
-        _ => env.new_string("Error: Rust Panic").unwrap().into_raw(),
+        Ok(v) => env.new_string(v).unwrap().into_raw(),
+        Err(e) => env.new_string(e).unwrap().into_raw(),
     }
 }
