@@ -37,8 +37,10 @@ fn string_to_field(input: &str) -> Vec<F> {
     input.bytes().map(F::from_canonical_u8).collect()
 }
 
+// 🦁 CRITICAL FIX: Name changed to match 'com.example.zkpapp.ZkAuth'
+// Yeh naam 'ZkAuth.kt' file ke package aur object name se match karna chahiye.
 #[no_mangle]
-pub extern "system" fn Java_com_example_zkpapp_auth_ZkAuthManager_generateSecureNullifier(
+pub extern "system" fn Java_com_example_zkpapp_ZkAuth_generateSecureNullifier(
     mut env: JNIEnv,
     _class: JClass,
     secret_input: JString,
@@ -100,6 +102,7 @@ pub extern "system" fn Java_com_example_zkpapp_auth_ZkAuthManager_generateSecure
                 .map_err(|_| "Error: Serialize Failed".to_string())?,
         );
 
+        // Nullifier is at index 2 (PI_NULLIFIER)
         let nullifier = proof.public_inputs[PI_NULLIFIER];
 
         Ok(format!("{}|{}", nullifier, proof_b64))
