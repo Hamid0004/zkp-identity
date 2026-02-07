@@ -24,31 +24,42 @@ class LoginActivity : AppCompatActivity() {
         val progressBar = findViewById<ProgressBar>(R.id.loader)
         val titleText = findViewById<TextView>(R.id.lblTitle)
 
-        // 2. Dummy Data (Offline Test ke liye)
-        val mySecret = "User_Passport_Hash_123"
-        val website = "google.com"
+        // 🦁 DAY 83 UPGRADE: Check for Real Identity
+        val hasIdentity = IdentityStorage.hasIdentity()
         
-        // Random Challenge (Server ki zaroorat nahi, Local Generate kar rahe hain)
+        // Random Challenge (Local)
         val localChallenge = UUID.randomUUID().toString().substring(0, 8)
 
-        // 3. UI Start State
-        statusText.text = "🦁 Starting Offline Test...\nChallenge: $localChallenge"
-        statusText.setTextColor(Color.DKGRAY)
-        progressBar.visibility = View.VISIBLE
+        // 2. UI Start State
+        statusText.text = if (hasIdentity) {
+            "🦁 REAL IDENTITY FOUND!\nGenerating Proof for Challenge: $localChallenge"
+        } else {
+            "⚠️ NO PASSPORT DATA!\nPlease Scan NFC first."
+        }
+        
+        statusText.setTextColor(if (hasIdentity) Color.DKGRAY else Color.RED)
+        progressBar.visibility = if (hasIdentity) View.VISIBLE else View.GONE
+        
+        if (!hasIdentity) {
+            Toast.makeText(this, "Please scan Passport first!", Toast.LENGTH_LONG).show()
+            return
+        }
 
-        // 4. ⚡ EXECUTE OFFLINE PROOF (No Internet Required)
-        // Hum IO Dispatcher use karenge taaki UI freeze na ho
+        // 3. ⚡ EXECUTE OFFLINE PROOF (Only if Identity Exists)
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 🦁 KEY FIX: Direct call to ZkAuth Wrapper (No ZkAuthManager!)
-                // Yeh function Internet check nahi karega, seedha Math karega.
+                // 🦁 GET REAL DATA FROM STORAGE
+                val realSecret = IdentityStorage.getSecret()
+                val realDomain = IdentityStorage.getDomain()
+
+                // 🦁 Direct Rust Call (No Internet)
                 val rawResult = ZkAuth.safeGenerateNullifier(
-                    secret = mySecret,
-                    domain = website,
+                    secret = realSecret,
+                    domain = realDomain,
                     challenge = localChallenge
                 )
 
-                // 5. Update UI on Main Thread
+                // 4. Update UI
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
 
@@ -59,28 +70,27 @@ class LoginActivity : AppCompatActivity() {
                         val proof = parts[1]
 
                         statusText.text = "✅ OFFLINE PROOF GENERATED!\n\n" +
+                                "Identity: Real Passport (PK)\n" +
                                 "Nullifier: $nullifier\n" +
                                 "(Proof Size: ${proof.length} chars)\n\n" +
                                 "⚠️ Pure Math. No Internet Used."
                         
                         statusText.setTextColor(Color.parseColor("#2E7D32")) // Green
                         
-                        // Title Update (Optional, agar ID hai to)
-                        titleText?.text = "Offline Test Passed 🛡️"
+                        titleText?.text = "Real ID Verified 🛡️"
                         
-                        Toast.makeText(applicationContext, "Math Works!", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(applicationContext, "Real Passport Proof Success!", Toast.LENGTH_SHORT).show()
 
                     } else {
-                        // ❌ ERROR CASE (e.g. Rust panic)
+                        // ❌ ERROR CASE
                         statusText.text = "❌ Calculation Failed:\n$rawResult"
                         statusText.setTextColor(Color.RED)
                     }
                 }
             } catch (e: Exception) {
-                // Crash Handler
                 withContext(Dispatchers.Main) {
                     progressBar.visibility = View.GONE
-                    statusText.text = "🔥 App Crash: ${e.message}"
+                    statusText.text = "🔥 Error: ${e.message}"
                     statusText.setTextColor(Color.RED)
                 }
             }

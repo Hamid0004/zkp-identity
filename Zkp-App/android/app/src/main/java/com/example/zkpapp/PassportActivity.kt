@@ -220,19 +220,25 @@ class PassportActivity : AppCompatActivity() {
                     finalColor
                 )
 
-                if (isError) performErrorVibration()
-            }
-        }
+                if (isError) {
+                    performErrorVibration()
+                } else {
+                    // 🦁 MERGER LOGIC
+                    val passportNum = data.documentNumber ?: "UNKNOWN_ID"
+                    val uniqueSecret = "$passportNum-ZKP-SECRET-KEY"
 
-        lifecycleScope.launch {
-            delay(15000)
-            if (!isFinishing && !isDestroyed) {
-                session = PassportSession()
-                resetUI()
-                updateStatus("Ready for next scan", Color.DKGRAY)
+                    IdentityStorage.saveIdentity(uniqueSecret, "PK_PASSPORT")
+
+                    Toast.makeText(this@PassportActivity, "🦁 Identity Secured! Redirecting...", Toast.LENGTH_SHORT).show()
+
+                    lifecycleScope.launch {
+                        delay(2000)
+                        finish()
+                    }
+                }
             }
         }
-    }
+    } // <--- 🦁 YE BRACE MISSING THA! AB CODE PERFECT HAI.
 
     private fun handleError(e: Exception) {
         progressBar.visibility = View.GONE

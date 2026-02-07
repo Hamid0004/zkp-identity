@@ -2,6 +2,7 @@ package com.example.zkpapp.auth
 
 import android.content.Context
 import android.util.Log
+import com.example.zkpapp.IdentityStorage // 🦁 NEW IMPORT
 import com.example.zkpapp.NetworkUtils
 import com.example.zkpapp.ZkAuth
 import com.example.zkpapp.models.ProofRequest
@@ -49,26 +50,39 @@ object ZkAuthManager {
         running = true
 
         try {
+            // 1. Internet Check
             if (!NetworkUtils.isInternetAvailable(context)) {
                 onError("❌ No Internet")
                 return
             }
 
-            onStatus("🦁 Generating ZK Proof…")
+            onStatus("🦁 Fetching Passport Identity...")
 
+            // 2. Generate Proof with REAL Data
             val proof = withContext(Dispatchers.Default) {
-                ZkAuth.generateSecureNullifier(
-                    secret = "123456",
-                    domain = "zk_login",
+                
+                // 🦁 DAY 83 LOGIC: Check Storage First
+                if (!IdentityStorage.hasIdentity()) {
+                    throw Exception("⚠️ No Passport Data! Please Scan NFC First.")
+                }
+
+                val realSecret = IdentityStorage.getSecret()
+                val realDomain = IdentityStorage.getDomain()
+
+                // Use Real Data for Zero Knowledge Proof
+                ZkAuth.safeGenerateNullifier(
+                    secret = realSecret,
+                    domain = realDomain,
                     challenge = sessionId
                 )
             }
 
-            if (proof.startsWith("Error")) {
+            if (proof.startsWith("Error") || proof.startsWith("🔥")) {
                 onError(proof)
                 return
             }
 
+            // 3. Upload to Server
             onStatus("☁️ Verifying with Server…")
 
             val response = withContext(Dispatchers.IO) {
