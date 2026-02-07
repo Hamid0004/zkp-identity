@@ -3,6 +3,7 @@ package com.example.zkpapp
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -16,6 +17,10 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnWebLogin: Button = findViewById(R.id.btnWebLogin)
         btnWebLogin.setOnClickListener {
+            // Check karein ke Identity hai ya nahi (Optional UX)
+            if (!IdentityStorage.hasIdentity()) {
+                Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
+            }
             val intent = Intent(this, VerifierActivity::class.java)
             startActivity(intent)
         }
@@ -25,7 +30,7 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnPassport: Button = findViewById(R.id.btnPassport)
         btnPassport.setOnClickListener {
-            // 🦁 FIX: Camera nahi, pehle Passport Dashboard khulega
+            // Passport Dashboard khulega (NFC Scan)
             val intent = Intent(this, PassportActivity::class.java) 
             startActivity(intent)
         }
@@ -37,6 +42,15 @@ class MainActivity : AppCompatActivity() {
         btnTest.setOnClickListener {
             val intent = Intent(this, LoginActivity::class.java)
             startActivity(intent)
+        }
+    }
+
+    // 🦁 DAY 84: SECURITY HARDENING (RAM Cleanup)
+    // Jab user App close kare, to sensitive data memory se uda do.
+    override fun onDestroy() {
+        super.onDestroy()
+        if (IdentityStorage.hasIdentity()) {
+            IdentityStorage.clear()
         }
     }
 }

@@ -2,7 +2,7 @@ package com.example.zkpapp.auth
 
 import android.content.Context
 import android.util.Log
-import com.example.zkpapp.IdentityStorage // 🦁 NEW IMPORT
+import com.example.zkpapp.IdentityStorage
 import com.example.zkpapp.NetworkUtils
 import com.example.zkpapp.ZkAuth
 import com.example.zkpapp.models.ProofRequest
@@ -58,10 +58,14 @@ object ZkAuthManager {
 
             onStatus("🦁 Fetching Passport Identity...")
 
+            // ⏱️ DAY 84: START BENCHMARK TIMER
+            val startTime = System.currentTimeMillis()
+            var proofDuration = 0L
+
             // 2. Generate Proof with REAL Data
             val proof = withContext(Dispatchers.Default) {
-                
-                // 🦁 DAY 83 LOGIC: Check Storage First
+
+                // Check Storage First
                 if (!IdentityStorage.hasIdentity()) {
                     throw Exception("⚠️ No Passport Data! Please Scan NFC First.")
                 }
@@ -70,11 +74,17 @@ object ZkAuthManager {
                 val realDomain = IdentityStorage.getDomain()
 
                 // Use Real Data for Zero Knowledge Proof
-                ZkAuth.safeGenerateNullifier(
+                val result = ZkAuth.safeGenerateNullifier(
                     secret = realSecret,
                     domain = realDomain,
                     challenge = sessionId
                 )
+                
+                // Calculate Time immediately after proof generation
+                val endTime = System.currentTimeMillis()
+                proofDuration = endTime - startTime
+                
+                return@withContext result
             }
 
             if (proof.startsWith("Error") || proof.startsWith("🔥")) {
@@ -82,9 +92,10 @@ object ZkAuthManager {
                 return
             }
 
-            // 3. Upload to Server
-            onStatus("☁️ Verifying with Server…")
+            // 🦁 DISPLAY SPEED TO USER
+            onStatus("⚡ Proof Generated in ${proofDuration}ms\n☁️ Verifying with Server...")
 
+            // 3. Upload to Server
             val response = withContext(Dispatchers.IO) {
                 api.uploadProof(ProofRequest(sessionId, proof))
             }
