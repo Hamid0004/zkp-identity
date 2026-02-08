@@ -34,12 +34,17 @@ class MainActivity : AppCompatActivity() {
         }
 
         // =========================================================
-        // 🟢 BUTTON 3: OFFLINE MENU (New Green Button)
+        // 🟢 BUTTON 3: OFFLINE IDENTITY (Updated: Direct QR)
         // =========================================================
         val btnOfflineMenu: Button = findViewById(R.id.btnOfflineMenu)
         btnOfflineMenu.setOnClickListener {
-            // Opens the Menu with Transmit/Verify options
-            startActivity(Intent(this, OfflineMenuActivity::class.java))
+            // 🛡️ Security Check (Safety First)
+            if (!IdentityStorage.hasIdentity()) {
+                Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            // 🦁 UPDATE: Bypassed Menu -> Opens QR Generator directly
+            startActivity(Intent(this, LoginActivity::class.java))
         }
 
         // =========================================================
@@ -47,7 +52,7 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnTest: Button = findViewById(R.id.btnTest)
         btnTest.setOnClickListener {
-            // Direct Proof Generation (Quick Test)
+            // Direct Proof Generation (For Debugging/Testing)
             startActivity(Intent(this, LoginActivity::class.java))
         }
     }
