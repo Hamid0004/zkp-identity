@@ -49,7 +49,9 @@
         android:appComponentFactory="androidx.core.app.CoreComponentFactory"
         android:debuggable="true"
         android:extractNativeLibs="false"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:label="ZKP Mobile"
+        android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar" >
         <activity
@@ -62,8 +64,14 @@
             </intent-filter>
         </activity>
         <activity
+            android:name="com.example.zkpapp.OfflineMenuActivity"
+            android:exported="false"
+            android:label="Offline Tools"
+            android:screenOrientation="portrait" />
+        <activity
             android:name="com.example.zkpapp.LoginActivity"
             android:exported="false"
+            android:label="Generating Proof..."
             android:screenOrientation="portrait" />
         <activity
             android:name="com.example.zkpapp.PassportActivity"
@@ -81,12 +89,12 @@
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
         <activity
-            android:name="com.example.zkpapp.CameraActivity"
+            android:name="com.example.zkpapp.VerifierActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
-            android:name="com.example.zkpapp.VerifierActivity"
+            android:name="com.example.zkpapp.CameraActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />

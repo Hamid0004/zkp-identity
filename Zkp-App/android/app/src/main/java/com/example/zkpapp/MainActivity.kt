@@ -13,34 +13,39 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         // =========================================================
-        // 🔵 BUTTON 1: WEB LOGIN (Day 81 - Relay)
+        // 🔵 BUTTON 1: ONLINE LOGIN (Scan QR)
         // =========================================================
         val btnWebLogin: Button = findViewById(R.id.btnWebLogin)
         btnWebLogin.setOnClickListener {
-            // Check karein ke Identity hai ya nahi (Optional UX)
+            // 🛡️ Security Check: Kya Identity hai?
             if (!IdentityStorage.hasIdentity()) {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener // 🛑 Stop here if no ID
             }
+            
+            // ✅ Agar Identity hai, to Scanner kholo
             val intent = Intent(this, VerifierActivity::class.java)
             startActivity(intent)
         }
 
         // =========================================================
-        // 🟠 BUTTON 2: CREATE IDENTITY (Passport Phase 6)
+        // 🟠 BUTTON 2: CREATE IDENTITY (Scan Passport)
         // =========================================================
         val btnPassport: Button = findViewById(R.id.btnPassport)
         btnPassport.setOnClickListener {
-            // Passport Dashboard khulega (NFC Scan)
-            val intent = Intent(this, PassportActivity::class.java) 
+            // Passport Dashboard khulega
+            val intent = Intent(this, PassportActivity::class.java)
             startActivity(intent)
         }
 
         // =========================================================
-        // ⚪ BUTTON 3: OFFLINE TEST (Debug Tool)
+        // ⚪ BUTTON 3: OFFLINE IDENTITY TOOLS (Next Page)
         // =========================================================
-        val btnTest: Button = findViewById(R.id.btnTest)
-        btnTest.setOnClickListener {
-            val intent = Intent(this, LoginActivity::class.java)
+        // ⚠️ Note: XML ID updated to 'btnOfflineMenu' to match layout
+        val btnOfflineMenu: Button = findViewById(R.id.btnOfflineMenu)
+        btnOfflineMenu.setOnClickListener {
+            // Ab hum 'Menu Page' kholenge jahan Transmit/Verify buttons hain
+            val intent = Intent(this, OfflineMenuActivity::class.java)
             startActivity(intent)
         }
     }

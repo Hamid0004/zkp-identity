@@ -3,7 +3,6 @@
     package="com.example.zkpapp">
 
     <uses-permission android:name="android.permission.INTERNET" />
-
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.NFC" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -14,7 +13,9 @@
 
     <application
         android:allowBackup="true"
+        android:icon="@android:drawable/sym_def_app_icon"
         android:label="ZKP Mobile"
+        android:roundIcon="@android:drawable/sym_def_app_icon"
         android:supportsRtl="true"
         android:theme="@style/Theme.AppCompat.Light.DarkActionBar">
 
@@ -27,10 +28,17 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".OfflineMenuActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:label="Offline Tools" />
+
         <activity 
             android:name=".LoginActivity"
             android:exported="false"
-            android:screenOrientation="portrait" />
+            android:screenOrientation="portrait"
+            android:label="Generating Proof..." />
 
         <activity
             android:name=".PassportActivity"
@@ -49,13 +57,13 @@
         </activity>
 
         <activity
-            android:name=".CameraActivity"
+            android:name=".VerifierActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <activity
-            android:name=".VerifierActivity"
+            android:name=".CameraActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />

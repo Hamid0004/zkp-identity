@@ -3175,13 +3175,16 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
+id btnOfflineMenu
 id btnPassport
-id btnTest
+id btnTransmit
+id btnVerifyOffline
 id btnWebLogin
 id buttonPanel
 id cache_measures
 id callMeasure
 id cancel_button
+id cardTransmit
 id carryVelocity
 id center
 id centerCrop
@@ -3563,6 +3566,8 @@ id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
 id triangle
+id tvSubtitle
+id tvTitle
 id txtStatus
 id unchecked
 id uniform
@@ -3719,6 +3724,7 @@ layout abc_tooltip
 layout activity_camera
 layout activity_login
 layout activity_main
+layout activity_offline_menu
 layout activity_verifier
 layout custom_dialog
 layout design_bottom_navigation_item

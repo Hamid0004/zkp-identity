@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -9,11 +11,11 @@
 
     <ImageView
         android:id="@+id/app_logo"
-        android:layout_width="120dp"
-        android:layout_height="120dp"
-        android:src="@android:drawable/sym_def_app_icon" 
-        android:layout_marginBottom="20dp"
-        android:elevation="10dp"/>
+        android:layout_width="100dp"
+        android:layout_height="100dp"
+        android:src="@android:drawable/sym_def_app_icon"
+        android:layout_marginBottom="24dp"
+        android:elevation="8dp"/>
 
     <TextView
         android:id="@+id/app_title"
@@ -22,50 +24,55 @@
         android:text="ZKP Identity"
         android:textSize="32sp"
         android:textStyle="bold"
-        android:textColor="#212121"
-        android:letterSpacing="0.05"
-        android:layout_marginBottom="50dp"/>
+        android:textColor="#263238"
+        android:fontFamily="sans-serif-medium"
+        android:letterSpacing="0.02"
+        android:layout_marginBottom="48dp"/>
 
     <Button
         android:id="@+id/btnWebLogin"
         android:layout_width="match_parent"
-        android:layout_height="65dp"
-        android:text="📷 Scan QR to Login"
-        android:textSize="18sp"
+        android:layout_height="70dp"
+        android:text="📷  Scan QR to Login"
+        android:textSize="16sp"
         android:textStyle="bold"
-        android:backgroundTint="#2196F3"
+        android:backgroundTint="#2962FF"
         android:textColor="#FFFFFF"
-        android:elevation="5dp"
-        android:layout_marginBottom="20dp"/>
+        android:elevation="6dp"
+        app:cornerRadius="12dp"
+        android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/btnPassport"
         android:layout_width="match_parent"
-        android:layout_height="65dp"
-        android:text="🛂 Scan Passport (Create ID)"
-        android:textSize="18sp"
+        android:layout_height="70dp"
+        android:text="🛂  Scan Passport (Create)"
+        android:textSize="16sp"
         android:textStyle="bold"
-        android:backgroundTint="#FF9800"
+        android:backgroundTint="#FF6D00"
         android:textColor="#FFFFFF"
-        android:elevation="5dp"
-        android:layout_marginBottom="20dp"/>
+        android:elevation="6dp"
+        app:cornerRadius="12dp"
+        android:layout_marginBottom="16dp"/>
 
     <Button
-        android:id="@+id/btnTest"
+        android:id="@+id/btnOfflineMenu"
         android:layout_width="match_parent"
         android:layout_height="60dp"
-        android:text="🧪 Test Proof (Offline)"
-        android:textSize="16sp"
-        android:backgroundTint="#607D8B"
+        android:text="📡  Offline Identity Tools"
+        android:textSize="14sp"
+        android:textStyle="bold"
+        android:backgroundTint="#455A64"
         android:textColor="#FFFFFF"
-        android:elevation="2dp"/>
+        android:elevation="2dp"
+        app:cornerRadius="12dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Powered by Rust + Plonky2 🦁"
         android:textSize="12sp"
-        android:textColor="#9E9E9E"
+        android:textColor="#90A4AE"
         android:layout_marginTop="40dp"/>
 
 </LinearLayout>
