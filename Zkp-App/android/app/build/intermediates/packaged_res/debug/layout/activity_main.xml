@@ -27,45 +27,58 @@
         android:textColor="#263238"
         android:fontFamily="sans-serif-medium"
         android:letterSpacing="0.02"
-        android:layout_marginBottom="48dp"/>
+        android:layout_marginBottom="40dp"/>
 
     <Button
         android:id="@+id/btnWebLogin"
         android:layout_width="match_parent"
-        android:layout_height="70dp"
+        android:layout_height="65dp"
         android:text="📷  Scan QR to Login"
         android:textSize="16sp"
         android:textStyle="bold"
         android:backgroundTint="#2962FF"
         android:textColor="#FFFFFF"
         android:elevation="6dp"
-        app:cornerRadius="12dp"
+        app:cornerRadius="8dp"
         android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/btnPassport"
         android:layout_width="match_parent"
-        android:layout_height="70dp"
-        android:text="🛂  Scan Passport (Create)"
+        android:layout_height="65dp"
+        android:text="🛂  Scan Passport (Create ID)"
         android:textSize="16sp"
         android:textStyle="bold"
-        android:backgroundTint="#FF6D00"
+        android:backgroundTint="#FF9800"
         android:textColor="#FFFFFF"
         android:elevation="6dp"
-        app:cornerRadius="12dp"
+        app:cornerRadius="8dp"
         android:layout_marginBottom="16dp"/>
 
     <Button
         android:id="@+id/btnOfflineMenu"
         android:layout_width="match_parent"
-        android:layout_height="60dp"
-        android:text="📡  Offline Identity Tools"
-        android:textSize="14sp"
+        android:layout_height="65dp"
+        android:text="🪪  OFFLINE IDENTITY"
+        android:textSize="16sp"
         android:textStyle="bold"
-        android:backgroundTint="#455A64"
+        android:backgroundTint="#2E7D32"
+        android:textColor="#FFFFFF"
+        android:elevation="6dp"
+        app:cornerRadius="8dp"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnTest"
+        android:layout_width="match_parent"
+        android:layout_height="65dp"
+        android:text="🧪  Test Proof (Offline)"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:backgroundTint="#607D8B"
         android:textColor="#FFFFFF"
         android:elevation="2dp"
-        app:cornerRadius="12dp"/>
+        app:cornerRadius="8dp"/>
 
     <TextView
         android:layout_width="wrap_content"
@@ -73,6 +86,6 @@
         android:text="Powered by Rust + Plonky2 🦁"
         android:textSize="12sp"
         android:textColor="#90A4AE"
-        android:layout_marginTop="40dp"/>
+        android:layout_marginTop="30dp"/>
 
 </LinearLayout>

@@ -3177,6 +3177,7 @@ id bounceEnd
 id bounceStart
 id btnOfflineMenu
 id btnPassport
+id btnTest
 id btnTransmit
 id btnVerifyOffline
 id btnWebLogin

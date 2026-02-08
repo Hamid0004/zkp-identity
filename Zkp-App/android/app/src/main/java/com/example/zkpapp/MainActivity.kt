@@ -17,15 +17,12 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnWebLogin: Button = findViewById(R.id.btnWebLogin)
         btnWebLogin.setOnClickListener {
-            // 🛡️ Security Check: Kya Identity hai?
+            // 🛡️ Security Check
             if (!IdentityStorage.hasIdentity()) {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
-                return@setOnClickListener // 🛑 Stop here if no ID
+                return@setOnClickListener
             }
-            
-            // ✅ Agar Identity hai, to Scanner kholo
-            val intent = Intent(this, VerifierActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, VerifierActivity::class.java))
         }
 
         // =========================================================
@@ -33,25 +30,29 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnPassport: Button = findViewById(R.id.btnPassport)
         btnPassport.setOnClickListener {
-            // Passport Dashboard khulega
-            val intent = Intent(this, PassportActivity::class.java)
-            startActivity(intent)
+            startActivity(Intent(this, PassportActivity::class.java))
         }
 
         // =========================================================
-        // ⚪ BUTTON 3: OFFLINE IDENTITY TOOLS (Next Page)
+        // 🟢 BUTTON 3: OFFLINE MENU (New Green Button)
         // =========================================================
-        // ⚠️ Note: XML ID updated to 'btnOfflineMenu' to match layout
         val btnOfflineMenu: Button = findViewById(R.id.btnOfflineMenu)
         btnOfflineMenu.setOnClickListener {
-            // Ab hum 'Menu Page' kholenge jahan Transmit/Verify buttons hain
-            val intent = Intent(this, OfflineMenuActivity::class.java)
-            startActivity(intent)
+            // Opens the Menu with Transmit/Verify options
+            startActivity(Intent(this, OfflineMenuActivity::class.java))
+        }
+
+        // =========================================================
+        // ⚪ BUTTON 4: TEST PROOF (Old Debug Logic)
+        // =========================================================
+        val btnTest: Button = findViewById(R.id.btnTest)
+        btnTest.setOnClickListener {
+            // Direct Proof Generation (Quick Test)
+            startActivity(Intent(this, LoginActivity::class.java))
         }
     }
 
-    // 🦁 DAY 84: SECURITY HARDENING (RAM Cleanup)
-    // Jab user App close kare, to sensitive data memory se uda do.
+    // 🦁 SECURITY: Clean RAM on Close
     override fun onDestroy() {
         super.onDestroy()
         if (IdentityStorage.hasIdentity()) {

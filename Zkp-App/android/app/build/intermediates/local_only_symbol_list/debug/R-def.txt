@@ -11,6 +11,7 @@ id app_title
 id barcode_scanner
 id btnOfflineMenu
 id btnPassport
+id btnTest
 id btnTransmit
 id btnVerifyOffline
 id btnWebLogin
