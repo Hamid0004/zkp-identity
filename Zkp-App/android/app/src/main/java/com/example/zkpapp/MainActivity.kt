@@ -22,6 +22,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            // Opens Scanner (Receiver Mode logic for Online)
             startActivity(Intent(this, VerifierActivity::class.java))
         }
 
@@ -30,34 +31,36 @@ class MainActivity : AppCompatActivity() {
         // =========================================================
         val btnPassport: Button = findViewById(R.id.btnPassport)
         btnPassport.setOnClickListener {
+            // Passport Reader (NFC)
             startActivity(Intent(this, PassportActivity::class.java))
         }
 
         // =========================================================
-        // 🟢 BUTTON 3: OFFLINE IDENTITY (Updated: Direct QR)
+        // 🟢 BUTTON 3: OFFLINE IDENTITY (Direct Sender Mode)
         // =========================================================
         val btnOfflineMenu: Button = findViewById(R.id.btnOfflineMenu)
         btnOfflineMenu.setOnClickListener {
-            // 🛡️ Security Check (Safety First)
+            // 🛡️ Security Check
             if (!IdentityStorage.hasIdentity()) {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            // 🦁 UPDATE: Bypassed Menu -> Opens QR Generator directly
+            // 🦁 UPDATE: Bypassed Menu -> Opens Animated QR Generator directly
             startActivity(Intent(this, LoginActivity::class.java))
         }
 
         // =========================================================
-        // ⚪ BUTTON 4: TEST PROOF (Old Debug Logic)
+        // ⚪ BUTTON 4: TEST PROOF (Quick Debug)
         // =========================================================
         val btnTest: Button = findViewById(R.id.btnTest)
         btnTest.setOnClickListener {
-            // Direct Proof Generation (For Debugging/Testing)
+            // Direct Proof Generation (Useful for benchmarks/testing without checks)
             startActivity(Intent(this, LoginActivity::class.java))
         }
     }
 
     // 🦁 SECURITY: Clean RAM on Close
+    // Jab user App close kare, to sensitive data memory se uda do.
     override fun onDestroy() {
         super.onDestroy()
         if (IdentityStorage.hasIdentity()) {

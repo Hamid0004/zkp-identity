@@ -1,98 +1,134 @@
 package com.example.zkpapp
 
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
-import android.view.View
-import android.widget.ProgressBar
+import android.widget.Button
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import java.util.UUID
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.MultiFormatWriter
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
+import com.journeyapps.barcodescanner.BarcodeEncoder
+import kotlinx.coroutines.*
+import org.json.JSONArray
+import java.util.EnumMap
 
 class LoginActivity : AppCompatActivity() {
+
+    // 👇 JNI Connection (Rust Logic)
+    companion object {
+        init { System.loadLibrary("zkp_mobile") }
+    }
+    // Note: Rust function should return JSON Array of chunks
+    external fun stringFromRust(): String
+
+    // UI Elements
+    private lateinit var qrImage: ImageView
+    private lateinit var statusText: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
         // 1. Initialize UI
-        val statusText = findViewById<TextView>(R.id.txtStatus)
-        val progressBar = findViewById<ProgressBar>(R.id.loader)
-        val titleText = findViewById<TextView>(R.id.lblTitle)
+        qrImage = findViewById(R.id.imgDynamicQr)
+        statusText = findViewById(R.id.tvStatus)
+        val btnGotoScanner: Button = findViewById(R.id.btnGotoScanner)
 
-        // 🦁 DAY 83 UPGRADE: Check for Real Identity
-        val hasIdentity = IdentityStorage.hasIdentity()
-        
-        // Random Challenge (Local)
-        val localChallenge = UUID.randomUUID().toString().substring(0, 8)
-
-        // 2. UI Start State
-        statusText.text = if (hasIdentity) {
-            "🦁 REAL IDENTITY FOUND!\nGenerating Proof for Challenge: $localChallenge"
-        } else {
-            "⚠️ NO PASSPORT DATA!\nPlease Scan NFC first."
-        }
-        
-        statusText.setTextColor(if (hasIdentity) Color.DKGRAY else Color.RED)
-        progressBar.visibility = if (hasIdentity) View.VISIBLE else View.GONE
-        
-        if (!hasIdentity) {
-            Toast.makeText(this, "Please scan Passport first!", Toast.LENGTH_LONG).show()
+        // 🦁 2. SECURITY CHECK: Real Identity Exists?
+        if (!IdentityStorage.hasIdentity()) {
+            Toast.makeText(this, "⚠️ No Identity Found! Scan Passport First.", Toast.LENGTH_LONG).show()
+            finish() // Close Activity if no ID
             return
         }
 
-        // 3. ⚡ EXECUTE OFFLINE PROOF (Only if Identity Exists)
+        // 3. Start Proof Generation (Animated QR)
+        startProofGeneration()
+
+        // 4. Button Logic: Switch to Receiver Mode
+        btnGotoScanner.setOnClickListener {
+            finish() // Close Sender
+            startActivity(Intent(this, VerifierActivity::class.java))
+        }
+    }
+
+    private fun startProofGeneration() {
+        statusText.text = "⏳ Generating Real ID Proof..."
+        statusText.setTextColor(Color.DKGRAY)
+        
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 🦁 GET REAL DATA FROM STORAGE
-                val realSecret = IdentityStorage.getSecret()
-                val realDomain = IdentityStorage.getDomain()
-
-                // 🦁 Direct Rust Call (No Internet)
-                val rawResult = ZkAuth.safeGenerateNullifier(
-                    secret = realSecret,
-                    domain = realDomain,
-                    challenge = localChallenge
-                )
-
-                // 4. Update UI
+                // 🦁 CALL RUST (This uses Real ID inside Rust to generate chunks)
+                val jsonResponse = stringFromRust() 
+                
                 withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
-
-                    if (rawResult.contains("|")) {
-                        // ✅ SUCCESS CASE
-                        val parts = rawResult.split("|")
-                        val nullifier = parts[0]
-                        val proof = parts[1]
-
-                        statusText.text = "✅ OFFLINE PROOF GENERATED!\n\n" +
-                                "Identity: Real Passport (PK)\n" +
-                                "Nullifier: $nullifier\n" +
-                                "(Proof Size: ${proof.length} chars)\n\n" +
-                                "⚠️ Pure Math. No Internet Used."
+                    // Check if Rust returned an error message instead of JSON
+                    if (jsonResponse.startsWith("Error")) {
+                        statusText.text = "❌ $jsonResponse"
+                        statusText.setTextColor(Color.RED)
+                    } else {
+                        // Success: Parse JSON chunks
+                        val jsonArray = JSONArray(jsonResponse)
+                        val totalChunks = jsonArray.length()
                         
+                        statusText.text = "🛡️ Real ID Verified!\nBroadcasting $totalChunks Frames..."
                         statusText.setTextColor(Color.parseColor("#2E7D32")) // Green
                         
-                        titleText?.text = "Real ID Verified 🛡️"
-                        
-                        Toast.makeText(applicationContext, "Real Passport Proof Success!", Toast.LENGTH_SHORT).show()
-
-                    } else {
-                        // ❌ ERROR CASE
-                        statusText.text = "❌ Calculation Failed:\n$rawResult"
-                        statusText.setTextColor(Color.RED)
+                        // Start Animation Loop
+                        playQrAnimation(jsonArray)
                     }
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    progressBar.visibility = View.GONE
                     statusText.text = "🔥 Error: ${e.message}"
                     statusText.setTextColor(Color.RED)
                 }
+            }
+        }
+    }
+
+    // 🔄 ANIMATION ENGINE (Forward -> Reverse -> Random)
+    private fun playQrAnimation(dataChunks: JSONArray) {
+        val encoder = BarcodeEncoder()
+        
+        // QR Settings (Low Error Correction for Speed)
+        val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java)
+        hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L 
+        hints[EncodeHintType.MARGIN] = 1 
+        
+        CoroutineScope(Dispatchers.Main).launch {
+            val indices = (0 until dataChunks.length()).toMutableList()
+            var loopCount = 0 
+            
+            while (isActive) { 
+                // Strategy: Change sequence every loop to help scanner catch missed frames
+                if (loopCount == 0) {
+                    indices.sort() // Forward (1 -> End)
+                } else if (loopCount == 1) {
+                    indices.sortDescending() // Reverse (End -> 1)
+                } else {
+                    indices.shuffle() // Random (Cleanup)
+                }
+
+                for (i in indices) {
+                    val chunkData = dataChunks.getString(i)
+                    try {
+                        val matrix = MultiFormatWriter().encode(
+                            chunkData, BarcodeFormat.QR_CODE, 800, 800, hints 
+                        )
+                        val bitmap = encoder.createBitmap(matrix)
+                        qrImage.setImageBitmap(bitmap)
+                    } catch (e: Exception) { }
+
+                    delay(110) // ⚡ Speed: 110ms per frame
+                }
+                loopCount++
+                delay(100) // Small pause between loops
             }
         }
     }

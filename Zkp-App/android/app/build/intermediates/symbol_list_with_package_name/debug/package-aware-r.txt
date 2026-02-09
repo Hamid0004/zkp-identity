@@ -2979,6 +2979,7 @@ drawable design_password_eye
 drawable design_snackbar_background
 drawable googleg_disabled_color_18
 drawable googleg_standard_color_18
+drawable gradient_header_bg
 drawable ic_arrow_back_black_24
 drawable ic_call_answer
 drawable ic_call_answer_low
@@ -2997,6 +2998,8 @@ drawable ic_mtrl_chip_checked_black
 drawable ic_mtrl_chip_checked_circle
 drawable ic_mtrl_chip_close_circle
 drawable ic_search_black_24
+drawable ic_shield_lock
+drawable info_bg
 drawable m3_appbar_background
 drawable m3_avd_hide_password
 drawable m3_avd_show_password
@@ -3068,6 +3071,7 @@ drawable notification_template_icon_bg
 drawable notification_template_icon_low_bg
 drawable notification_tile_bg
 drawable notify_panel_notification_icon_bg
+drawable qr_border
 drawable rounded_border
 drawable test_level_drawable
 drawable tooltip_frame_dark
@@ -3175,6 +3179,7 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
+id btnGotoScanner
 id btnOfflineMenu
 id btnPassport
 id btnTest
@@ -3308,6 +3313,7 @@ id ifRoom
 id ignore
 id ignoreRequest
 id image
+id imgDynamicQr
 id immediateStop
 id included
 id indeterminate
@@ -3567,9 +3573,9 @@ id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
 id triangle
+id tvStatus
 id tvSubtitle
 id tvTitle
-id txtStatus
 id unchecked
 id uniform
 id unlabeled
