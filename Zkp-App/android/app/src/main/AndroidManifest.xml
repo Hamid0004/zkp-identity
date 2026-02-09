@@ -12,6 +12,7 @@
     <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
 
     <application
+        android:name=".MyApplication"
         android:allowBackup="true"
         android:icon="@android:drawable/sym_def_app_icon"
         android:label="ZKP Mobile"
@@ -28,17 +29,18 @@
             </intent-filter>
         </activity>
 
-        <activity
-            android:name=".OfflineMenuActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:label="Offline Tools" />
-
         <activity 
             android:name=".LoginActivity"
             android:exported="false"
             android:screenOrientation="portrait"
-            android:label="Generating Proof..." />
+            android:label="Generating Proof..."
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
+
+        <activity
+            android:name=".VerifierActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <activity
             android:name=".PassportActivity"
@@ -55,18 +57,6 @@
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
-
-        <activity
-            android:name=".VerifierActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.NoActionBar" />
-
-        <activity
-            android:name=".CameraActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
     </application>
 
