@@ -10,7 +10,7 @@ crate-type = ["cdylib"]
 # 🌉 Android Communication
 jni = "0.21.1"
 
-# 🧠 ZKP Engine (Day 78 - New)
+# 🧠 ZKP Engine (Plonky2)
 plonky2 = "0.2.2"
 plonky2_field = "0.2.2"
 
@@ -21,13 +21,16 @@ anyhow = "1.0"
 bincode = "1.3"
 base64 = "0.21"
 
-# 🔐 Passport Security (Old Logic)
+# 🦁 NEW: Integrity Check (Critical for Chunking)
+crc32fast = "1.3" 
+
+# 🔐 Passport Security (Crypto)
 hex = "0.4"
 sha2 = "0.10"
 rsa = { version = "0.9", features = ["sha2"] }
 rand = "0.8"
 
-# 🛠️ Build Fixes
+# 🛠️ Build Fixes (Dependency Pinning)
 base64ct = "=1.6.0"
 rayon = "=1.10.0"
 
