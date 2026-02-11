@@ -1,26 +1,13 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
-buildscript {c
-    ext {
-        kotlin_version = '1.9.0'
-    }
+buildscript {
+    ext.kotlin_version = '1.9.0'
     repositories {
         google()
         mavenCentral()
     }
     dependencies {
-        // 🦁 Gradle Plugin Version (Zaroori hai)
         classpath 'com.android.tools.build:gradle:8.1.1'
-        
-        // 🦁 Kotlin Plugin
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
-}
-
-// Is block mein hum Plugins define karte hain lekin apply nahi karte (apply false)
-plugins {
-    id 'com.android.application' version '8.1.1' apply false
-    id 'com.android.library' version '8.1.1' apply false
-    id 'org.jetbrains.kotlin.android' version '1.9.0' apply false
 }
 
 allprojects {

@@ -40,9 +40,9 @@
     <string msgid="8793775615905189152" name="call_notification_answer_video_action">"Bideoa"</string>
     <string msgid="3229508546291798546" name="call_notification_decline_action">"Baztertu"</string>
     <string msgid="2659457946726154263" name="call_notification_hang_up_action">"Amaitu deia"</string>
-    <string msgid="6107532579223922871" name="call_notification_incoming_text">"Jasotako deia"</string>
+    <string msgid="6107532579223922871" name="call_notification_incoming_text">"Sarrerako deia"</string>
     <string msgid="8623827134497363134" name="call_notification_ongoing_text">"Deia abian da"</string>
-    <string msgid="59049573811482460" name="call_notification_screening_text">"Jasotako dei bat bistaratzen"</string>
+    <string msgid="59049573811482460" name="call_notification_screening_text">"Sarrerako dei bat bistaratzen"</string>
     <string name="character_counter_content_description">%1$d/%2$d karaktere idatzi dira</string>
     <string name="character_counter_overflowed_content_description">Karaktere-muga gainditu da: %1$d/%2$d</string>
     <string name="clear_text_end_icon_content_description">Garbitu testua</string>
@@ -86,18 +86,22 @@
     <string name="mtrl_exceed_max_badge_number_content_description" ns2:ignore="PluralsCandidate">%1$d jakinarazpen berri baino gehiago</string>
     <string name="mtrl_picker_a11y_next_month">Aldatu hurrengo hilabetera</string>
     <string name="mtrl_picker_a11y_prev_month">Aldatu aurreko hilabetera</string>
+    <string name="mtrl_picker_announce_current_range_selection">Hasiera-dataren hautapena: %1$s, amaiera-dataren hautapena: %2$s</string>
     <string name="mtrl_picker_announce_current_selection">Oraingo hautapena: %1$s</string>
+    <string name="mtrl_picker_announce_current_selection_none">bat ere ez</string>
     <string name="mtrl_picker_cancel">Utzi</string>
     <string name="mtrl_picker_confirm">Ados</string>
     <string name="mtrl_picker_date_header_selected">%1$s</string>
     <string name="mtrl_picker_date_header_title">Hautatu data</string>
     <string name="mtrl_picker_date_header_unselected">Hautatutako data</string>
     <string name="mtrl_picker_day_of_week_column_header">Egunen zutabea:%1$s</string>
+    <string name="mtrl_picker_end_date_description">Amaiera-data: %1$s</string>
     <string name="mtrl_picker_invalid_format">Formatuak ez du balio.</string>
     <string name="mtrl_picker_invalid_format_example">Adibidea: %1$s</string>
     <string name="mtrl_picker_invalid_format_use">Erabili: %1$s</string>
     <string name="mtrl_picker_invalid_range">Tarteak ez du balio.</string>
-    <string name="mtrl_picker_navigate_to_year_description">Joan %1$s. urtera</string>
+    <string name="mtrl_picker_navigate_to_current_year_description">Joan aurtengo ikuspegira %1$d</string>
+    <string name="mtrl_picker_navigate_to_year_description">Joan %1$d. urtera</string>
     <string name="mtrl_picker_out_of_range">Onartutako barrutitik kanpo: %1$s</string>
     <string name="mtrl_picker_range_header_only_end_selected">Hasiera-data – %1$s</string>
     <string name="mtrl_picker_range_header_only_start_selected">%1$s – Amaiera-data</string>
@@ -105,16 +109,18 @@
     <string name="mtrl_picker_range_header_title">Hautatu barrutia</string>
     <string name="mtrl_picker_range_header_unselected">Hasiera-data - Amaiera-data</string>
     <string name="mtrl_picker_save">Gorde</string>
+    <string name="mtrl_picker_start_date_description">Hasiera-data: %1$s</string>
     <string name="mtrl_picker_text_input_date_hint">Data</string>
     <string name="mtrl_picker_text_input_date_range_end_hint">Amaiera-data</string>
     <string name="mtrl_picker_text_input_date_range_start_hint">Hasiera-data</string>
     <string name="mtrl_picker_text_input_day_abbr">e</string>
     <string name="mtrl_picker_text_input_month_abbr">h</string>
     <string name="mtrl_picker_text_input_year_abbr">u</string>
+    <string name="mtrl_picker_today_description">Gaur %1$s</string>
     <string name="mtrl_picker_toggle_to_calendar_input_mode">Aldatu egutegiaren idazketa-metodora</string>
-    <string name="mtrl_picker_toggle_to_day_selection">Sakatu eguna hautatzeko modura aldatzeko</string>
+    <string name="mtrl_picker_toggle_to_day_selection">Calendar-en ikuspegira aldatzeko, sakatu hau</string>
     <string name="mtrl_picker_toggle_to_text_input_mode">Aldatu testua idazteko modura</string>
-    <string name="mtrl_picker_toggle_to_year_selection">Sakatu urtea hautatzeko modura aldatzeko</string>
+    <string name="mtrl_picker_toggle_to_year_selection">Urteko ikuspegira aldatzeko, sakatu hau</string>
     <string name="mtrl_timepicker_cancel">Utzi</string>
     <string name="mtrl_timepicker_confirm">Ados</string>
     <string name="password_toggle_content_description">Erakutsi pasahitza</string>

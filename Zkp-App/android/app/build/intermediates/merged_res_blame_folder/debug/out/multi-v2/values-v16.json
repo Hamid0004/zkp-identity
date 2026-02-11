@@ -23,7 +23,7 @@
                     }
                 },
                 {
-                    "source": "/home/codespace/.gradle/caches/transforms-3/8657ddf9414041b368f127aa96401629/transformed/core-1.10.1/res/values-v16/values-v16.xml",
+                    "source": "/home/codespace/.gradle/caches/transforms-3/88b02e5e32d386c009c0cf84573a232a/transformed/core-1.12.0/res/values-v16/values-v16.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

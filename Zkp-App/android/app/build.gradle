@@ -1,21 +1,27 @@
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
-    id 'kotlin-parcelize' // ✅ Essential for passing data
+    // 🦁 1. Parcelize Plugin Added (Critical for Passport Data)
+    id 'kotlin-parcelize'
 }
 
 android {
     namespace 'com.example.zkpapp'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "com.example.zkpapp"
         minSdk 24
-        targetSdk 33
+        targetSdk 34
         versionCode 1
         versionName "1.0"
 
-        multiDexEnabled true
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        
+        // 🦁 2. NDK Filter for Rust Library
+        ndk {
+            abiFilters "arm64-v8a"
+        }
     }
 
     buildTypes {
@@ -24,59 +30,58 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
     }
     kotlinOptions {
-        jvmTarget = '17'
+        jvmTarget = '1.8'
     }
-
-    sourceSets {
-        main {
-            // 🦁 CRITICAL: Rust Library Path
-            jniLibs.srcDirs = ['src/main/jniLibs']
-        }
+    buildFeatures {
+        viewBinding true
+    }
+    
+    // 🦁 3. Packaging Options (Prevents JMRTD License Conflicts)
+    packagingOptions {
+        pickFirst 'META-INF/LICENSE'
+        pickFirst 'META-INF/NOTICE'
+        pickFirst 'META-INF/DEPENDENCIES'
+        pickFirst 'META-INF/LICENSE.txt'
+        pickFirst 'META-INF/NOTICE.txt'
     }
 }
 
 dependencies {
-    // Basics
-    implementation 'androidx.core:core-ktx:1.10.1'
+    // Android Core
+    implementation 'androidx.core:core-ktx:1.12.0'
     implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
-    implementation "androidx.lifecycle:lifecycle-runtime-ktx:2.6.2"
-    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3"
 
-    // 📷 CameraX (For Passport Scanning)
-    implementation "androidx.camera:camera-core:1.2.3"
-    implementation "androidx.camera:camera-camera2:1.2.3"
-    implementation "androidx.camera:camera-lifecycle:1.2.3"
-    implementation "androidx.camera:camera-view:1.2.3"
+    // 🦁 4. ML Kit (Text Recognition for MRZ)
+    implementation 'com.google.android.gms:play-services-mlkit-text-recognition:19.0.0'
 
-    // 🧠 ML Kit (For MRZ Text Reading)
-    implementation 'com.google.mlkit:text-recognition:16.0.0'
-
-    // QR Code (For Verifier Logic)
-    implementation "com.journeyapps:zxing-android-embedded:4.3.0"
-    implementation "com.google.zxing:core:3.4.1"
-
-    // NFC Passport (JMRTD)
-    implementation 'org.jmrtd:jmrtd:0.7.18'
+    // 🦁 5. JMRTD & NFC (Passport Reading)
+    implementation 'org.jmrtd:jmrtd:0.7.31'
     implementation 'net.sf.scuba:scuba-sc-android:0.0.20'
-    implementation 'com.madgag.spongycastle:prov:1.58.0.0'
+    implementation 'com.madgag.spongycastle:prov:1.58.0.0' 
 
-    // Multidex
-    implementation 'androidx.multidex:multidex:2.0.1'
+    // 🦁 6. Networking (Retrofit & OkHttp)
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.11.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.11.0'
+    
+    // QR Code Scanner
+    implementation 'com.journeyapps:zxing-android-embedded:4.3.0'
+    implementation 'com.google.zxing:core:3.4.1'
+    
+    // CameraX
+    implementation "androidx.camera:camera-core:1.3.1"
+    implementation "androidx.camera:camera-camera2:1.3.1"
+    implementation "androidx.camera:camera-lifecycle:1.3.1"
+    implementation "androidx.camera:camera-view:1.3.1"
 
-    // JSON Parsing (General)
+    // GSON
     implementation 'com.google.code.gson:gson:2.10.1'
-
-    // 👇👇👇 DAY 79/81: NETWORKING TOOLS (Server Connection) 👇👇👇
-    // Yeh woh lines hain jo Missing thi aur Errors de rahi thi
-    implementation 'com.squareup.retrofit2:retrofit:2.9.0' // Postman for Android
-    implementation 'com.squareup.retrofit2:converter-gson:2.9.0' // JSON Converter
-    implementation 'com.squareup.okhttp3:logging-interceptor:4.9.3' // Debug Logs
 }
