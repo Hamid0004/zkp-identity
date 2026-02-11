@@ -4,24 +4,7 @@
             "outputFile": "com.example.zkpapp-mergeDebugResources-37:/values-pt/values-pt.xml",
             "map": [
                 {
-                    "source": "/home/codespace/.gradle/caches/transforms-3/35da4fc1d8efd2d155d782ef63b1b66c/transformed/core-1.10.1/res/values-pt/values-pt.xml",
-                    "from": {
-                        "startLines": "2,3,4,5,6,7,8,9",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "55,152,254,353,453,560,670,790",
-                        "endColumns": "96,101,98,99,106,109,119,100",
-                        "endOffsets": "147,249,348,448,555,665,785,886"
-                    },
-                    "to": {
-                        "startLines": "29,30,31,32,33,34,35,37",
-                        "startColumns": "4,4,4,4,4,4,4,4",
-                        "startOffsets": "2843,2940,3042,3141,3241,3348,3458,3664",
-                        "endColumns": "96,101,98,99,106,109,119,100",
-                        "endOffsets": "2935,3037,3136,3236,3343,3453,3573,3760"
-                    }
-                },
-                {
-                    "source": "/home/codespace/.gradle/caches/transforms-3/485f65fe4b5870cdba1c588cba41f536/transformed/appcompat-1.6.1/res/values-pt/values-pt.xml",
+                    "source": "/home/codespace/.gradle/caches/transforms-3/a30e2b592a2e45556790167a259f8a67/transformed/appcompat-1.6.1/res/values-pt/values-pt.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29",
                         "startColumns": "4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4",
@@ -38,7 +21,24 @@
                     }
                 },
                 {
-                    "source": "/home/codespace/.gradle/caches/transforms-3/a5f99cc11d88ef9ad7ed9fadc53e5f54/transformed/jetified-zxing-android-embedded-4.3.0/res/values-pt/values-pt.xml",
+                    "source": "/home/codespace/.gradle/caches/transforms-3/8657ddf9414041b368f127aa96401629/transformed/core-1.10.1/res/values-pt/values-pt.xml",
+                    "from": {
+                        "startLines": "2,3,4,5,6,7,8,9",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "55,152,254,353,453,560,670,790",
+                        "endColumns": "96,101,98,99,106,109,119,100",
+                        "endOffsets": "147,249,348,448,555,665,785,886"
+                    },
+                    "to": {
+                        "startLines": "29,30,31,32,33,34,35,37",
+                        "startColumns": "4,4,4,4,4,4,4,4",
+                        "startOffsets": "2843,2940,3042,3141,3241,3348,3458,3664",
+                        "endColumns": "96,101,98,99,106,109,119,100",
+                        "endOffsets": "2935,3037,3136,3236,3343,3453,3573,3760"
+                    }
+                },
+                {
+                    "source": "/home/codespace/.gradle/caches/transforms-3/064796d7c7986fba24061d687b22d122/transformed/jetified-zxing-android-embedded-4.3.0/res/values-pt/values-pt.xml",
                     "from": {
                         "startLines": "2,3,4,5",
                         "startColumns": "4,4,4,4",

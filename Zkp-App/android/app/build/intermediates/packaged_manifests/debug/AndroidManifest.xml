@@ -19,9 +19,6 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
-    <uses-feature
-        android:name="android.hardware.camera.autofocus"
-        android:required="false" />
 
     <permission
         android:name="com.example.zkpapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
@@ -31,6 +28,10 @@
 
     <uses-feature
         android:name="android.hardware.camera.front"
+        android:required="false" /> <!-- TODO replace above two with next line after Android 4.2 -->
+    <!-- <uses-feature android:name="android.hardware.camera.any"/> -->
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.camera.flash"
@@ -71,7 +72,6 @@
         <activity
             android:name="com.example.zkpapp.LoginActivity"
             android:exported="false"
-            android:label="Generating Proof..."
             android:screenOrientation="portrait" />
         <activity
             android:name="com.example.zkpapp.VerifierActivity"
@@ -80,7 +80,6 @@
         <activity
             android:name="com.example.zkpapp.PassportActivity"
             android:exported="true"
-            android:label="Passport Scanner"
             android:launchMode="singleTop" >
             <intent-filter>
                 <action android:name="android.nfc.action.TECH_DISCOVERED" />
