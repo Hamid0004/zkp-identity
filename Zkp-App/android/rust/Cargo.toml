@@ -37,3 +37,11 @@ rayon = "=1.10.0"
 # 📝 Logging
 log = "0.4"
 android_logger = "0.13"
+
+[profile.release]
+opt-level = 3          # Full optimization for ZKP math
+lto = "fat"            # Heavy Link Time Optimization (Library size badhayega)
+codegen-units = 1      # Better optimization, single unit build
+panic = "abort"        # Android ke liye stable crash handling
+strip = false          # 🦁 FIX: Symbols ko delete mat karo (Size wapis layega)
+debug = true           # Crash report mein sahi lines dikhane ke liye
