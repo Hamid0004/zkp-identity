@@ -11,8 +11,8 @@
 9-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml
 10
 11    <uses-permission android:name="android.permission.INTERNET" />
-11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:5-67
-11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:22-64
+11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:35-97
+11-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:3:52-94
 12    <uses-permission android:name="android.permission.CAMERA" />
 12-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:4:5-65
 12-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:4:22-62
@@ -103,7 +103,7 @@
 57        <activity
 57-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:20:9-27:20
 58            android:name="com.example.zkpapp.MainActivity"
-58-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:13-41
+58-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:21:13-59
 59            android:exported="true" >
 59-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:22:13-36
 60            <intent-filter>
@@ -118,61 +118,61 @@
 64            </intent-filter>
 65        </activity>
 66        <activity
-66-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:29:9-33:51
-67            android:name="com.example.zkpapp.LoginActivity"
-67-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:30:13-42
+66-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:29:9-33:66
+67            android:name="com.example.zkpapp.CameraActivity"
+67-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:30:13-61
 68            android:exported="false"
 68-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:31:13-37
-69            android:label="Generating Proof..."
-69-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:33:13-48
-70            android:screenOrientation="portrait" />
-70-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:32:13-49
+69            android:screenOrientation="portrait"
+69-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:32:13-49
+70            android:theme="@style/Theme.AppCompat.NoActionBar" />
+70-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:33:13-63
 71        <activity
-71-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:35:9-38:52
-72            android:name="com.example.zkpapp.VerifierActivity"
-72-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:36:13-45
+71-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:35:9-39:51
+72            android:name="com.example.zkpapp.LoginActivity"
+72-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:36:13-60
 73            android:exported="false"
 73-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:37:13-37
-74            android:screenOrientation="portrait" />
-74-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:38:13-49
-75        <activity
-75-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:40:9-54:20
-76            android:name="com.example.zkpapp.PassportActivity"
-76-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:41:13-45
-77            android:exported="true"
-77-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:42:13-36
-78            android:label="Passport Scanner"
-78-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:44:13-45
-79            android:launchMode="singleTop" >
-79-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:43:13-43
-80            <intent-filter>
-80-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:46:13-49:29
-81                <action android:name="android.nfc.action.TECH_DISCOVERED" />
-81-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:47:17-77
-81-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:47:25-74
-82
-83                <category android:name="android.intent.category.DEFAULT" />
-83-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:48:17-76
-83-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:48:27-73
-84            </intent-filter>
-85
-86            <meta-data
-86-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:51:13-53:59
-87                android:name="android.nfc.action.TECH_DISCOVERED"
-87-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:52:17-66
-88                android:resource="@xml/nfc_tech_filter" />
-88-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:53:17-56
-89        </activity>
-90        <activity
-90-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:56:9-60:66
-91            android:name="com.example.zkpapp.CameraActivity"
-91-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:57:13-43
-92            android:exported="false"
-92-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:58:13-37
-93            android:screenOrientation="portrait"
-93-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:59:13-49
-94            android:theme="@style/Theme.AppCompat.NoActionBar" />
-94-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:60:13-63
+74            android:label="Generating Proof..."
+74-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:39:13-48
+75            android:screenOrientation="portrait" />
+75-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:38:13-49
+76        <activity
+76-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:41:9-44:52
+77            android:name="com.example.zkpapp.VerifierActivity"
+77-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:42:13-63
+78            android:exported="false"
+78-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:43:13-37
+79            android:screenOrientation="portrait" />
+79-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:44:13-49
+80        <activity
+80-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:46:9-60:20
+81            android:name="com.example.zkpapp.PassportActivity"
+81-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:47:13-63
+82            android:exported="true"
+82-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:48:13-36
+83            android:label="Passport Scanner"
+83-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:50:13-45
+84            android:launchMode="singleTop" >
+84-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:49:13-43
+85            <intent-filter>
+85-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:52:13-55:29
+86                <action android:name="android.nfc.action.TECH_DISCOVERED" />
+86-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:53:17-77
+86-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:53:25-74
+87
+88                <category android:name="android.intent.category.DEFAULT" />
+88-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:54:17-76
+88-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:54:27-73
+89            </intent-filter>
+90
+91            <meta-data
+91-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:57:13-59:59
+92                android:name="android.nfc.action.TECH_DISCOVERED"
+92-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:58:17-66
+93                android:resource="@xml/nfc_tech_filter" />
+93-->/workspaces/Zkp-learning-/Zkp-App/android/app/src/main/AndroidManifest.xml:59:17-56
+94        </activity>
 95
 96        <service
 96-->[com.google.android.gms:play-services-mlkit-text-recognition-common:19.0.0] /home/codespace/.gradle/caches/transforms-3/29367f45ed59dbd4f9ce861167f2ba48/transformed/jetified-play-services-mlkit-text-recognition-common-19.0.0/AndroidManifest.xml:9:9-15:19

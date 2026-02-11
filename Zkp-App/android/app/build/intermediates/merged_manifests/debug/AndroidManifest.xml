@@ -64,6 +64,11 @@
             </intent-filter>
         </activity>
         <activity
+            android:name="com.example.zkpapp.CameraActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
             android:name="com.example.zkpapp.LoginActivity"
             android:exported="false"
             android:label="Generating Proof..."
@@ -87,11 +92,6 @@
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
-        <activity
-            android:name="com.example.zkpapp.CameraActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"
-            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <service
             android:name="com.google.mlkit.common.internal.MlKitComponentDiscoveryService"
