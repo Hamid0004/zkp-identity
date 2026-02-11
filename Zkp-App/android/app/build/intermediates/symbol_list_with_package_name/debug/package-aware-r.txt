@@ -2945,6 +2945,9 @@ drawable abc_textfield_search_material
 drawable abc_vector_test
 drawable avd_hide_password
 drawable avd_show_password
+drawable bg_circle_button
+drawable bg_scanner_border
+drawable bg_scanner_overlay
 drawable btn_checkbox_checked_mtrl
 drawable btn_checkbox_checked_to_unchecked_mtrl_animation
 drawable btn_checkbox_unchecked_mtrl
@@ -2989,6 +2992,7 @@ drawable ic_call_decline
 drawable ic_call_decline_low
 drawable ic_clear_black_24
 drawable ic_clock_black_24dp
+drawable ic_flash
 drawable ic_keyboard_black_24dp
 drawable ic_m3_chip_check
 drawable ic_m3_chip_checked_circle
@@ -3158,8 +3162,6 @@ id animateToEnd
 id animateToStart
 id antiClockwise
 id anticipate
-id app_logo
-id app_title
 id arc
 id asConfigured
 id async
@@ -3167,7 +3169,6 @@ id auto
 id autoComplete
 id autoCompleteToEnd
 id autoCompleteToStart
-id barcode_scanner
 id barrier
 id baseline
 id beginOnFirstDraw
@@ -3179,10 +3180,10 @@ id bounce
 id bounceBoth
 id bounceEnd
 id bounceStart
+id btnFlash
 id btnGotoScanner
 id btnOfflineMenu
 id btnPassport
-id btnTest
 id btnTransmit
 id btnVerifyOffline
 id btnWebLogin
@@ -3438,7 +3439,7 @@ id pin
 id position
 id postLayout
 id pressed
-id progress_bar
+id progressBar
 id progress_circular
 id progress_horizontal
 id radio
@@ -3455,6 +3456,7 @@ id save_non_transition_alpha
 id save_overlay_view
 id sawtooth
 id scale
+id scannerView
 id screen
 id scroll
 id scrollIndicatorDown
@@ -3521,7 +3523,6 @@ id startToEnd
 id startVertical
 id staticLayout
 id staticPostLayout
-id status_text
 id stop
 id stretch
 id submenuarrow
@@ -3573,6 +3574,7 @@ id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
 id triangle
+id tvGuide
 id tvStatus
 id tvSubtitle
 id tvTitle

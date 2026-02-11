@@ -12,124 +12,252 @@ import androidx.appcompat.app.AppCompatActivity
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.EncodeHintType
 import com.google.zxing.MultiFormatWriter
+import com.google.zxing.WriterException
 import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
 import com.journeyapps.barcodescanner.BarcodeEncoder
 import kotlinx.coroutines.*
 import org.json.JSONArray
+import org.json.JSONException
 import java.util.EnumMap
 
+/**
+ * LoginActivity - Zero-Knowledge Proof Transmitter 🦁
+ * * Features:
+ * ✅ Generates ZK Proof via Rust
+ * ✅ Animates QR chunks for offline transfer
+ * ✅ Robust Error Handling
+ */
 class LoginActivity : AppCompatActivity() {
 
-    // 👇 JNI Connection (Rust Logic)
+    // ═══════════════════════════════════════════════════════════
+    // 🦁 RUST JNI BRIDGE
+    // ═══════════════════════════════════════════════════════════
     companion object {
-        init { System.loadLibrary("zkp_mobile") }
+        init {
+            System.loadLibrary("zkp_mobile")
+        }
+
+        // QR Animation Constants
+        private const val QR_SIZE = 800 
+        private const val FRAME_DELAY_MS = 150L // Slower for better scanning
+        private const val CYCLE_PAUSE_MS = 300L 
     }
-    // Note: Rust function should return JSON Array of chunks
+
+    /**
+     * Calls Rust to generate ZK Proof + chunked data
+     * Returns: JSON array like ["1/5|data|crc32", "2/5|data|crc32", ...]
+     */
     external fun stringFromRust(): String
 
-    // UI Elements
+    // ═══════════════════════════════════════════════════════════
+    // 📱 UI COMPONENTS
+    // ═══════════════════════════════════════════════════════════
     private lateinit var qrImage: ImageView
     private lateinit var statusText: TextView
+    private lateinit var btnTransmit: Button
+    private lateinit var btnGotoScanner: Button
 
+    // ═══════════════════════════════════════════════════════════
+    // 🎬 ANIMATION STATE
+    // ═══════════════════════════════════════════════════════════
+    private var animationJob: Job? = null
+    @Volatile private var isTransmitting = false
+
+    // ═══════════════════════════════════════════════════════════
+    // 🎯 LIFECYCLE METHODS
+    // ═══════════════════════════════════════════════════════════
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        // 1. Initialize UI
-        qrImage = findViewById(R.id.imgDynamicQr)
-        statusText = findViewById(R.id.tvStatus)
-        val btnGotoScanner: Button = findViewById(R.id.btnGotoScanner)
-
-        // 🦁 2. SECURITY CHECK: Real Identity Exists?
+        initializeUI()
+        
+        // 🛡️ Security Check
         if (!IdentityStorage.hasIdentity()) {
-            Toast.makeText(this, "⚠️ No Identity Found! Scan Passport First.", Toast.LENGTH_LONG).show()
-            finish() // Close Activity if no ID
+            Toast.makeText(this, "⚠️ Please Create Identity First!", Toast.LENGTH_LONG).show()
+            finish()
             return
         }
 
-        // 3. Start Proof Generation (Animated QR)
-        startProofGeneration()
+        setupButtonListeners()
+    }
 
-        // 4. Button Logic: Switch to Receiver Mode
-        btnGotoScanner.setOnClickListener {
-            finish() // Close Sender
-            startActivity(Intent(this, VerifierActivity::class.java))
+    override fun onDestroy() {
+        super.onDestroy()
+        stopAnimation()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        if (isTransmitting) {
+            animationJob?.cancel()
         }
     }
 
-    private fun startProofGeneration() {
-        statusText.text = "⏳ Generating Real ID Proof..."
+    // ═══════════════════════════════════════════════════════════
+    // 🔧 INITIALIZATION
+    // ═══════════════════════════════════════════════════════════
+
+    private fun initializeUI() {
+        qrImage = findViewById(R.id.imgDynamicQr)
+        statusText = findViewById(R.id.tvStatus)
+        btnTransmit = findViewById(R.id.btnTransmit)
+        btnGotoScanner = findViewById(R.id.btnGotoScanner)
+
+        statusText.text = "🔐 Ready to Transmit Zero-Knowledge Proof"
         statusText.setTextColor(Color.DKGRAY)
-        
+    }
+
+    private fun setupButtonListeners() {
+        btnTransmit.setOnClickListener {
+            if (isTransmitting) return@setOnClickListener
+            startTransmission()
+        }
+
+        btnGotoScanner.setOnClickListener {
+            stopAnimation()
+            startActivity(Intent(this, VerifierActivity::class.java))
+            finish()
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 🚀 PROOF GENERATION
+    // ═══════════════════════════════════════════════════════════
+
+    private fun startTransmission() {
+        isTransmitting = true
+
+        // UI Feedback
+        qrImage.alpha = 1.0f
+        btnTransmit.isEnabled = false
+        btnTransmit.text = "⏳ Generating Proof..."
+        btnTransmit.setBackgroundColor(Color.GRAY)
+        statusText.text = "⚡ Computing Zero-Knowledge Proof..."
+        statusText.setTextColor(Color.parseColor("#FF9800")) // Orange
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 🦁 CALL RUST (This uses Real ID inside Rust to generate chunks)
-                val jsonResponse = stringFromRust() 
-                
+                // 🦁 1. CALL RUST
+                val jsonResponse = stringFromRust()
+
                 withContext(Dispatchers.Main) {
-                    // Check if Rust returned an error message instead of JSON
-                    if (jsonResponse.startsWith("Error")) {
-                        statusText.text = "❌ $jsonResponse"
-                        statusText.setTextColor(Color.RED)
-                    } else {
-                        // Success: Parse JSON chunks
-                        val jsonArray = JSONArray(jsonResponse)
-                        val totalChunks = jsonArray.length()
-                        
-                        statusText.text = "🛡️ Real ID Verified!\nBroadcasting $totalChunks Frames..."
-                        statusText.setTextColor(Color.parseColor("#2E7D32")) // Green
-                        
-                        // Start Animation Loop
-                        playQrAnimation(jsonArray)
-                    }
+                    handleProofGeneration(jsonResponse)
                 }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
-                    statusText.text = "🔥 Error: ${e.message}"
-                    statusText.setTextColor(Color.RED)
+                    showError("Critical error: ${e.message}")
                 }
             }
         }
     }
 
-    // 🔄 ANIMATION ENGINE (Forward -> Reverse -> Random)
-    private fun playQrAnimation(dataChunks: JSONArray) {
+    private fun handleProofGeneration(jsonResponse: String) {
+        if (jsonResponse.startsWith("Error", ignoreCase = true)) {
+            showError(jsonResponse)
+            return
+        }
+
+        try {
+            val jsonArray = JSONArray(jsonResponse)
+            val totalChunks = jsonArray.length()
+
+            if (totalChunks == 0) {
+                showError("No data chunks received")
+                return
+            }
+
+            // Success UI
+            statusText.text = "📡 Broadcasting ($totalChunks frames)"
+            statusText.setTextColor(Color.parseColor("#2E7D32")) // Green
+            btnTransmit.text = "🔄 Transmitting..."
+            btnTransmit.setBackgroundColor(Color.parseColor("#4CAF50"))
+
+            // 🦁 2. START ANIMATION
+            startQrAnimation(jsonArray)
+
+        } catch (e: JSONException) {
+            showError("Failed to parse chunks: ${e.message}")
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 🔄 FOUNTAIN ANIMATION LOGIC
+    // ═══════════════════════════════════════════════════════════
+
+    private fun startQrAnimation(dataChunks: JSONArray) {
+        val totalFrames = dataChunks.length()
         val encoder = BarcodeEncoder()
         
-        // QR Settings (Low Error Correction for Speed)
+        // Optimize QR for Data Density (Level L)
         val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java)
-        hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L 
-        hints[EncodeHintType.MARGIN] = 1 
-        
-        CoroutineScope(Dispatchers.Main).launch {
-            val indices = (0 until dataChunks.length()).toMutableList()
-            var loopCount = 0 
-            
-            while (isActive) { 
-                // Strategy: Change sequence every loop to help scanner catch missed frames
-                if (loopCount == 0) {
-                    indices.sort() // Forward (1 -> End)
-                } else if (loopCount == 1) {
-                    indices.sortDescending() // Reverse (End -> 1)
-                } else {
-                    indices.shuffle() // Random (Cleanup)
+        hints[EncodeHintType.ERROR_CORRECTION] = ErrorCorrectionLevel.L
+        hints[EncodeHintType.MARGIN] = 1
+
+        animationJob = CoroutineScope(Dispatchers.Main).launch {
+            val indices = (0 until totalFrames).toMutableList()
+            var cycleMode = AnimationMode.FORWARD
+
+            while (isActive) {
+                // Shuffle Strategy
+                when (cycleMode) {
+                    AnimationMode.FORWARD -> indices.sort()
+                    AnimationMode.REVERSE -> indices.sortDescending()
+                    AnimationMode.RANDOM -> indices.shuffle()
                 }
 
                 for (i in indices) {
+                    if (!isActive) break
+
                     val chunkData = dataChunks.getString(i)
                     try {
                         val matrix = MultiFormatWriter().encode(
-                            chunkData, BarcodeFormat.QR_CODE, 800, 800, hints 
+                            chunkData, BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints
                         )
                         val bitmap = encoder.createBitmap(matrix)
                         qrImage.setImageBitmap(bitmap)
-                    } catch (e: Exception) { }
+                    } catch (_: Exception) {}
 
-                    delay(110) // ⚡ Speed: 110ms per frame
+                    delay(FRAME_DELAY_MS)
                 }
-                loopCount++
-                delay(100) // Small pause between loops
+
+                cycleMode = cycleMode.next()
+                delay(CYCLE_PAUSE_MS)
             }
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 🛠️ UTILITY
+    // ═══════════════════════════════════════════════════════════
+
+    private fun stopAnimation() {
+        animationJob?.cancel()
+        animationJob = null
+        isTransmitting = false
+        resetButton()
+    }
+
+    private fun showError(message: String) {
+        statusText.text = "❌ $message"
+        statusText.setTextColor(Color.RED)
+        resetButton()
+        isTransmitting = false
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
+
+    private fun resetButton() {
+        btnTransmit.isEnabled = true
+        btnTransmit.text = "📡 TRANSMIT IDENTITY"
+        btnTransmit.setBackgroundColor(Color.parseColor("#4CAF50"))
+    }
+
+    private enum class AnimationMode {
+        FORWARD, REVERSE, RANDOM;
+        fun next() = when (this) {
+            FORWARD -> REVERSE
+            REVERSE -> RANDOM
+            RANDOM -> RANDOM
         }
     }
 }
