@@ -2,46 +2,47 @@
 name = "zkp_mobile"
 version = "0.1.0"
 edition = "2021"
+# 🦁 Force modern dependency resolution
+resolver = "2"
 
 [lib]
 crate-type = ["cdylib"]
 
 [dependencies]
-# 🌉 Android Communication
-jni = "0.21.1"
+# 🌉 Android JNI Bridge
+jni = { version = "0.21.1", default-features = false }
 
-# 🧠 ZKP Engine (Plonky2)
+# 🧠 ZKP Engine (Plonky2) - Core Math logic
 plonky2 = "0.2.2"
 plonky2_field = "0.2.2"
 
-# 📦 Data Handling & Serialization
+# 📦 Serialization (Essential for data passing)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 anyhow = "1.0"
 bincode = "1.3"
 base64 = "0.21"
 
-# 🦁 FIX: Pin to 1.3.2 to avoid "stdarch_arm_crc32" error
-crc32fast = "=1.3.2"
-
-# 🔐 Passport Security (Crypto)
+# 🔐 Passport & RSA Security
 hex = "0.4"
 sha2 = "0.10"
-rsa = { version = "0.9", features = ["sha2"] }
+rsa = { version = "0.9", features = ["sha2", "pem"] }
 rand = "0.8"
 
-# 🛠️ Build Fixes (Dependency Pinning)
+# 🦁 CRITICAL FIXES: Dependency Pinning for Android NDK
+crc32fast = "=1.3.2"  # Prevents stdarch_arm_crc32 error
 base64ct = "=1.6.0"
 rayon = "=1.10.0"
 
-# 📝 Logging
+# 📝 Logging (Debugging for Android Logcat)
 log = "0.4"
 android_logger = "0.13"
 
 [profile.release]
-opt-level = 3          # Full optimization for ZKP math
-lto = "fat"            # Heavy Link Time Optimization (Library size badhayega)
-codegen-units = 1      # Better optimization, single unit build
-panic = "abort"        # Android ke liye stable crash handling
-strip = false          # 🦁 FIX: Symbols ko delete mat karo (Size wapis layega)
-debug = true           # Crash report mein sahi lines dikhane ke liye
+opt-level = 3           # Max speed for Plonky2 math
+lto = "fat"             # 🦁 Full Link Time Optimization (Fixes size issue)
+codegen-units = 1       # Better binary consistency
+panic = "abort"         # Stable crash handling for NDK
+strip = false           # 🛑 DO NOT STRIP: Keeps symbols (Brings size back to 20MB+)
+debug = true            # Essential for crash reports
+overflow-checks = true  # Extra safety for ZKP math
