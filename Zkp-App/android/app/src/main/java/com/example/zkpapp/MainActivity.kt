@@ -12,44 +12,37 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // =========================================================
-        // 🟦 BUTTON 1: SCAN QR TO LOGIN (PHASE 7 - ZkAuth)
-        // =========================================================
+        // 🟦 BLUE BUTTON: SCAN QR TO LOGIN (Phase 7 - ZkAuth)
+        // Logic: Seedha Camera khulega web login ke liye
         findViewById<Button>(R.id.btnScanQrLogin).setOnClickListener {
             if (IdentityStorage.hasIdentity()) {
                 val intent = Intent(this, LoginActivity::class.java)
-                intent.putExtra("MODE", "SCAN_LOGIN") // 🦁 Batao ke Login karna hai
+                intent.putExtra("MODE", "WEB_LOGIN") // 🦁 Special Mode
                 startActivity(intent)
             } else {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // =========================================================
-        // 🟧 BUTTON 2: SCAN PASSPORT (CREATE ID)
-        // =========================================================
+        // 🟧 ORANGE BUTTON: CREATE ID
         findViewById<Button>(R.id.btnScanPassport).setOnClickListener {
             startActivity(Intent(this, PassportActivity::class.java))
         }
 
-        // =========================================================
-        // 🟢 BUTTON 3: OFFLINE IDENTITY (Show QR)
-        // =========================================================
+        // 🟩 GREEN BUTTON: OFFLINE IDENTITY (Phase 8)
+        // Logic: LoginActivity khulega jahan Transmit/Verify buttons honge
         findViewById<Button>(R.id.btnOfflineIdentity).setOnClickListener {
             if (IdentityStorage.hasIdentity()) {
                 val intent = Intent(this, LoginActivity::class.java)
-                intent.putExtra("MODE", "TRANSMIT") // 🦁 Batao ke QR dikhana hai
+                intent.putExtra("MODE", "OFFLINE_DASHBOARD") // 🦁 Dashboard Mode
                 startActivity(intent)
             } else {
                 Toast.makeText(this, "⚠️ Please Scan Passport First!", Toast.LENGTH_SHORT).show()
             }
         }
 
-        // =========================================================
-        // ⬜ BUTTON 4: TEST PROOF (OFFLINE VERIFIER)
-        // =========================================================
+        // ⬜ GREY BUTTON: TEST PROOF (Direct Verifier)
         findViewById<Button>(R.id.btnTestProof).setOnClickListener {
-            // Yeh offline proof check karne ke liye hai
             startActivity(Intent(this, VerifierActivity::class.java))
         }
     }

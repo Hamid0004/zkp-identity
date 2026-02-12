@@ -43,7 +43,7 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var qrImage: ImageView
     private lateinit var statusText: TextView
     private lateinit var btnTransmit: Button
-    private lateinit var btnScanWeb: Button 
+    private lateinit var btnVerify: Button // Formerly btnGotoScanner
 
     private var animationJob: Job? = null
     @Volatile private var isTransmitting = false
@@ -64,28 +64,30 @@ class LoginActivity : AppCompatActivity() {
 
         setupListeners()
 
-        // 🦁 LOGIC SEPARATION & AUTO-START
+        // 🦁 MODE SELECTION LOGIC
         val mode = intent.getStringExtra("MODE")
-        currentMode = mode ?: ""
+        currentMode = mode ?: "OFFLINE_DASHBOARD"
 
-        if (mode == "SCAN_LOGIN") {
-            // MODE 1: SCANNER ONLY
-            // Transmit wale buttons CHUPA DO
-            btnTransmit.visibility = View.GONE
+        if (currentMode == "WEB_LOGIN") {
+            // 🔵 PHASE 7: WEB LOGIN MODE
+            // Hide everything, Start Camera
             qrImage.visibility = View.GONE
-            statusText.text = "🦁 Opening Scanner..."
+            btnTransmit.visibility = View.GONE
+            btnVerify.visibility = View.GONE
+            statusText.text = "🦁 Starting Web Scanner..."
             
-            // Auto-start Scanner
-            startQrScanner()
+            startWebQrScanner()
 
-        } else if (mode == "TRANSMIT") {
-            // MODE 2: TRANSMITTER ONLY
-            // Scanner wala button CHUPA DO
-            btnScanWeb.visibility = View.GONE
-            statusText.text = "Ready to Transmit Identity"
+        } else {
+            // 🟩 PHASE 8: OFFLINE IDENTITY DASHBOARD
+            // Show QR, Transmit Button, AND Verify Button
+            qrImage.visibility = View.VISIBLE
+            btnTransmit.visibility = View.VISIBLE
+            btnVerify.visibility = View.VISIBLE
             
-            // Auto-start Animation
-            startTransmission()
+            btnTransmit.text = "TRANSMIT IDENTITY"
+            btnVerify.text = "🔍 SCAN & VERIFY" // 🦁 Button Wapis Aa Gaya
+            statusText.text = "Ready to Share Identity"
         }
     }
 
@@ -103,36 +105,34 @@ class LoginActivity : AppCompatActivity() {
         qrImage = findViewById(R.id.imgDynamicQr)
         statusText = findViewById(R.id.tvStatus)
         btnTransmit = findViewById(R.id.btnTransmit)
-        btnScanWeb = findViewById(R.id.btnGotoScanner)
-
-        btnScanWeb.text = "📷 RESCAN QR"
-        btnScanWeb.setBackgroundColor(Color.parseColor("#1976D2")) // Blue
+        btnVerify = findViewById(R.id.btnGotoScanner) // Using existing ID in layout
     }
 
     private fun setupListeners() {
+        // Button 1: Transmit Identity (Animation)
         btnTransmit.setOnClickListener {
             if (!isTransmitting) startTransmission()
         }
-        btnScanWeb.setOnClickListener {
-            startQrScanner()
+
+        // Button 2: Scan & Verify (Opens VerifierActivity)
+        // 🦁 Yeh wo button hai jo aap maang rahe thay
+        btnVerify.setOnClickListener {
+            stopAnimation()
+            startActivity(Intent(this, VerifierActivity::class.java))
         }
     }
 
     // -----------------------------------------------------------
-    // 🔵 PHASE 7: ZK AUTH SCANNER (PORTRAIT FIXED)
+    // 🔵 LOGIC 1: WEB LOGIN SCANNER (Phase 7)
     // -----------------------------------------------------------
-    private fun startQrScanner() {
+    private fun startWebQrScanner() {
         val integrator = IntentIntegrator(this)
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-        integrator.setPrompt("🦁 Scan Login QR from Web")
+        integrator.setPrompt("🦁 Scan Web Login QR")
         integrator.setCameraId(0)
-        integrator.setBeepEnabled(false)
+        integrator.setBeepEnabled(true)
         integrator.setBarcodeImageEnabled(false)
-        
-        // 🦁 FIX: Phone Rotation Issue
-        // False = Device ki orientation follow karega (Portrait)
-        integrator.setOrientationLocked(false) 
-        
+        integrator.setOrientationLocked(false) // 🦁 Rotation Fixed
         integrator.initiateScan()
     }
 
@@ -140,10 +140,10 @@ class LoginActivity : AppCompatActivity() {
         val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
         if (result != null) {
             if (result.contents == null) {
-                Toast.makeText(this, "Scan Cancelled", Toast.LENGTH_SHORT).show()
-                // Agar cancel kiya to wapis dashboard bhej do (Cleaner UX)
-                if(currentMode == "SCAN_LOGIN") finish()
+                // Cancel hua to wapis jao
+                if (currentMode == "WEB_LOGIN") finish()
             } else {
+                // QR Scanned -> ZkAuth Login
                 performZkLogin(result.contents)
             }
         } else {
@@ -152,45 +152,38 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun performZkLogin(sessionId: String) {
-        statusText.text = "🦁 Verifying with ZkAuth..."
-        btnScanWeb.isEnabled = false
-
+        statusText.text = "🦁 Generating Proof for Web..."
         lifecycleScope.launch {
             ZkAuthManager.startUniversalLogin(
                 context = this@LoginActivity,
                 sessionId = sessionId,
                 onStatus = { msg -> statusText.text = msg },
                 onSuccess = {
-                    statusText.text = "✅ Login Approved!"
-                    statusText.setTextColor(Color.parseColor("#2E7D32"))
-                    Toast.makeText(this@LoginActivity, "Web Login Successful!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(this@LoginActivity, "Login Successful!", Toast.LENGTH_LONG).show()
                     finish()
                 },
                 onError = { error ->
-                    statusText.text = "❌ $error"
-                    statusText.setTextColor(Color.RED)
-                    btnScanWeb.isEnabled = true
+                    Toast.makeText(this@LoginActivity, error, Toast.LENGTH_LONG).show()
+                    finish()
                 }
             )
         }
     }
 
     // -----------------------------------------------------------
-    // 🟢 OFFLINE TRANSMIT LOGIC
+    // 🟢 LOGIC 2: OFFLINE TRANSMIT (Phase 8)
     // -----------------------------------------------------------
     private fun startTransmission() {
         isTransmitting = true
         btnTransmit.isEnabled = false
         btnTransmit.text = "Generating..."
         statusText.text = "Computing Proof..."
-        
+
         lifecycleScope.launch {
             try {
                 val jsonResponse = withContext(Dispatchers.IO) { stringFromRust() }
                 handleRustResponse(jsonResponse)
-            } catch (e: Exception) { 
-                showError("Error: ${e.message}") 
-            }
+            } catch (e: Exception) { showError("Error: ${e.message}") }
         }
     }
 
@@ -236,10 +229,12 @@ class LoginActivity : AppCompatActivity() {
         isTransmitting = false
         animationJob?.cancel()
         animationJob = null
-        runOnUiThread { 
+        runOnUiThread {
             if (!isDestroyed) {
                 btnTransmit.isEnabled = true
                 btnTransmit.text = "TRANSMIT IDENTITY"
+                statusText.text = "Ready to Share"
+                statusText.setTextColor(Color.DKGRAY)
             }
         }
     }
