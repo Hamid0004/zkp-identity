@@ -4,7 +4,6 @@ import android.content.Intent
 import android.os.Bundle
 import android.widget.Button
 import android.widget.Toast
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 
 class MainActivity : AppCompatActivity() {
@@ -13,28 +12,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // 🦁 1. SCAN QR TO LOGIN (Blue Button)
-        // Connection: Opens LoginActivity (QR Generator)
+        // =========================================================
+        // 🟦 BUTTON 1: SCAN QR TO LOGIN
+        // =========================================================
+        // 🦁 FIX: Ab ye "LoginActivity" (QR Generator) kholega.
+        // User apna QR dikhayega login karne ke liye.
         findViewById<Button>(R.id.btnScanQrLogin).setOnClickListener {
-            // Agar Identity nahi hai to pehle passport scan karne ka bolo
-            if (IdentityStorage.hasIdentity()) {
-                startActivity(Intent(this, LoginActivity::class.java))
-            } else {
-                 // Or allow login if it's meant to generate QR
-                 // For now, let's open it directly based on your request
-                 startActivity(Intent(this, LoginActivity::class.java))
-            }
-        }
-
-        // 🦁 2. SCAN PASSPORT (Orange Button)
-        // Connection: Opens PassportActivity (Already Existing)
-        findViewById<Button>(R.id.btnScanPassport).setOnClickListener {
-            startActivity(Intent(this, PassportActivity::class.java))
-        }
-
-        // 🦁 3. OFFLINE IDENTITY (Green Button)
-        // Connection: Opens LoginActivity (QR Generator for Offline Proof)
-        findViewById<Button>(R.id.btnOfflineIdentity).setOnClickListener {
             if (IdentityStorage.hasIdentity()) {
                 startActivity(Intent(this, LoginActivity::class.java))
             } else {
@@ -42,10 +25,31 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // 🦁 4. TEST PROOF (Grey Button)
-        // Connection: Opens VerifierActivity (Scanner) for testing
+        // =========================================================
+        // 🟧 BUTTON 2: SCAN PASSPORT
+        // =========================================================
+        findViewById<Button>(R.id.btnScanPassport).setOnClickListener {
+            startActivity(Intent(this, PassportActivity::class.java))
+        }
+
+        // =========================================================
+        // 🟩 BUTTON 3: OFFLINE IDENTITY
+        // =========================================================
+        findViewById<Button>(R.id.btnOfflineIdentity).setOnClickListener {
+            if (IdentityStorage.hasIdentity()) {
+                startActivity(Intent(this, LoginActivity::class.java))
+            } else {
+                Toast.makeText(this, "⚠️ No Identity Found!", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+        // =========================================================
+        // ⬜ BUTTON 4: TEST PROOF (OFFLINE)
+        // =========================================================
+        // 🦁 FIX: Ab ye "VerifierActivity" (Scanner) kholega.
+        // Ye testing tool hai check karne ke liye ke proof sahi hai ya nahi.
         findViewById<Button>(R.id.btnTestProof).setOnClickListener {
-             startActivity(Intent(this, VerifierActivity::class.java))
+            startActivity(Intent(this, VerifierActivity::class.java))
         }
     }
 }
