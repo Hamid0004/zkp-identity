@@ -1,7 +1,6 @@
 package com.example.zkpapp
 
 import android.content.Intent
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
@@ -33,26 +32,20 @@ class LoginActivity : AppCompatActivity() {
                 Log.e("ZKP", "Native library failed to load", e)
             }
         }
-
         private const val QR_SIZE = 800
         private const val FRAME_DELAY_MS = 150L
         private const val CYCLE_PAUSE_MS = 300L
     }
 
-    // Rust Function for Offline Proof
     external fun stringFromRust(): String
 
     private lateinit var qrImage: ImageView
     private lateinit var statusText: TextView
     private lateinit var btnTransmit: Button
-    private lateinit var btnScanWeb: Button // Renamed from btnGotoScanner
+    private lateinit var btnScanWeb: Button 
 
     private var animationJob: Job? = null
     @Volatile private var isTransmitting = false
-
-    // -----------------------------------------------------------
-    // Lifecycle
-    // -----------------------------------------------------------
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,6 +65,14 @@ class LoginActivity : AppCompatActivity() {
         }
 
         setupListeners()
+        
+        // 🦁 AUTO-START LOGIC
+        val mode = intent.getStringExtra("MODE")
+        if (mode == "SCAN_LOGIN") {
+            startQrScanner()
+        } else if (mode == "TRANSMIT") {
+            startTransmission()
+        }
     }
 
     override fun onPause() {
@@ -84,41 +85,26 @@ class LoginActivity : AppCompatActivity() {
         stopAnimation()
     }
 
-    // -----------------------------------------------------------
-    // UI Setup
-    // -----------------------------------------------------------
-
     private fun initializeUI() {
         qrImage = findViewById(R.id.imgDynamicQr)
         statusText = findViewById(R.id.tvStatus)
         btnTransmit = findViewById(R.id.btnTransmit)
-        btnScanWeb = findViewById(R.id.btnGotoScanner) // Using existing ID
+        btnScanWeb = findViewById(R.id.btnGotoScanner)
 
-        // Update Button Text for Clarity
         btnScanWeb.text = "📷 SCAN WEB QR (LOGIN)"
         btnScanWeb.setBackgroundColor(Color.parseColor("#1976D2")) // Blue for Scan
-
         updateStatus("Choose Mode: Transmit or Scan", Color.DKGRAY)
     }
 
     private fun setupListeners() {
-        // 🟢 MODE 1: OFFLINE TRANSMIT (For Green Button)
         btnTransmit.setOnClickListener {
-            if (!isTransmitting) {
-                startTransmission()
-            }
+            if (!isTransmitting) startTransmission()
         }
-
-        // 🔵 MODE 2: WEB SCANNER (For Blue Button)
         btnScanWeb.setOnClickListener {
             stopAnimation()
             startQrScanner()
         }
     }
-
-    // -----------------------------------------------------------
-    // 🔵 SCANNER LOGIC (ZkAuth)
-    // -----------------------------------------------------------
 
     private fun startQrScanner() {
         val integrator = IntentIntegrator(this)
@@ -136,7 +122,6 @@ class LoginActivity : AppCompatActivity() {
             if (result.contents == null) {
                 Toast.makeText(this, "Scan Cancelled", Toast.LENGTH_SHORT).show()
             } else {
-                // QR Found -> Start ZkAuth Login
                 performZkLogin(result.contents)
             }
         } else {
@@ -154,9 +139,10 @@ class LoginActivity : AppCompatActivity() {
                 sessionId = sessionId,
                 onStatus = { msg -> updateStatus(msg, Color.DKGRAY) },
                 onSuccess = {
+                    // 🦁 FIX: Removed 'delay()' to prevent crash
                     updateStatus("✅ Login Approved!", Color.parseColor("#2E7D32"))
                     Toast.makeText(this@LoginActivity, "Web Login Successful!", Toast.LENGTH_LONG).show()
-                    finish()
+                    finish() // Close activity immediately
                 },
                 onError = { error ->
                     showError(error)
@@ -166,14 +152,9 @@ class LoginActivity : AppCompatActivity() {
         }
     }
 
-    // -----------------------------------------------------------
-    // 🟢 TRANSMITTER LOGIC (Offline Animation)
-    // -----------------------------------------------------------
-
     private fun startTransmission() {
         isTransmitting = true
         setLoadingState()
-
         lifecycleScope.launch {
             try {
                 val jsonResponse = withContext(Dispatchers.IO) {
@@ -193,17 +174,14 @@ class LoginActivity : AppCompatActivity() {
             showError(response)
             return
         }
-
         try {
             val jsonArray = JSONArray(response)
             if (jsonArray.length() == 0) {
                 showError("No proof frames.")
                 return
             }
-
             updateStatus("Broadcasting Identity...", Color.parseColor("#4CAF50"))
             startQrAnimation(jsonArray)
-
         } catch (e: JSONException) {
             showError("Invalid proof format.")
         }
@@ -211,28 +189,24 @@ class LoginActivity : AppCompatActivity() {
 
     private fun startQrAnimation(dataChunks: JSONArray) {
         stopAnimation()
-
         animationJob = lifecycleScope.launch(Dispatchers.Default) {
             val encoder = BarcodeEncoder()
             val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
                 put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
                 put(EncodeHintType.MARGIN, 1)
             }
-
             val totalFrames = dataChunks.length()
             val indices = (0 until totalFrames).toMutableList()
             var mode = AnimationMode.FORWARD
             val writer = MultiFormatWriter()
 
             isTransmitting = true
-
             while (isActive && isTransmitting) {
                 when (mode) {
                     AnimationMode.FORWARD -> indices.sort()
                     AnimationMode.REVERSE -> indices.sortDescending()
                     AnimationMode.RANDOM -> indices.shuffle()
                 }
-
                 for (i in indices) {
                     if (!isActive || !isTransmitting) break
                     try {
@@ -254,10 +228,6 @@ class LoginActivity : AppCompatActivity() {
         animationJob = null
         runOnUiThread { resetButton() }
     }
-
-    // -----------------------------------------------------------
-    // Helpers
-    // -----------------------------------------------------------
 
     private fun setLoadingState() {
         btnTransmit.isEnabled = false
