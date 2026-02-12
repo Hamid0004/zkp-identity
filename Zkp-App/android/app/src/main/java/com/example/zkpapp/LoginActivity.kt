@@ -4,6 +4,7 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.widget.Button
 import android.widget.ImageView
 import android.widget.TextView
@@ -46,6 +47,7 @@ class LoginActivity : AppCompatActivity() {
 
     private var animationJob: Job? = null
     @Volatile private var isTransmitting = false
+    private var currentMode = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -53,24 +55,36 @@ class LoginActivity : AppCompatActivity() {
 
         initializeUI()
 
-        // 🛡️ Security Check
-        try {
-            if (!IdentityStorage.hasIdentity()) {
-                Toast.makeText(this, "⚠️ Please create identity first.", Toast.LENGTH_LONG).show()
-                finish()
-                return
-            }
-        } catch (e: Exception) {
-            Log.e("ZKP", "Storage Error", e)
+        // 🛡️ Identity Check
+        if (!IdentityStorage.hasIdentity()) {
+            Toast.makeText(this, "⚠️ Identity Missing", Toast.LENGTH_SHORT).show()
+            finish()
+            return
         }
 
         setupListeners()
-        
-        // 🦁 AUTO-START LOGIC
+
+        // 🦁 LOGIC SEPARATION & AUTO-START
         val mode = intent.getStringExtra("MODE")
+        currentMode = mode ?: ""
+
         if (mode == "SCAN_LOGIN") {
+            // MODE 1: SCANNER ONLY
+            // Transmit wale buttons CHUPA DO
+            btnTransmit.visibility = View.GONE
+            qrImage.visibility = View.GONE
+            statusText.text = "🦁 Opening Scanner..."
+            
+            // Auto-start Scanner
             startQrScanner()
+
         } else if (mode == "TRANSMIT") {
+            // MODE 2: TRANSMITTER ONLY
+            // Scanner wala button CHUPA DO
+            btnScanWeb.visibility = View.GONE
+            statusText.text = "Ready to Transmit Identity"
+            
+            // Auto-start Animation
             startTransmission()
         }
     }
@@ -91,9 +105,8 @@ class LoginActivity : AppCompatActivity() {
         btnTransmit = findViewById(R.id.btnTransmit)
         btnScanWeb = findViewById(R.id.btnGotoScanner)
 
-        btnScanWeb.text = "📷 SCAN WEB QR (LOGIN)"
-        btnScanWeb.setBackgroundColor(Color.parseColor("#1976D2")) // Blue for Scan
-        updateStatus("Choose Mode: Transmit or Scan", Color.DKGRAY)
+        btnScanWeb.text = "📷 RESCAN QR"
+        btnScanWeb.setBackgroundColor(Color.parseColor("#1976D2")) // Blue
     }
 
     private fun setupListeners() {
@@ -101,18 +114,25 @@ class LoginActivity : AppCompatActivity() {
             if (!isTransmitting) startTransmission()
         }
         btnScanWeb.setOnClickListener {
-            stopAnimation()
             startQrScanner()
         }
     }
 
+    // -----------------------------------------------------------
+    // 🔵 PHASE 7: ZK AUTH SCANNER (PORTRAIT FIXED)
+    // -----------------------------------------------------------
     private fun startQrScanner() {
         val integrator = IntentIntegrator(this)
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
-        integrator.setPrompt("🦁 Scan Login QR from Web Screen")
+        integrator.setPrompt("🦁 Scan Login QR from Web")
         integrator.setCameraId(0)
-        integrator.setBeepEnabled(true)
+        integrator.setBeepEnabled(false)
         integrator.setBarcodeImageEnabled(false)
+        
+        // 🦁 FIX: Phone Rotation Issue
+        // False = Device ki orientation follow karega (Portrait)
+        integrator.setOrientationLocked(false) 
+        
         integrator.initiateScan()
     }
 
@@ -121,6 +141,8 @@ class LoginActivity : AppCompatActivity() {
         if (result != null) {
             if (result.contents == null) {
                 Toast.makeText(this, "Scan Cancelled", Toast.LENGTH_SHORT).show()
+                // Agar cancel kiya to wapis dashboard bhej do (Cleaner UX)
+                if(currentMode == "SCAN_LOGIN") finish()
             } else {
                 performZkLogin(result.contents)
             }
@@ -130,61 +152,55 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun performZkLogin(sessionId: String) {
-        updateStatus("🦁 Verifying with ZkAuth...", Color.parseColor("#FF9800"))
+        statusText.text = "🦁 Verifying with ZkAuth..."
         btnScanWeb.isEnabled = false
 
         lifecycleScope.launch {
             ZkAuthManager.startUniversalLogin(
                 context = this@LoginActivity,
                 sessionId = sessionId,
-                onStatus = { msg -> updateStatus(msg, Color.DKGRAY) },
+                onStatus = { msg -> statusText.text = msg },
                 onSuccess = {
-                    // 🦁 FIX: Removed 'delay()' to prevent crash
-                    updateStatus("✅ Login Approved!", Color.parseColor("#2E7D32"))
+                    statusText.text = "✅ Login Approved!"
+                    statusText.setTextColor(Color.parseColor("#2E7D32"))
                     Toast.makeText(this@LoginActivity, "Web Login Successful!", Toast.LENGTH_LONG).show()
-                    finish() // Close activity immediately
+                    finish()
                 },
                 onError = { error ->
-                    showError(error)
+                    statusText.text = "❌ $error"
+                    statusText.setTextColor(Color.RED)
                     btnScanWeb.isEnabled = true
                 }
             )
         }
     }
 
+    // -----------------------------------------------------------
+    // 🟢 OFFLINE TRANSMIT LOGIC
+    // -----------------------------------------------------------
     private fun startTransmission() {
         isTransmitting = true
-        setLoadingState()
+        btnTransmit.isEnabled = false
+        btnTransmit.text = "Generating..."
+        statusText.text = "Computing Proof..."
+        
         lifecycleScope.launch {
             try {
-                val jsonResponse = withContext(Dispatchers.IO) {
-                    stringFromRust()
-                }
+                val jsonResponse = withContext(Dispatchers.IO) { stringFromRust() }
                 handleRustResponse(jsonResponse)
-            } catch (e: UnsatisfiedLinkError) {
-                showError("Native engine missing.")
-            } catch (e: Exception) {
-                showError("Error: ${e.message}")
+            } catch (e: Exception) { 
+                showError("Error: ${e.message}") 
             }
         }
     }
 
     private fun handleRustResponse(response: String) {
-        if (response.startsWith("Error", ignoreCase = true) || response.isBlank()) {
-            showError(response)
-            return
-        }
         try {
             val jsonArray = JSONArray(response)
-            if (jsonArray.length() == 0) {
-                showError("No proof frames.")
-                return
-            }
-            updateStatus("Broadcasting Identity...", Color.parseColor("#4CAF50"))
+            statusText.text = "Broadcasting Identity..."
+            statusText.setTextColor(Color.parseColor("#4CAF50"))
             startQrAnimation(jsonArray)
-        } catch (e: JSONException) {
-            showError("Invalid proof format.")
-        }
+        } catch (e: Exception) { showError("Invalid Proof") }
     }
 
     private fun startQrAnimation(dataChunks: JSONArray) {
@@ -193,22 +209,17 @@ class LoginActivity : AppCompatActivity() {
             val encoder = BarcodeEncoder()
             val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
                 put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
-                put(EncodeHintType.MARGIN, 1)
             }
             val totalFrames = dataChunks.length()
             val indices = (0 until totalFrames).toMutableList()
-            var mode = AnimationMode.FORWARD
+            var mode = 0
             val writer = MultiFormatWriter()
 
             isTransmitting = true
             while (isActive && isTransmitting) {
-                when (mode) {
-                    AnimationMode.FORWARD -> indices.sort()
-                    AnimationMode.REVERSE -> indices.sortDescending()
-                    AnimationMode.RANDOM -> indices.shuffle()
-                }
+                indices.shuffle()
                 for (i in indices) {
-                    if (!isActive || !isTransmitting) break
+                    if (!isActive) break
                     try {
                         val matrix = writer.encode(dataChunks.getString(i), BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
                         val bitmap = encoder.createBitmap(matrix)
@@ -216,7 +227,6 @@ class LoginActivity : AppCompatActivity() {
                     } catch (_: Exception) {}
                     delay(FRAME_DELAY_MS)
                 }
-                mode = mode.next()
                 delay(CYCLE_PAUSE_MS)
             }
         }
@@ -226,40 +236,17 @@ class LoginActivity : AppCompatActivity() {
         isTransmitting = false
         animationJob?.cancel()
         animationJob = null
-        runOnUiThread { resetButton() }
-    }
-
-    private fun setLoadingState() {
-        btnTransmit.isEnabled = false
-        btnTransmit.text = "Generating..."
-        updateStatus("Computing Proof...", Color.DKGRAY)
-    }
-
-    private fun resetButton() {
-        if (!isDestroyed) {
-            btnTransmit.isEnabled = true
-            btnTransmit.text = "TRANSMIT IDENTITY"
-            btnScanWeb.isEnabled = true
+        runOnUiThread { 
+            if (!isDestroyed) {
+                btnTransmit.isEnabled = true
+                btnTransmit.text = "TRANSMIT IDENTITY"
+            }
         }
-    }
-
-    private fun updateStatus(text: String, color: Int) {
-        statusText.text = text
-        statusText.setTextColor(color)
     }
 
     private fun showError(message: String) {
         stopAnimation()
-        updateStatus("❌ $message", Color.RED)
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private enum class AnimationMode {
-        FORWARD, REVERSE, RANDOM;
-        fun next() = when (this) {
-            FORWARD -> REVERSE
-            REVERSE -> RANDOM
-            RANDOM -> FORWARD
-        }
+        statusText.text = "❌ $message"
+        statusText.setTextColor(Color.RED)
     }
 }
