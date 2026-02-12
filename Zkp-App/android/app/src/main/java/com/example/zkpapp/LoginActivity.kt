@@ -69,13 +69,13 @@ class LoginActivity : AppCompatActivity() {
         currentMode = mode ?: "OFFLINE_DASHBOARD"
 
         if (currentMode == "WEB_LOGIN") {
-            // 🔵 PHASE 7: WEB LOGIN MODE
+            // 🔵 PHASE 7: WEB LOGIN MODE (ZkAuth)
             // Hide everything, Start Camera
             qrImage.visibility = View.GONE
             btnTransmit.visibility = View.GONE
             btnVerify.visibility = View.GONE
             statusText.text = "🦁 Starting Web Scanner..."
-            
+
             startWebQrScanner()
 
         } else {
@@ -84,9 +84,9 @@ class LoginActivity : AppCompatActivity() {
             qrImage.visibility = View.VISIBLE
             btnTransmit.visibility = View.VISIBLE
             btnVerify.visibility = View.VISIBLE
-            
+
             btnTransmit.text = "TRANSMIT IDENTITY"
-            btnVerify.text = "🔍 SCAN & VERIFY" // 🦁 Button Wapis Aa Gaya
+            btnVerify.text = "🔍 SCAN & VERIFY" 
             statusText.text = "Ready to Share Identity"
         }
     }
@@ -105,7 +105,7 @@ class LoginActivity : AppCompatActivity() {
         qrImage = findViewById(R.id.imgDynamicQr)
         statusText = findViewById(R.id.tvStatus)
         btnTransmit = findViewById(R.id.btnTransmit)
-        btnVerify = findViewById(R.id.btnGotoScanner) // Using existing ID in layout
+        btnVerify = findViewById(R.id.btnGotoScanner)
     }
 
     private fun setupListeners() {
@@ -115,7 +115,6 @@ class LoginActivity : AppCompatActivity() {
         }
 
         // Button 2: Scan & Verify (Opens VerifierActivity)
-        // 🦁 Yeh wo button hai jo aap maang rahe thay
         btnVerify.setOnClickListener {
             stopAnimation()
             startActivity(Intent(this, VerifierActivity::class.java))
@@ -127,12 +126,17 @@ class LoginActivity : AppCompatActivity() {
     // -----------------------------------------------------------
     private fun startWebQrScanner() {
         val integrator = IntentIntegrator(this)
+        
+        // 🦁 FIX: Force Portrait Mode using custom Activity
+        // Make sure PortraitCaptureActivity.kt is created!
+        integrator.setCaptureActivity(PortraitCaptureActivity::class.java)
+        integrator.setOrientationLocked(true) // Lock Rotation
+        
         integrator.setDesiredBarcodeFormats(IntentIntegrator.QR_CODE)
         integrator.setPrompt("🦁 Scan Web Login QR")
         integrator.setCameraId(0)
         integrator.setBeepEnabled(true)
         integrator.setBarcodeImageEnabled(false)
-        integrator.setOrientationLocked(false) // 🦁 Rotation Fixed
         integrator.initiateScan()
     }
 
@@ -153,6 +157,8 @@ class LoginActivity : AppCompatActivity() {
 
     private fun performZkLogin(sessionId: String) {
         statusText.text = "🦁 Generating Proof for Web..."
+        
+        // 🦁 CRITICAL: Wrapped in coroutine scope for safety
         lifecycleScope.launch {
             ZkAuthManager.startUniversalLogin(
                 context = this@LoginActivity,
