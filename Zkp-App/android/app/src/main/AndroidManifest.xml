@@ -28,6 +28,16 @@
         </activity>
 
         <activity 
+            android:name=".DashboardActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+        <activity 
+            android:name=".PassportScanActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+
+        <activity 
             android:name=".ErrorActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
 

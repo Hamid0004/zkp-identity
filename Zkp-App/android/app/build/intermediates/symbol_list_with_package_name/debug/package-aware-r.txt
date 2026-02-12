@@ -3250,11 +3250,12 @@ id bounceEnd
 id bounceStart
 id btnFlash
 id btnGotoScanner
-id btnOfflineMenu
-id btnPassport
+id btnOfflineIdentity
+id btnScanPassport
+id btnScanQrLogin
+id btnTestProof
 id btnTransmit
 id btnVerifyOffline
-id btnWebLogin
 id buttonPanel
 id cache_measures
 id callMeasure

@@ -20,20 +20,25 @@ public final class ActivityMainBinding implements ViewBinding {
   private final ScrollView rootView;
 
   @NonNull
-  public final Button btnOfflineMenu;
+  public final Button btnOfflineIdentity;
 
   @NonNull
-  public final Button btnPassport;
+  public final Button btnScanPassport;
 
   @NonNull
-  public final Button btnWebLogin;
+  public final Button btnScanQrLogin;
 
-  private ActivityMainBinding(@NonNull ScrollView rootView, @NonNull Button btnOfflineMenu,
-      @NonNull Button btnPassport, @NonNull Button btnWebLogin) {
+  @NonNull
+  public final Button btnTestProof;
+
+  private ActivityMainBinding(@NonNull ScrollView rootView, @NonNull Button btnOfflineIdentity,
+      @NonNull Button btnScanPassport, @NonNull Button btnScanQrLogin,
+      @NonNull Button btnTestProof) {
     this.rootView = rootView;
-    this.btnOfflineMenu = btnOfflineMenu;
-    this.btnPassport = btnPassport;
-    this.btnWebLogin = btnWebLogin;
+    this.btnOfflineIdentity = btnOfflineIdentity;
+    this.btnScanPassport = btnScanPassport;
+    this.btnScanQrLogin = btnScanQrLogin;
+    this.btnTestProof = btnTestProof;
   }
 
   @Override
@@ -63,26 +68,32 @@ public final class ActivityMainBinding implements ViewBinding {
     // This is done to optimize the compiled bytecode for size and performance.
     int id;
     missingId: {
-      id = R.id.btnOfflineMenu;
-      Button btnOfflineMenu = ViewBindings.findChildViewById(rootView, id);
-      if (btnOfflineMenu == null) {
+      id = R.id.btnOfflineIdentity;
+      Button btnOfflineIdentity = ViewBindings.findChildViewById(rootView, id);
+      if (btnOfflineIdentity == null) {
         break missingId;
       }
 
-      id = R.id.btnPassport;
-      Button btnPassport = ViewBindings.findChildViewById(rootView, id);
-      if (btnPassport == null) {
+      id = R.id.btnScanPassport;
+      Button btnScanPassport = ViewBindings.findChildViewById(rootView, id);
+      if (btnScanPassport == null) {
         break missingId;
       }
 
-      id = R.id.btnWebLogin;
-      Button btnWebLogin = ViewBindings.findChildViewById(rootView, id);
-      if (btnWebLogin == null) {
+      id = R.id.btnScanQrLogin;
+      Button btnScanQrLogin = ViewBindings.findChildViewById(rootView, id);
+      if (btnScanQrLogin == null) {
         break missingId;
       }
 
-      return new ActivityMainBinding((ScrollView) rootView, btnOfflineMenu, btnPassport,
-          btnWebLogin);
+      id = R.id.btnTestProof;
+      Button btnTestProof = ViewBindings.findChildViewById(rootView, id);
+      if (btnTestProof == null) {
+        break missingId;
+      }
+
+      return new ActivityMainBinding((ScrollView) rootView, btnOfflineIdentity, btnScanPassport,
+          btnScanQrLogin, btnTestProof);
     }
     String missingId = rootView.getResources().getResourceName(id);
     throw new NullPointerException("Missing required view with ID: ".concat(missingId));

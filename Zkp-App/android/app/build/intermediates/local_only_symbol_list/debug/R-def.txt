@@ -16,11 +16,12 @@ drawable qr_border
 drawable rounded_border
 id btnFlash
 id btnGotoScanner
-id btnOfflineMenu
-id btnPassport
+id btnOfflineIdentity
+id btnScanPassport
+id btnScanQrLogin
+id btnTestProof
 id btnTransmit
 id btnVerifyOffline
-id btnWebLogin
 id cardTransmit
 id imgDynamicQr
 id lblTitle

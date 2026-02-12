@@ -66,6 +66,14 @@
             </intent-filter>
         </activity>
         <activity
+            android:name="com.example.zkpapp.DashboardActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
+            android:name="com.example.zkpapp.PassportScanActivity"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
             android:name="com.example.zkpapp.ErrorActivity"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity

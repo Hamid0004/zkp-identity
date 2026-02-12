@@ -12,19 +12,9 @@
         android:orientation="vertical"
         android:padding="24dp">
 
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:text="ZKP Mobile"
-            android:textColor="#333333"
-            android:textSize="22sp"
-            android:textStyle="bold"
-            android:letterSpacing="0.05" />
-
         <ImageView
-            android:layout_width="160dp"
-            android:layout_height="160dp"
+            android:layout_width="140dp"
+            android:layout_height="140dp"
             android:layout_marginTop="40dp"
             android:src="@android:drawable/sym_def_app_icon"
             android:contentDescription="App Logo" />
@@ -34,8 +24,8 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="20dp"
             android:text="ZKP Identity"
-            android:textColor="#1A237E"
-            android:textSize="36sp"
+            android:textColor="#222222"
+            android:textSize="34sp"
             android:textStyle="bold" />
 
         <Space
@@ -43,42 +33,52 @@
             android:layout_height="40dp" />
 
         <Button
-            android:id="@+id/btnPassport"
+            android:id="@+id/btnScanQrLogin"
             android:layout_width="match_parent"
             android:layout_height="65dp"
             android:layout_marginBottom="16dp"
-            android:backgroundTint="#FF9800"
-            android:text="🛂 SCAN PASSPORT (CREATE ID)"
+            android:backgroundTint="#1976D2"
+            android:text="📷  SCAN QR TO LOGIN"
             android:textColor="#FFFFFF"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:elevation="4dp" />
 
         <Button
-            android:id="@+id/btnOfflineMenu"
+            android:id="@+id/btnScanPassport"
             android:layout_width="match_parent"
             android:layout_height="65dp"
             android:layout_marginBottom="16dp"
-            android:backgroundTint="#2E7D32"
-            android:text="📡 TRANSMIT IDENTITY (QR)"
+            android:backgroundTint="#FFA000"
+            android:text="🛂  SCAN PASSPORT (CREATE ID)"
             android:textColor="#FFFFFF"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:elevation="4dp" />
 
         <Button
-            android:id="@+id/btnWebLogin"
+            android:id="@+id/btnOfflineIdentity"
             android:layout_width="match_parent"
             android:layout_height="65dp"
             android:layout_marginBottom="16dp"
-            android:backgroundTint="#2962FF"
-            android:text="🕵️ VERIFIER MODE (SCAN)"
+            android:backgroundTint="#388E3C"
+            android:text="🪪  OFFLINE IDENTITY"
             android:textColor="#FFFFFF"
+            android:textSize="16sp"
             android:textStyle="bold"
             android:elevation="4dp" />
 
-        <Space
+        <Button
+            android:id="@+id/btnTestProof"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_height="65dp"
+            android:layout_marginBottom="20dp"
+            android:backgroundTint="#607D8B"
+            android:text="🧪  TEST PROOF (OFFLINE)"
+            android:textColor="#FFFFFF"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:elevation="4dp" />
 
         <TextView
             android:layout_width="wrap_content"
