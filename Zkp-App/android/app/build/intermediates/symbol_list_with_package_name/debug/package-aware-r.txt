@@ -3260,7 +3260,7 @@ id buttonPanel
 id cache_measures
 id callMeasure
 id cancel_button
-id cardTransmit
+id cardQrDisplay
 id carryVelocity
 id center
 id centerCrop
@@ -3386,6 +3386,7 @@ id ignore
 id ignoreRequest
 id image
 id imgDynamicQr
+id imgOfflineQr
 id immediateStop
 id included
 id indeterminate
@@ -3398,6 +3399,7 @@ id jumpToEnd
 id jumpToStart
 id labeled
 id layout
+id layoutButtons
 id lblTitle
 id left
 id leftToRight
@@ -3647,6 +3649,7 @@ id transition_scene_layoutid_cache
 id transition_transform
 id triangle
 id tvGuide
+id tvQrStatus
 id tvStatus
 id tvSubtitle
 id tvTitle

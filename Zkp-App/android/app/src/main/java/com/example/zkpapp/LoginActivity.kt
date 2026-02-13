@@ -7,23 +7,13 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.View
-import android.view.ViewGroup
-import android.widget.Button
-import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope 
+import androidx.lifecycle.lifecycleScope
 import com.example.zkpapp.auth.ZkAuthManager
-import com.google.zxing.BarcodeFormat
-import com.google.zxing.EncodeHintType
-import com.google.zxing.MultiFormatWriter
 import com.google.zxing.integration.android.IntentIntegrator
-import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel
-import com.journeyapps.barcodescanner.BarcodeEncoder
-import kotlinx.coroutines.* import org.json.JSONArray
-import org.json.JSONException
-import java.util.EnumMap
+import kotlinx.coroutines.launch
 
 class LoginActivity : AppCompatActivity() {
 
@@ -35,88 +25,55 @@ class LoginActivity : AppCompatActivity() {
                 Log.e("ZKP", "Native library failed to load", e)
             }
         }
-        private const val QR_SIZE = 800
-        private const val FRAME_DELAY_MS = 150L
-        private const val CYCLE_PAUSE_MS = 300L
     }
 
+    // 🦁 NOTE: Yeh JNI function zaroori hai kyunki ZkAuthManager isay use kar sakta hai proof generate karne ke liye.
     external fun stringFromRust(): String
 
-    private lateinit var qrImage: ImageView
-    private var qrCardView: View? = null
     private lateinit var statusText: TextView
-    private lateinit var btnTransmit: Button
     
-    private var animationJob: Job? = null
-    @Volatile private var isTransmitting = false
-    private var currentMode = ""
+    // UI Containers to hide (White Box Fix)
+    private var qrCardView: View? = null 
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_login)
 
-        initializeUI()
+        // 1. Init UI
+        statusText = findViewById(R.id.tvStatus)
+        
+        // Find CardView to hide it (Safed Dabba Fix)
+        val qrImage = findViewById<View>(R.id.imgDynamicQr)
+        val parent1 = qrImage?.parent as? View
+        val parent2 = parent1?.parent as? View
+        val parent3 = parent2?.parent as? View
+        qrCardView = parent3 ?: parent2 // Attempt to find the CardView
 
+        // 2. Identity Check
         if (!IdentityStorage.hasIdentity()) {
             Toast.makeText(this, "⚠️ Identity Missing", Toast.LENGTH_SHORT).show()
             finish()
             return
         }
 
-        setupListeners()
-
-        val mode = intent.getStringExtra("MODE")
-        currentMode = mode ?: "TRANSMIT"
-
-        if (currentMode == "WEB_LOGIN") {
-            qrCardView?.visibility = View.GONE
-            qrImage.visibility = View.GONE
-            btnTransmit.visibility = View.GONE
-            statusText.text = "🦁 Starting Web Scanner..."
-            statusText.setTextColor(Color.WHITE)
-            startWebQrScanner()
-        } else {
-            qrCardView?.visibility = View.VISIBLE
-            qrImage.visibility = View.VISIBLE
-            btnTransmit.visibility = View.VISIBLE
-            btnTransmit.text = "TRANSMIT IDENTITY"
-            statusText.text = "Ready to Share Identity"
-        }
-        
+        // 3. Clean UI for Web Login
+        // Hum Transmit buttons aur QR images ko chupayenge
+        qrCardView?.visibility = View.GONE
+        findViewById<View>(R.id.imgDynamicQr)?.visibility = View.GONE
+        findViewById<View>(R.id.btnTransmit)?.visibility = View.GONE
         findViewById<View>(R.id.btnGotoScanner)?.visibility = View.GONE
+
+        // 4. Start Process
+        statusText.text = "🦁 Starting Web Scanner..."
+        statusText.setTextColor(Color.WHITE)
+        
+        startWebQrScanner()
     }
 
-    override fun onPause() {
-        super.onPause()
-        stopAnimation()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        stopAnimation()
-    }
-
-    private fun initializeUI() {
-        qrImage = findViewById(R.id.imgDynamicQr)
-        statusText = findViewById(R.id.tvStatus)
-        btnTransmit = findViewById(R.id.btnTransmit)
-
-        try {
-            val parent1 = qrImage.parent as? ViewGroup
-            val parent2 = parent1?.parent as? ViewGroup
-            val parent3 = parent2?.parent as? ViewGroup 
-            qrCardView = parent3 as? View ?: parent2 as? View
-        } catch (e: Exception) {
-            Log.e("ZKP", "Could not find CardView parent", e)
-        }
-    }
-
-    private fun setupListeners() {
-        btnTransmit.setOnClickListener {
-            if (!isTransmitting) startTransmission()
-        }
-    }
-
+    // -----------------------------------------------------------
+    // 🔵 WEB LOGIN LOGIC (Phase 7)
+    // -----------------------------------------------------------
+    
     private fun startWebQrScanner() {
         val integrator = IntentIntegrator(this)
         integrator.setCaptureActivity(PortraitCaptureActivity::class.java)
@@ -133,8 +90,10 @@ class LoginActivity : AppCompatActivity() {
         val result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data)
         if (result != null) {
             if (result.contents == null) {
-                if (currentMode == "WEB_LOGIN") finish()
+                // User ne back button dabaya
+                finish()
             } else {
+                // QR Scan ho gaya -> Login Process Karo
                 performZkLogin(result.contents)
             }
         } else {
@@ -143,12 +102,8 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun performZkLogin(sessionId: String) {
-        qrCardView?.visibility = View.GONE 
-        qrImage.visibility = View.GONE
-        btnTransmit.visibility = View.GONE
-
         statusText.text = "🦁 Generating Proof..."
-        statusText.setTextColor(Color.parseColor("#FF9800"))
+        statusText.setTextColor(Color.parseColor("#FF9800")) // Orange
         statusText.textSize = 20f
 
         lifecycleScope.launch {
@@ -158,10 +113,10 @@ class LoginActivity : AppCompatActivity() {
                 onStatus = { msg -> statusText.text = msg },
                 onSuccess = {
                     statusText.text = "✅ Login Approved!"
-                    statusText.setTextColor(Color.parseColor("#2E7D32"))
+                    statusText.setTextColor(Color.parseColor("#2E7D32")) // Green
                     Toast.makeText(this@LoginActivity, "Web Login Successful!", Toast.LENGTH_LONG).show()
                     
-                    // 🦁 FIX: Removed 'delay()' and used Handler
+                    // Handler Fix (No Coroutine Delay Error)
                     Handler(Looper.getMainLooper()).postDelayed({
                         finish()
                     }, 1500)
@@ -170,86 +125,13 @@ class LoginActivity : AppCompatActivity() {
                     statusText.text = error
                     statusText.setTextColor(Color.RED)
                     Toast.makeText(this@LoginActivity, error, Toast.LENGTH_LONG).show()
-                    
-                    // 🦁 FIX: Removed 'delay()' and used Handler
+
+                    // Handler Fix
                     Handler(Looper.getMainLooper()).postDelayed({
                         finish()
                     }, 2500)
                 }
             )
         }
-    }
-
-    private fun startTransmission() {
-        isTransmitting = true
-        btnTransmit.isEnabled = false
-        btnTransmit.text = "Generating..."
-        statusText.text = "Computing Proof..."
-
-        lifecycleScope.launch {
-            try {
-                val jsonResponse = withContext(Dispatchers.IO) { stringFromRust() }
-                handleRustResponse(jsonResponse)
-            } catch (e: Exception) { 
-                showError("Error: ${e.message}") 
-            }
-        }
-    }
-
-    private fun handleRustResponse(response: String) {
-        try {
-            val jsonArray = JSONArray(response)
-            statusText.text = "Broadcasting Identity..."
-            statusText.setTextColor(Color.parseColor("#4CAF50"))
-            startQrAnimation(jsonArray)
-        } catch (e: Exception) { showError("Invalid Proof") }
-    }
-
-    private fun startQrAnimation(dataChunks: JSONArray) {
-        stopAnimation()
-        animationJob = lifecycleScope.launch(Dispatchers.Default) {
-            val encoder = BarcodeEncoder()
-            val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
-                put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
-            }
-            val totalFrames = dataChunks.length()
-            val indices = (0 until totalFrames).toMutableList()
-            val writer = MultiFormatWriter()
-
-            isTransmitting = true
-            while (isActive && isTransmitting) {
-                indices.shuffle()
-                for (i in indices) {
-                    if (!isActive) break
-                    try {
-                        val matrix = writer.encode(dataChunks.getString(i), BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
-                        val bitmap = encoder.createBitmap(matrix)
-                        withContext(Dispatchers.Main) { qrImage.setImageBitmap(bitmap) }
-                    } catch (_: Exception) {}
-                    delay(FRAME_DELAY_MS)
-                }
-                delay(CYCLE_PAUSE_MS)
-            }
-        }
-    }
-
-    private fun stopAnimation() {
-        isTransmitting = false
-        animationJob?.cancel()
-        animationJob = null
-        runOnUiThread {
-            if (!isDestroyed) {
-                btnTransmit.isEnabled = true
-                btnTransmit.text = "TRANSMIT IDENTITY"
-                statusText.text = "Ready to Share"
-                statusText.setTextColor(Color.LTGRAY)
-            }
-        }
-    }
-
-    private fun showError(message: String) {
-        stopAnimation()
-        statusText.text = "❌ $message"
-        statusText.setTextColor(Color.RED)
     }
 }

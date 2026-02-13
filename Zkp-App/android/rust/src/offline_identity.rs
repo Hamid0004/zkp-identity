@@ -74,7 +74,7 @@ fn build_identity_circuit(
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[no_mangle]
-pub extern "C" fn Java_com_example_zkpapp_LoginActivity_stringFromRust(
+pub extern "C" fn Java_com_example_zkpapp_OfflineMenuActivity_stringFromRust(
     env: JNIEnv,
     _class: JClass,
 ) -> jstring {
