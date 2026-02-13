@@ -19,6 +19,9 @@
     <uses-feature
         android:name="android.hardware.camera"
         android:required="true" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
 
     <permission
         android:name="com.example.zkpapp.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
@@ -28,10 +31,6 @@
 
     <uses-feature
         android:name="android.hardware.camera.front"
-        android:required="false" /> <!-- TODO replace above two with next line after Android 4.2 -->
-    <!-- <uses-feature android:name="android.hardware.camera.any"/> -->
-    <uses-feature
-        android:name="android.hardware.camera.autofocus"
         android:required="false" />
     <uses-feature
         android:name="android.hardware.camera.flash"
@@ -66,10 +65,16 @@
             </intent-filter>
         </activity>
         <activity
-            android:name="com.example.zkpapp.ErrorActivity"
+            android:name="com.example.zkpapp.OfflineMenuActivity"
+            android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
         <activity
-            android:name="com.example.zkpapp.CameraActivity"
+            android:name="com.example.zkpapp.LoginActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
+            android:name="com.example.zkpapp.VerifierActivity"
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
@@ -78,14 +83,6 @@
             android:screenOrientation="portrait"
             android:stateNotNeeded="true"
             android:theme="@style/Theme.AppCompat.NoActionBar" />
-        <activity
-            android:name="com.example.zkpapp.LoginActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
-        <activity
-            android:name="com.example.zkpapp.VerifierActivity"
-            android:exported="false"
-            android:screenOrientation="portrait" />
         <activity
             android:name="com.example.zkpapp.PassportActivity"
             android:exported="true"
@@ -100,6 +97,14 @@
                 android:name="android.nfc.action.TECH_DISCOVERED"
                 android:resource="@xml/nfc_tech_filter" />
         </activity>
+        <activity
+            android:name="com.example.zkpapp.ErrorActivity"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
+        <activity
+            android:name="com.example.zkpapp.CameraActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.NoActionBar" />
 
         <service
             android:name="androidx.camera.core.impl.MetadataHolderService"
