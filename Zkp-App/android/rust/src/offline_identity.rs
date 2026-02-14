@@ -1,52 +1,60 @@
-// ═══════════════════════════════════════════════════════════════════════════
-// 🦁 OFFLINE IDENTITY SYSTEM (ZKP Core)
-// ═══════════════════════════════════════════════════════════════════════════
-
 use jni::JNIEnv;
 use jni::objects::{JClass, JString};
 use jni::sys::jstring;
-use std::ffi::CString; // Essential for string conversion
+use std::ffi::CString;
 use std::panic;
 use std::time::Instant;
 use base64::{Engine as _, engine::general_purpose};
 use android_logger::Config;
-use log::{info, error, LevelFilter};
-use crc32fast::Hasher;
-use serde_json::json; // For structured output
+use log::{info, LevelFilter};
 
-// Plonky2 - The Brain 🧠
+// Plonky2 Imports
 use plonky2::field::types::Field;
 use plonky2::plonk::circuit_builder::CircuitBuilder;
 use plonky2::plonk::circuit_data::CircuitConfig;
 use plonky2::plonk::config::{GenericConfig, PoseidonGoldilocksConfig};
+use plonky2::plonk::proof::ProofWithPublicInputs; 
 use plonky2::hash::poseidon::PoseidonHash;
+// 🦁 CRITICAL FIX: Yeh line zaroori hai taaki 'hash_no_pad' kaam kare 👇
+use plonky2::plonk::config::Hasher; 
 use plonky2::iop::witness::{PartialWitness, WitnessWrite};
+use anyhow::Result;
 
-// ═══════════════════════════════════════════════════════════════════════════
-// 🌍 GLOBAL CONFIGURATION
-// ═══════════════════════════════════════════════════════════════════════════
+// Logger Init
+fn init_logger() {
+    let _ = android_logger::init_once(
+        Config::default().with_max_level(LevelFilter::Info).with_tag("RustZKP"),
+    );
+}
 
+// 🔧 CONFIGURATION
+fn get_diet_config() -> CircuitConfig {
+    CircuitConfig::standard_recursion_config()
+}
+
+// Shared Constants
 const D: usize = 2;
 type C = PoseidonGoldilocksConfig;
 type F = <C as GenericConfig<D>>::F;
 
-// 500 bytes limit for optimal QR scanning
-const CHUNK_SIZE: usize = 500; 
-
-// ═══════════════════════════════════════════════════════════════════════════
-// 📱 ANDROID LOGGER (Debugging)
-// ═══════════════════════════════════════════════════════════════════════════
-
-fn init_logger() {
-    let _ = android_logger::init_once(
-        Config::default()
-            .with_max_level(LevelFilter::Info)
-            .with_tag("RustZKP_Lion"),
-    );
+// Shared Logic
+fn build_identity_circuit(builder: &mut CircuitBuilder<F, D>) -> (plonky2::iop::target::Target, plonky2::hash::hash_types::HashOutTarget) {
+    let balance_target = builder.add_virtual_target();
+    let computed_hash = builder.hash_n_to_hash_no_pad::<PoseidonHash>(vec![balance_target]);
+    let expected_hash_target = builder.add_virtual_hash();
+    
+    builder.connect_hashes(computed_hash, expected_hash_target);
+    builder.register_public_input(expected_hash_target.elements[0]);
+    
+    let min_required = builder.constant(F::from_canonical_u64(10000));
+    let diff = builder.sub(balance_target, min_required);
+    builder.range_check(diff, 32); 
+    
+    (balance_target, expected_hash_target)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 1️⃣ PROVER (Generates Proof for Transmit)
+// 1️⃣ PROVER (Sender)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[no_mangle]
@@ -55,72 +63,67 @@ pub extern "C" fn Java_com_example_zkpapp_OfflineMenuActivity_stringFromRust(
     _class: JClass,
 ) -> jstring {
     init_logger();
-    info!("🚀 PROVER STARTED: Generating Zero-Knowledge Proof...");
+    let start_time = Instant::now();
+    info!("🚀 PROVER START: Generating Standard Proof...");
 
-    // Safe execution to prevent app crashes
-    let result = panic::catch_unwind(|| {
-        let start_time = Instant::now();
+    let result = panic::catch_unwind(|| -> Result<String> {
+        let config = get_diet_config(); 
 
-        // 🦁 1. DUMMY PROOF LOGIC (Simulating Complex ZKP)
-        // Note: Real Plonky2 logic is heavy, for now we simulate "Huge Data"
-        // to test the QR Chunking system perfectly.
-        
-        let mut huge_data = String::new();
-        huge_data.push_str("ZKP_PROOF_HEADER_V1_");
-        for _ in 0..10 {
-            huge_data.push_str("A1B2C3D4E5F6G7H8I9J0_"); // Simulating bytes
-        }
-        huge_data.push_str("END_OF_PROOF_SIGNATURE_LION");
-
-        // Real Logic Placeholder (Commented out to save build time for this test)
-        /*
-        let config = CircuitConfig::standard_recursion_config();
         let mut builder = CircuitBuilder::<F, D>::new(config);
-        // ... build circuit ...
-        let proof = data.prove(pw).unwrap();
-        let proof_bytes = bincode::serialize(&proof).unwrap();
-        let huge_data = general_purpose::STANDARD.encode(&proof_bytes);
-        */
+        let (balance_target, expected_hash_target) = build_identity_circuit(&mut builder);
+        let data = builder.build::<C>();
 
-        info!("✅ Proof Generated in {:.2?}", start_time.elapsed());
-
-        // 🦁 2. CHUNKING SYSTEM (The Magic Part)
-        // Splits big data into small QR codes
-        let total_len = huge_data.len();
-        let total_chunks = (total_len + CHUNK_SIZE - 1) / CHUNK_SIZE;
+        // 🦁 Secret Data: Balance 50,000
+        let my_real_balance = F::from_canonical_u64(50000);
         
-        let mut chunks_vec = Vec::new();
+        // 🦁 AB YEH ERROR NAHI DEGA KYUNKI 'Hasher' TRAIT IMPORTED HAI ✅
+        let my_balance_hash = PoseidonHash::hash_no_pad(&[my_real_balance]);
 
+        let mut pw = PartialWitness::new();
+        pw.set_target(balance_target, my_real_balance);
+        pw.set_hash_target(expected_hash_target, my_balance_hash);
+
+        info!("🔨 Computing Proof...");
+        let proof = data.prove(pw)?;
+
+        let duration = start_time.elapsed();
+        info!("✅ PROOF GENERATED in: {:.2?}", duration);
+
+        let proof_bytes = bincode::serialize(&proof)?;
+        let proof_base64 = general_purpose::STANDARD.encode(proof_bytes);
+
+        // 👇 OPTIMIZATION: 750 Chars per QR
+        let chunk_size = 750; 
+        let total_chunks = (proof_base64.len() + chunk_size - 1) / chunk_size;
+
+        info!("📦 FINAL SIZE: {} bytes in {} chunks", proof_base64.len(), total_chunks);
+
+        let mut json_array = String::from("[");
         for i in 0..total_chunks {
-            let start = i * CHUNK_SIZE;
-            let end = std::cmp::min(start + CHUNK_SIZE, total_len);
-            let chunk_data = &huge_data[start..end];
-
-            // Calculate Checksum for integrity
-            let mut hasher = Hasher::new();
-            hasher.update(chunk_data.as_bytes());
-            let checksum = hasher.finalize();
-
-            // Format: "index/total|checksum|data"
-            // Example: "1/4|3928472|ZKP_PROOF..."
-            let formatted_chunk = format!("{}/{}|{:x}|{}", i + 1, total_chunks, checksum, chunk_data);
-            chunks_vec.push(formatted_chunk);
+            let start = i * chunk_size;
+            let end = std::cmp::min(start + chunk_size, proof_base64.len());
+            let slice = &proof_base64[start..end];
+            
+            if i > 0 { json_array.push(','); }
+            json_array.push_str(&format!("\"{}/{}|{}\"", i + 1, total_chunks, slice));
         }
-
-        // Return as JSON Array ["chunk1", "chunk2", ...]
-        json!(chunks_vec).to_string()
+        json_array.push(']');
+        
+        Ok(json_array)
     });
 
-    // Handle Panic cleanly
-    let output = result.unwrap_or_else(|_| "[]".to_string());
+    let output = match result {
+        Ok(Ok(json)) => json,
+        Ok(Err(e)) => format!("[\"Error: {}\"]", e),
+        Err(_) => "[\"Error: Rust Panic\"]".to_string(),
+    };
     
-    // Convert Rust String -> Java String
     let c_str = CString::new(output).unwrap();
-    env.new_string(c_str.to_str().unwrap()).expect("Failed to create Java String").into_raw()
+    env.new_string(c_str.to_str().unwrap()).expect("JNI Error").into_raw()
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 2️⃣ VERIFIER (Validates Proof from Camera)
+// 2️⃣ VERIFIER (Receiver)
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[no_mangle]
@@ -128,23 +131,51 @@ pub extern "C" fn Java_com_example_zkpapp_VerifierActivity_verifyProofFromRust(
     mut env: JNIEnv,
     _class: JClass,
     proof_str: JString,
-) -> jstring {
+) -> jstring { 
     init_logger();
-    info!("🕵️ VERIFIER STARTED");
 
-    // Get String from Java
-    let input: String = env.get_string(&proof_str).expect("Invalid JString").into();
+    let proof_base64: String = match env.get_string(&proof_str) {
+        Ok(s) => s.into(),
+        Err(_) => return env.new_string("❌ Error: JNI String Fail").unwrap().into_raw(),
+    };
 
-    let result = panic::catch_unwind(|| {
-        // Logic: Check if it starts with our header (Simulation)
-        if input.contains("ZKP_PROOF_HEADER_V1") {
-            "✅ Verified: Valid Identity Proof".to_string()
+    let result_msg = panic::catch_unwind(|| {
+        let deser_start = Instant::now();
+
+        let proof_bytes = match general_purpose::STANDARD.decode(&proof_base64) {
+            Ok(b) => b,
+            Err(_) => return "❌ Error: Base64 Fail".to_string(),
+        };
+
+        let proof: ProofWithPublicInputs<F, C, D> = match bincode::deserialize(&proof_bytes) {
+            Ok(p) => p,
+            Err(_) => return "❌ Error: Parse Fail".to_string(),
+        };
+
+        let deser_time = deser_start.elapsed(); 
+
+        let math_start = Instant::now();
+        let config = get_diet_config(); 
+        let mut builder = CircuitBuilder::<F, D>::new(config);
+        build_identity_circuit(&mut builder);
+        let data = builder.build::<C>();
+
+        let is_valid = data.verify(proof).is_ok();
+
+        let math_time = math_start.elapsed(); 
+
+        if is_valid {
+            format!("✅ Verified!\n📂 Parse: {:.2?}\n🧮 Math: {:.2?}", deser_time, math_time)
         } else {
-            "❌ Invalid: Corrupted or Fake Proof".to_string()
+            "⛔ Invalid Proof".to_string()
         }
     });
 
-    let output = result.unwrap_or_else(|_| "Error: Verifier Panic".to_string());
-    let c_str = CString::new(output).unwrap();
-    env.new_string(c_str.to_str().unwrap()).expect("Failed to create Java String").into_raw()
+    let final_output = match result_msg {
+        Ok(msg) => msg,
+        Err(_) => "💥 Rust Panic (Crash)".to_string(),
+    };
+
+    let c_str = CString::new(final_output).unwrap();
+    env.new_string(c_str.to_str().unwrap()).expect("JNI Error").into_raw()
 }
