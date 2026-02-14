@@ -31,14 +31,14 @@ class OfflineMenuActivity : AppCompatActivity() {
             }
         }
         private const val QR_SIZE = 800
-        private const val FRAME_DELAY_MS = 150L // 🦁 Speed of chunks
+        private const val FRAME_DELAY_MS = 200L // 🦁 Thora slow kiya taaki clear dikhe
     }
 
     external fun stringFromRust(): String 
 
     private lateinit var imgQr: ImageView
     private lateinit var tvStatus: TextView
-    private lateinit var tvFrameCounter: TextView // 🦁 New Counter Text
+    private lateinit var tvFrameCounter: TextView
     private lateinit var loader: ProgressBar
     private lateinit var btnTransmit: Button
     private lateinit var btnVerifyOffline: Button
@@ -52,10 +52,9 @@ class OfflineMenuActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_offline_menu)
 
-        // Init UI
         imgQr = findViewById(R.id.imgOfflineQr)
         tvStatus = findViewById(R.id.tvQrStatus)
-        tvFrameCounter = findViewById(R.id.tvFrameCounter) // 🦁 Bind View
+        tvFrameCounter = findViewById(R.id.tvFrameCounter)
         loader = findViewById(R.id.loader)
         btnTransmit = findViewById(R.id.btnTransmit)
         btnVerifyOffline = findViewById(R.id.btnVerifyOffline)
@@ -81,7 +80,6 @@ class OfflineMenuActivity : AppCompatActivity() {
         cleanupResources()
     }
 
-    // 🦁 START LOGIC
     private fun startTransmission() {
         isGeneratingProof = true
         updateUIForComputing()
@@ -99,7 +97,7 @@ class OfflineMenuActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     isGeneratingProof = false
-                    showError("Error: ${e.message}")
+                    showError("Rust Error: ${e.message}")
                 }
             }
         }
@@ -109,20 +107,19 @@ class OfflineMenuActivity : AppCompatActivity() {
         try {
             val jsonArray = JSONArray(response)
             if (jsonArray.length() == 0) {
-                showError("Empty proof data")
+                showError("Empty Proof Data")
                 return
             }
             
             isTransmitting = true
-            updateUIForTransmitting()
-            startQrAnimation(jsonArray) // 🦁 Start Loop
+            updateUIForTransmitting() // 🦁 Yeh Tint Hatayega
+            startQrAnimation(jsonArray)
             
         } catch (e: Exception) {
-            showError("Invalid JSON Data")
+            showError("JSON Error: ${e.message}")
         }
     }
 
-    // 🦁 ANIMATION LOOP WITH COUNTER
     private fun startQrAnimation(dataChunks: JSONArray) {
         stopAnimation()
         
@@ -130,15 +127,14 @@ class OfflineMenuActivity : AppCompatActivity() {
             val encoder = BarcodeEncoder()
             val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
                 put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
-                put(EncodeHintType.MARGIN, 1)
+                put(EncodeHintType.MARGIN, 2) // White Border
             }
             val writer = MultiFormatWriter()
             val totalFrames = dataChunks.length()
             val indices = (0 until totalFrames).toMutableList()
 
-            // 🦁 Codespace Emulator ke liye Loop
             while (isActive && isTransmitting) {
-                indices.shuffle() // Security Shuffle (RND)
+                indices.shuffle()
                 
                 for (i in indices) {
                     if (!isActive || !isTransmitting) break
@@ -150,16 +146,21 @@ class OfflineMenuActivity : AppCompatActivity() {
                         val matrix = writer.encode(chunkData, BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
                         val bitmap = encoder.createBitmap(matrix)
                         
-                        // 2. Update UI (Image + Counter)
+                        // 2. Update UI
                         withContext(Dispatchers.Main) { 
+                            // 🦁 SAFETY CHECK: Ensure Tint is Gone!
+                            imgQr.clearColorFilter()
+                            imgQr.imageTintList = null 
                             imgQr.setImageBitmap(bitmap)
                             
-                            // 🦁 SHOW COUNTER (e.g., "CHUNK: 3/4")
-                            // i+1 kyunki index 0 se shuru hota hai
                             tvFrameCounter.text = "CHUNK: ${i + 1} / $totalFrames"
                         }
-                    } catch (e: Exception) { e.printStackTrace() }
-                    
+                    } catch (e: Exception) {
+                        withContext(Dispatchers.Main) {
+                            tvStatus.text = "QR Gen Error: ${e.message}"
+                            tvStatus.setTextColor(Color.RED)
+                        }
+                    }
                     delay(FRAME_DELAY_MS)
                 }
             }
@@ -184,7 +185,8 @@ class OfflineMenuActivity : AppCompatActivity() {
         proofGenerationJob = null
     }
 
-    // 🦁 UI STATE UPDATES
+    // 🦁 UI UPDATES (Crucial Changes Here)
+    
     private fun updateUIForComputing() {
         btnTransmit.text = "⏳ COMPUTING..."
         btnTransmit.setBackgroundColor(Color.parseColor("#FF6F00")) 
@@ -193,9 +195,11 @@ class OfflineMenuActivity : AppCompatActivity() {
         tvStatus.text = "🦁 Computing Proof..."
         tvStatus.setTextColor(Color.WHITE)
         
-        tvFrameCounter.visibility = View.INVISIBLE // Hide counter
+        tvFrameCounter.visibility = View.INVISIBLE
         loader.visibility = View.VISIBLE
-        imgQr.setColorFilter(Color.DKGRAY)
+        
+        // Placeholder Mode (Grey Tint)
+        imgQr.setColorFilter(Color.DKGRAY) 
     }
     
     private fun updateUIForTransmitting() {
@@ -206,9 +210,13 @@ class OfflineMenuActivity : AppCompatActivity() {
         tvStatus.text = "📡 Broadcasting Identity..."
         tvStatus.setTextColor(Color.parseColor("#00E676"))
         
-        tvFrameCounter.visibility = View.VISIBLE // Show counter
+        tvFrameCounter.visibility = View.VISIBLE
         loader.visibility = View.GONE
+        
+        // 🦁 FIX: FORCEFULLY REMOVE ALL TINTS
         imgQr.clearColorFilter()
+        imgQr.imageTintList = null
+        imgQr.setBackgroundColor(Color.WHITE) // Background White taaki QR saaf dikhe
     }
     
     private fun resetUI() {
@@ -219,17 +227,20 @@ class OfflineMenuActivity : AppCompatActivity() {
         tvStatus.text = "Ready to Transmit"
         tvStatus.setTextColor(Color.LTGRAY)
         
-        tvFrameCounter.visibility = View.INVISIBLE // Hide counter
+        tvFrameCounter.visibility = View.INVISIBLE
         loader.visibility = View.GONE
-        imgQr.clearColorFilter()
+        
+        // Reset to Icon with Tint
         imgQr.setImageResource(android.R.drawable.ic_menu_gallery)
         imgQr.setColorFilter(Color.DKGRAY)
+        imgQr.imageTintList = null
+        imgQr.setBackgroundColor(Color.TRANSPARENT) // Remove white background
     }
     
     private fun showError(message: String) {
         stopTransmission()
         tvStatus.text = "❌ $message"
         tvStatus.setTextColor(Color.RED)
-        lifecycleScope.launch { delay(3000); if (!isTransmitting) resetUI() }
+        lifecycleScope.launch { delay(4000); if (!isTransmitting) resetUI() }
     }
 }
