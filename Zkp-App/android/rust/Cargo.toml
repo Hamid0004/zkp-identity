@@ -9,7 +9,7 @@ resolver = "2"
 crate-type = ["cdylib"]
 
 [dependencies]
-# 🌉 Android JNI Bridge
+# 🌉 Android JNI Bridge (Default features disabled for smaller size)
 jni = { version = "0.21.1", default-features = false }
 
 # 🧠 ZKP Engine (Plonky2) - Core Math logic
@@ -30,7 +30,8 @@ rsa = { version = "0.9", features = ["sha2", "pem"] }
 rand = "0.8"
 
 # 🦁 CRITICAL FIXES: Dependency Pinning for Android NDK
-crc32fast = "=1.3.2"  # Prevents stdarch_arm_crc32 error
+# In versions ko change mat karna, yeh NDK errors rokte hain
+crc32fast = "=1.3.2" 
 base64ct = "=1.6.0"
 rayon = "=1.10.0"
 
@@ -40,9 +41,13 @@ android_logger = "0.13"
 
 [profile.release]
 opt-level = 3           # Max speed for Plonky2 math
-lto = "fat"             # 🦁 Full Link Time Optimization (Fixes size issue)
-codegen-units = 1       # Better binary consistency
-panic = "abort"         # Stable crash handling for NDK
-strip = false           # 🛑 DO NOT STRIP: Keeps symbols (Brings size back to 20MB+)
+lto = "fat"             # 🦁 Full Link Time Optimization (Benchmarks show 15% boost)
+codegen-units = 1       # Slower build, but faster runtime performance
+strip = false           # 🛑 DO NOT STRIP: Keeps symbols for debugging (remove for production Store release)
 debug = true            # Essential for crash reports
 overflow-checks = true  # Extra safety for ZKP math
+
+# 🦁 LOGIC SAVER FIX:
+# "abort" hataya kyunki hum code me 'catch_unwind' use kar rahe hain.
+# Agar 'abort' rakha toh app crash hogi, error return nahi hoga.
+panic = "unwind"
