@@ -31,7 +31,8 @@ class OfflineMenuActivity : AppCompatActivity() {
             }
         }
         private const val QR_SIZE = 800
-        private const val FRAME_DELAY_MS = 200L // 🦁 Thora slow kiya taaki clear dikhe
+        // 🦁 Speed Update: 100ms is better for Fountain Strategy (Faster sweeps)
+        private const val FRAME_DELAY_MS = 100L 
     }
 
     external fun stringFromRust(): String 
@@ -112,7 +113,7 @@ class OfflineMenuActivity : AppCompatActivity() {
             }
             
             isTransmitting = true
-            updateUIForTransmitting() // 🦁 Yeh Tint Hatayega
+            updateUIForTransmitting()
             startQrAnimation(jsonArray)
             
         } catch (e: Exception) {
@@ -120,6 +121,7 @@ class OfflineMenuActivity : AppCompatActivity() {
         }
     }
 
+    // 🦁 NEW: FOUNTAIN STRATEGY (FWD -> RWD -> RND)
     private fun startQrAnimation(dataChunks: JSONArray) {
         stopAnimation()
         
@@ -127,41 +129,62 @@ class OfflineMenuActivity : AppCompatActivity() {
             val encoder = BarcodeEncoder()
             val hints = EnumMap<EncodeHintType, Any>(EncodeHintType::class.java).apply {
                 put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.L)
-                put(EncodeHintType.MARGIN, 2) // White Border
+                put(EncodeHintType.MARGIN, 2)
             }
             val writer = MultiFormatWriter()
             val totalFrames = dataChunks.length()
-            val indices = (0 until totalFrames).toMutableList()
 
-            while (isActive && isTransmitting) {
-                indices.shuffle()
-                
-                for (i in indices) {
-                    if (!isActive || !isTransmitting) break
+            // Helper function to render frame (Avoids code duplication)
+            suspend fun renderFrame(index: Int, modeLabel: String) {
+                try {
+                    val chunkData = dataChunks.getString(index)
+                    val matrix = writer.encode(chunkData, BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
+                    val bitmap = encoder.createBitmap(matrix)
                     
-                    try {
-                        val chunkData = dataChunks.getString(i)
-                        
-                        // 1. Generate Bitmap
-                        val matrix = writer.encode(chunkData, BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
-                        val bitmap = encoder.createBitmap(matrix)
-                        
-                        // 2. Update UI
-                        withContext(Dispatchers.Main) { 
-                            // 🦁 SAFETY CHECK: Ensure Tint is Gone!
+                    withContext(Dispatchers.Main) { 
+                        if (isTransmitting) {
                             imgQr.clearColorFilter()
-                            imgQr.imageTintList = null 
+                            imgQr.imageTintList = null
                             imgQr.setImageBitmap(bitmap)
                             
-                            tvFrameCounter.text = "CHUNK: ${i + 1} / $totalFrames"
-                        }
-                    } catch (e: Exception) {
-                        withContext(Dispatchers.Main) {
-                            tvStatus.text = "QR Gen Error: ${e.message}"
-                            tvStatus.setTextColor(Color.RED)
+                            // 🦁 Dynamic Label: "FWD: 1 / 129"
+                            tvFrameCounter.text = "$modeLabel: ${index + 1} / $totalFrames"
+                            
+                            // Optional: Color coding for modes
+                            when(modeLabel) {
+                                "FWD" -> tvFrameCounter.setTextColor(Color.parseColor("#00E676")) // Green
+                                "RWD" -> tvFrameCounter.setTextColor(Color.parseColor("#FF9800")) // Orange
+                                "RND" -> tvFrameCounter.setTextColor(Color.parseColor("#2979FF")) // Blue
+                            }
                         }
                     }
-                    delay(FRAME_DELAY_MS)
+                } catch (e: Exception) { e.printStackTrace() }
+                delay(FRAME_DELAY_MS)
+            }
+
+            // 🦁 THE MAIN LOOP
+            while (isActive && isTransmitting) {
+                
+                // 1️⃣ PHASE 1: FORWARD (1 -> End)
+                for (i in 0 until totalFrames) {
+                    if (!isActive || !isTransmitting) break
+                    renderFrame(i, "FWD")
+                }
+
+                // 2️⃣ PHASE 2: REVERSE (End -> 1)
+                for (i in totalFrames - 1 downTo 0) {
+                    if (!isActive || !isTransmitting) break
+                    renderFrame(i, "RWD")
+                }
+
+                // 3️⃣ PHASE 3: RANDOM BURST (Shuffle)
+                // Hum total frames jitna hi random chalayenge taaki sab cover ho jaye
+                val randomIndices = (0 until totalFrames).toMutableList()
+                randomIndices.shuffle()
+                
+                for (i in randomIndices) {
+                    if (!isActive || !isTransmitting) break
+                    renderFrame(i, "RND")
                 }
             }
         }
@@ -185,8 +208,7 @@ class OfflineMenuActivity : AppCompatActivity() {
         proofGenerationJob = null
     }
 
-    // 🦁 UI UPDATES (Crucial Changes Here)
-    
+    // UI UPDATES
     private fun updateUIForComputing() {
         btnTransmit.text = "⏳ COMPUTING..."
         btnTransmit.setBackgroundColor(Color.parseColor("#FF6F00")) 
@@ -197,8 +219,6 @@ class OfflineMenuActivity : AppCompatActivity() {
         
         tvFrameCounter.visibility = View.INVISIBLE
         loader.visibility = View.VISIBLE
-        
-        // Placeholder Mode (Grey Tint)
         imgQr.setColorFilter(Color.DKGRAY) 
     }
     
@@ -213,10 +233,9 @@ class OfflineMenuActivity : AppCompatActivity() {
         tvFrameCounter.visibility = View.VISIBLE
         loader.visibility = View.GONE
         
-        // 🦁 FIX: FORCEFULLY REMOVE ALL TINTS
         imgQr.clearColorFilter()
         imgQr.imageTintList = null
-        imgQr.setBackgroundColor(Color.WHITE) // Background White taaki QR saaf dikhe
+        imgQr.setBackgroundColor(Color.WHITE) 
     }
     
     private fun resetUI() {
@@ -230,11 +249,10 @@ class OfflineMenuActivity : AppCompatActivity() {
         tvFrameCounter.visibility = View.INVISIBLE
         loader.visibility = View.GONE
         
-        // Reset to Icon with Tint
         imgQr.setImageResource(android.R.drawable.ic_menu_gallery)
         imgQr.setColorFilter(Color.DKGRAY)
         imgQr.imageTintList = null
-        imgQr.setBackgroundColor(Color.TRANSPARENT) // Remove white background
+        imgQr.setBackgroundColor(Color.TRANSPARENT)
     }
     
     private fun showError(message: String) {
