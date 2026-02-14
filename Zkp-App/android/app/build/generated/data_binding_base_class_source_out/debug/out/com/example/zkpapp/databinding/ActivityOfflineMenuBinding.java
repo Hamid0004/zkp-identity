@@ -43,6 +43,9 @@ public final class ActivityOfflineMenuBinding implements ViewBinding {
   public final ProgressBar loader;
 
   @NonNull
+  public final TextView tvFrameCounter;
+
+  @NonNull
   public final TextView tvQrStatus;
 
   @NonNull
@@ -55,7 +58,8 @@ public final class ActivityOfflineMenuBinding implements ViewBinding {
       @NonNull Button btnTransmit, @NonNull Button btnVerifyOffline,
       @NonNull CardView cardQrDisplay, @NonNull ImageView imgOfflineQr,
       @NonNull LinearLayout layoutButtons, @NonNull ProgressBar loader,
-      @NonNull TextView tvQrStatus, @NonNull TextView tvSubtitle, @NonNull TextView tvTitle) {
+      @NonNull TextView tvFrameCounter, @NonNull TextView tvQrStatus, @NonNull TextView tvSubtitle,
+      @NonNull TextView tvTitle) {
     this.rootView = rootView;
     this.btnTransmit = btnTransmit;
     this.btnVerifyOffline = btnVerifyOffline;
@@ -63,6 +67,7 @@ public final class ActivityOfflineMenuBinding implements ViewBinding {
     this.imgOfflineQr = imgOfflineQr;
     this.layoutButtons = layoutButtons;
     this.loader = loader;
+    this.tvFrameCounter = tvFrameCounter;
     this.tvQrStatus = tvQrStatus;
     this.tvSubtitle = tvSubtitle;
     this.tvTitle = tvTitle;
@@ -131,6 +136,12 @@ public final class ActivityOfflineMenuBinding implements ViewBinding {
         break missingId;
       }
 
+      id = R.id.tvFrameCounter;
+      TextView tvFrameCounter = ViewBindings.findChildViewById(rootView, id);
+      if (tvFrameCounter == null) {
+        break missingId;
+      }
+
       id = R.id.tvQrStatus;
       TextView tvQrStatus = ViewBindings.findChildViewById(rootView, id);
       if (tvQrStatus == null) {
@@ -150,8 +161,8 @@ public final class ActivityOfflineMenuBinding implements ViewBinding {
       }
 
       return new ActivityOfflineMenuBinding((ConstraintLayout) rootView, btnTransmit,
-          btnVerifyOffline, cardQrDisplay, imgOfflineQr, layoutButtons, loader, tvQrStatus,
-          tvSubtitle, tvTitle);
+          btnVerifyOffline, cardQrDisplay, imgOfflineQr, layoutButtons, loader, tvFrameCounter,
+          tvQrStatus, tvSubtitle, tvTitle);
     }
     String missingId = rootView.getResources().getResourceName(id);
     throw new NullPointerException("Missing required view with ID: ".concat(missingId));

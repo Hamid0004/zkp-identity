@@ -3648,6 +3648,7 @@ id transition_position
 id transition_scene_layoutid_cache
 id transition_transform
 id triangle
+id tvFrameCounter
 id tvGuide
 id tvQrStatus
 id tvStatus

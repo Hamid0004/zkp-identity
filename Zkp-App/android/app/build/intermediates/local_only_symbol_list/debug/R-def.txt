@@ -31,6 +31,7 @@ id loader
 id mrzOverlay
 id progressBar
 id scannerView
+id tvFrameCounter
 id tvGuide
 id tvQrStatus
 id tvStatus

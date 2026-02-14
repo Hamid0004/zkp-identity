@@ -57,7 +57,7 @@
                 android:textColor="#AAAAAA"
                 android:textSize="16sp"
                 android:textStyle="bold"
-                android:layout_marginBottom="20dp"/>
+                android:layout_marginBottom="10dp"/>
 
             <ImageView
                 android:id="@+id/imgOfflineQr"
@@ -67,11 +67,21 @@
                 app:tint="#333333"
                 android:scaleType="fitCenter"/>
 
-            <ProgressBar
+            <TextView
+                android:id="@+id/tvFrameCounter"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="-- / --"
+                android:textColor="#00E676"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                android:fontFamily="monospace"
+                android:layout_marginTop="10dp"
+                android:visibility="invisible"/> <ProgressBar
                 android:id="@+id/loader"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginTop="20dp"
+                android:layout_marginTop="10dp"
                 android:visibility="gone"
                 android:indeterminateTint="#00E676"/>
 

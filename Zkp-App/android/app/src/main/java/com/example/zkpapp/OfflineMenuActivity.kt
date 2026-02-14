@@ -3,6 +3,7 @@ package com.example.zkpapp
 import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.ImageView
@@ -26,18 +27,18 @@ class OfflineMenuActivity : AppCompatActivity() {
             try {
                 System.loadLibrary("zkp_mobile")
             } catch (e: UnsatisfiedLinkError) {
-                e.printStackTrace()
+                Log.e("ZKP_LION", "Failed to load Rust Library", e)
             }
         }
         private const val QR_SIZE = 800
-        private const val FRAME_DELAY_MS = 150L
+        private const val FRAME_DELAY_MS = 150L // 🦁 Speed of chunks
     }
 
-    // 🦁 Rust JNI Function (Make sure Rust side matches this name!)
     external fun stringFromRust(): String 
 
     private lateinit var imgQr: ImageView
     private lateinit var tvStatus: TextView
+    private lateinit var tvFrameCounter: TextView // 🦁 New Counter Text
     private lateinit var loader: ProgressBar
     private lateinit var btnTransmit: Button
     private lateinit var btnVerifyOffline: Button
@@ -51,17 +52,16 @@ class OfflineMenuActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_offline_menu)
 
-        // Initialize UI Elements
+        // Init UI
         imgQr = findViewById(R.id.imgOfflineQr)
         tvStatus = findViewById(R.id.tvQrStatus)
+        tvFrameCounter = findViewById(R.id.tvFrameCounter) // 🦁 Bind View
         loader = findViewById(R.id.loader)
         btnTransmit = findViewById(R.id.btnTransmit)
         btnVerifyOffline = findViewById(R.id.btnVerifyOffline)
 
-        // Set initial UI state
         resetUI()
 
-        // 🦁 TRANSMIT BUTTON - Toggle between Start/Stop
         btnTransmit.setOnClickListener {
             if (!isTransmitting && !isGeneratingProof) {
                 startTransmission()
@@ -70,24 +70,10 @@ class OfflineMenuActivity : AppCompatActivity() {
             }
         }
 
-        // 🦁 VERIFY BUTTON - Opens Camera Scanner
         btnVerifyOffline.setOnClickListener {
             stopTransmission()
             startActivity(Intent(this, VerifierActivity::class.java))
         }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        if (isTransmitting) {
-            stopAnimation()
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // Agar pehle transmit ho raha tha aur user wapis aaya, to restart logic yahan lag sakti hai.
-        // Filhal hum clean state rakhte hain taaki confusion na ho.
     }
 
     override fun onDestroy() {
@@ -95,33 +81,33 @@ class OfflineMenuActivity : AppCompatActivity() {
         cleanupResources()
     }
 
-    // 🦁 START TRANSMISSION Logic
+    // 🦁 START LOGIC
     private fun startTransmission() {
         isGeneratingProof = true
         updateUIForComputing()
         
         proofGenerationJob = lifecycleScope.launch {
             try {
-                // Background Thread: Generate Proof
                 val jsonResponse = withContext(Dispatchers.IO) { 
                     stringFromRust() 
                 }
                 
-                // Main Thread: Update UI
-                handleProofResponse(jsonResponse)
-                isGeneratingProof = false
+                withContext(Dispatchers.Main) {
+                    handleProofResponse(jsonResponse)
+                    isGeneratingProof = false
+                }
             } catch (e: Exception) {
-                isGeneratingProof = false
-                showError("Error: ${e.message ?: "Rust JNI Failure"}")
+                withContext(Dispatchers.Main) {
+                    isGeneratingProof = false
+                    showError("Error: ${e.message}")
+                }
             }
         }
     }
 
-    // 🦁 HANDLE RESPONSE
     private fun handleProofResponse(response: String) {
         try {
             val jsonArray = JSONArray(response)
-            
             if (jsonArray.length() == 0) {
                 showError("Empty proof data")
                 return
@@ -129,14 +115,14 @@ class OfflineMenuActivity : AppCompatActivity() {
             
             isTransmitting = true
             updateUIForTransmitting()
-            startQrAnimation(jsonArray)
+            startQrAnimation(jsonArray) // 🦁 Start Loop
             
         } catch (e: Exception) {
-            showError("Invalid Data: ${e.message}")
+            showError("Invalid JSON Data")
         }
     }
 
-    // 🦁 ANIMATION LOOP
+    // 🦁 ANIMATION LOOP WITH COUNTER
     private fun startQrAnimation(dataChunks: JSONArray) {
         stopAnimation()
         
@@ -150,18 +136,27 @@ class OfflineMenuActivity : AppCompatActivity() {
             val totalFrames = dataChunks.length()
             val indices = (0 until totalFrames).toMutableList()
 
+            // 🦁 Codespace Emulator ke liye Loop
             while (isActive && isTransmitting) {
-                indices.shuffle() // Security Shuffle
+                indices.shuffle() // Security Shuffle (RND)
                 
                 for (i in indices) {
                     if (!isActive || !isTransmitting) break
                     
                     try {
-                        val matrix = writer.encode(dataChunks.getString(i), BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
+                        val chunkData = dataChunks.getString(i)
+                        
+                        // 1. Generate Bitmap
+                        val matrix = writer.encode(chunkData, BarcodeFormat.QR_CODE, QR_SIZE, QR_SIZE, hints)
                         val bitmap = encoder.createBitmap(matrix)
                         
+                        // 2. Update UI (Image + Counter)
                         withContext(Dispatchers.Main) { 
-                            imgQr.setImageBitmap(bitmap) 
+                            imgQr.setImageBitmap(bitmap)
+                            
+                            // 🦁 SHOW COUNTER (e.g., "CHUNK: 3/4")
+                            // i+1 kyunki index 0 se shuru hota hai
+                            tvFrameCounter.text = "CHUNK: ${i + 1} / $totalFrames"
                         }
                     } catch (e: Exception) { e.printStackTrace() }
                     
@@ -189,39 +184,42 @@ class OfflineMenuActivity : AppCompatActivity() {
         proofGenerationJob = null
     }
 
-    // 🦁 UI UPDATES
+    // 🦁 UI STATE UPDATES
     private fun updateUIForComputing() {
         btnTransmit.text = "⏳ COMPUTING..."
-        btnTransmit.setBackgroundColor(Color.parseColor("#FF6F00")) // Orange
-        btnTransmit.isEnabled = false // Prevent double click
+        btnTransmit.setBackgroundColor(Color.parseColor("#FF6F00")) 
+        btnTransmit.isEnabled = false 
         
-        tvStatus.text = "🦁 Computing Zero-Knowledge Proof..."
+        tvStatus.text = "🦁 Computing Proof..."
         tvStatus.setTextColor(Color.WHITE)
         
+        tvFrameCounter.visibility = View.INVISIBLE // Hide counter
         loader.visibility = View.VISIBLE
         imgQr.setColorFilter(Color.DKGRAY)
     }
     
     private fun updateUIForTransmitting() {
         btnTransmit.text = "⏹ STOP BROADCAST"
-        btnTransmit.setBackgroundColor(Color.parseColor("#D32F2F")) // Red
+        btnTransmit.setBackgroundColor(Color.parseColor("#D32F2F"))
         btnTransmit.isEnabled = true
         
         tvStatus.text = "📡 Broadcasting Identity..."
-        tvStatus.setTextColor(Color.parseColor("#00E676")) // Neon Green
+        tvStatus.setTextColor(Color.parseColor("#00E676"))
         
+        tvFrameCounter.visibility = View.VISIBLE // Show counter
         loader.visibility = View.GONE
         imgQr.clearColorFilter()
     }
     
     private fun resetUI() {
         btnTransmit.text = "📡 TRANSMIT"
-        btnTransmit.setBackgroundColor(Color.parseColor("#2E7D32")) // Green
+        btnTransmit.setBackgroundColor(Color.parseColor("#2E7D32"))
         btnTransmit.isEnabled = true
         
         tvStatus.text = "Ready to Transmit"
         tvStatus.setTextColor(Color.LTGRAY)
         
+        tvFrameCounter.visibility = View.INVISIBLE // Hide counter
         loader.visibility = View.GONE
         imgQr.clearColorFilter()
         imgQr.setImageResource(android.R.drawable.ic_menu_gallery)
@@ -232,10 +230,6 @@ class OfflineMenuActivity : AppCompatActivity() {
         stopTransmission()
         tvStatus.text = "❌ $message"
         tvStatus.setTextColor(Color.RED)
-        
-        lifecycleScope.launch {
-            delay(3000)
-            if (!isTransmitting) resetUI()
-        }
+        lifecycleScope.launch { delay(3000); if (!isTransmitting) resetUI() }
     }
 }
