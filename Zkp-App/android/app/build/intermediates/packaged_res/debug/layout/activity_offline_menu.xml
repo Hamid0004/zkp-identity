@@ -77,7 +77,9 @@
                 android:textStyle="bold"
                 android:fontFamily="monospace"
                 android:layout_marginTop="10dp"
-                android:visibility="invisible"/> <ProgressBar
+                android:visibility="invisible"/>
+            
+            <ProgressBar
                 android:id="@+id/loader"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
