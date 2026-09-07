@@ -1,8 +1,8 @@
 // passport_security.rs
 //
 // ╔══════════════════════════════════════════════════════════════════════════╗
-// ║         ZKAuth — Production ZK Passport Engine v5.1                    ║
-// ║         Pre-Build Audit Fixed Edition                                  ║
+// ║         ZKAuth — Production ZK Passport Engine v6.0                    ║
+// ║         Hardened Edition (C1-C4d, H3, M1, M4 resolved)                 ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ v5.0 → v5.1 Pre-Build Audit Fixes:                                     ║
 // ║                                                                         ║
@@ -44,7 +44,7 @@
 // ║  ✅ Age >= 18 in-circuit range_check                                    ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ Still pending (future PRs):                                             ║
-// ║  ⏳ Full ASN.1 CMS + CSCA chain (rasn + x509-parser)                  ║
+// ║  ⏳ CSCA chain + x509-parser + ECDSA (C4c-full) · H1/H2 · sim-removal  ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ Performance (Android aarch64):                                          ║
 // ║   Circuit build  : ~800ms once — inner + outer (warmup on app start)   ║
@@ -513,6 +513,7 @@ fn generate_zk_proof(
     nullifier: HashOut<F>,
     data:      &PassportData,
     dg1_hash:  &[u8],
+    device_pubkey: &[u8],   // [H1] pre-validated bytes (owner: prove_passport)
 ) -> Result<(ZkProofOutput, u64)> {
     let start    = Instant::now();
     let circuits = get_circuits(); // Gets both Inner and Outer circuits
@@ -532,9 +533,9 @@ fn generate_zk_proof(
     };
 
     // [NEW v5.0] Hardware Binding
-    let device_pubkey = data.device_pubkey_hex.as_deref().unwrap_or("00");
+    // [H1] device_pubkey arrives PRE-VALIDATED (owner: prove_passport boundary)
     let mut hw_inputs = dg1_fields.clone();
-    hw_inputs.extend(bytes_to_field_elements(&hex::decode(device_pubkey).unwrap_or_default()));
+    hw_inputs.extend(bytes_to_field_elements(device_pubkey));
     let hw_binding = PoseidonHash::hash_no_pad(&hw_inputs);
 
     // [NEW v5.0] Revocation ID
@@ -637,6 +638,20 @@ fn generate_zk_proof(
 // PROVE ENTRYPOINT & JNI
 // ─────────────────────────────────────────────────────────────────────────────
 
+/// [H1] Single validation boundary for device_pubkey: required, non-"00",
+/// valid hex, >=32 bytes (real key material). Returns decoded bytes.
+fn validate_device_pubkey(data: &PassportData) -> Result<Vec<u8>> {
+    let hex_str = data.device_pubkey_hex.as_deref()
+        .filter(|s| !s.is_empty() && *s != "00")
+        .ok_or_else(|| anyhow!("device_pubkey_hex is required (H1)"))?;
+    let key = hex::decode(hex_str)
+        .map_err(|e| anyhow!("invalid device_pubkey_hex: {e}"))?;
+    if key.len() < 32 {
+        return Err(anyhow!("device_pubkey too short (min 32 bytes)"));
+    }
+    Ok(key)
+}
+
 pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
     let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"));
@@ -667,31 +682,30 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let dg1_hash  = sha256_hash(&dg1_bytes);
 
     
-    // [C4a] ICAO 9303 integrity: DG1 hash must match the CMS SOd's DG1 entry
-    let integrity_ok = match sod::parse_sod(&sod_bytes) {
+    // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
+    let (integrity_ok, signature_msg) = match sod::parse_sod(&sod_bytes) {
         Ok(info) => {
-            let m = info.dg_hash(1).map(|h| h == dg1_hash.as_slice()).unwrap_or(false);
-            if !m { error!("SOD integrity: DG1 hash mismatch or missing in SOd"); }
-            m
-        }
-        Err(e) => { error!("SOD parse failed: {}", e); false }
-    };
-    // [C4c] Trust tiers (H3): honest reporting + SIMULATED never = success
-    let signature_msg = match sod::parse_sod(&sod_bytes) {
-        Ok(info) => {
-            let is_placeholder = info.signer_info_sig.iter().all(|b| *b == 0);
-            if is_placeholder && info.ds_cert_der.is_empty() {
-                "SIMULATED"
-            } else {
-                match sod::sid_matches_cert(&info)
-                    .and_then(|_| sod::verify_ds_signature(&info))
-                {
-                    Ok(()) => "VERIFIED",
-                    Err(e) => { error!("DS verify: {}", e); "FAILED" }
+            let integrity = info.dg_hash(1)
+                .map(|h| h == dg1_hash.as_slice())
+                .unwrap_or(false);
+            if !integrity { error!("SOD integrity: DG1 hash mismatch or missing in SOd"); }
+            // [C4c] Trust tiers (H3): honest reporting + SIMULATED never = success
+            let sig_msg = {
+                let is_placeholder = info.signer_info_sig.iter().all(|b| *b == 0);
+                if is_placeholder && info.ds_cert_der.is_empty() {
+                    "SIMULATED"
+                } else {
+                    match sod::sid_matches_cert(&info)
+                        .and_then(|_| sod::verify_ds_signature(&info))
+                    {
+                        Ok(()) => "VERIFIED",
+                        Err(e) => { error!("DS verify: {}", e); "FAILED" }
+                    }
                 }
-            }
+            };
+            (integrity, sig_msg)
         }
-        Err(e) => { error!("SOD parse (sig): {}", e); "FAILED" }
+        Err(e) => { error!("SOD parse failed: {}", e); (false, "FAILED") }
     };
 
     // [C4c/H3] trust_level reflects ACTUAL guarantees — never overstated
@@ -700,16 +714,29 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
         "SIMULATED" => "SIMULATED",      // dev fixture — NOT production trust
         _ => "NONE",
     };
+    // [H1] device_rng is MANDATORY — missing/invalid => hard error.
+    // Doc-number-derived fallback randomness is FORBIDDEN: predictable salts
+    // make identity leaves linkable across verifiers (unlinkability loss).
     let device_rng = match data.device_rng_hex.as_deref() {
-        Some(hex_str) => hex::decode(hex_str).unwrap_or_else(|_| sha256_hash(data.document_number.as_bytes())),
-        None => sha256_hash(data.document_number.as_bytes())
+        Some(hex_str) => {
+            let rng = hex::decode(hex_str)
+                .map_err(|e| anyhow!("invalid device_rng_hex: {e}"))?;
+            if rng.len() < 16 {
+                return Err(anyhow!("device_rng_hex too short (min 16 bytes)"));
+            }
+            rng
+        }
+        None => return Err(anyhow!("device_rng_hex is required (H1)")),
     };
+
+    // [H1] single validation boundary — decoded bytes flow onward as params
+    let device_pubkey = validate_device_pubkey(&data)?;
 
     let tree = build_merkle_tree(&data, &device_rng);
     let nullifier = generate_domain_nullifier(&dg1_hash, domain); // v5 uses DG1 Hash instead of doc#
 
     let (zk_status, zk_ms, zk_output) = if integrity_ok {
-        match generate_zk_proof(&tree, &claim_type, nullifier, &data, &dg1_hash) {
+        match generate_zk_proof(&tree, &claim_type, nullifier, &data, &dg1_hash, &device_pubkey) {
             Ok((out, ms)) => ("GENERATED".to_string(), ms, Some(out)),
             Err(e) => { error!("ZK err: {}", e); ("FAILED".to_string(), 0u64, None) }
         }
@@ -739,7 +766,7 @@ fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) ->
         dg1_hex: hex::encode(dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
         ds_cert_hex: None, claim_type, verifier_domain: domain.or(Some("sim.local".into())),
         device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),  // [FIX v5.1] 32 bytes
-        expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("00".into()),
+        expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()), // [H1] 65-byte raw pubkey-shaped
     }
 }
 
@@ -819,6 +846,7 @@ mod sod {
     const OID_SHA256: &[u8] = &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x01];
     const OID_SHA384: &[u8] = &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x02];
     const OID_SHA512: &[u8] = &[0x60, 0x86, 0x48, 0x01, 0x65, 0x03, 0x04, 0x02, 0x03];
+    #[cfg(test)]
     const OID_RSA_ENCRYPTION: &[u8] = &[0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x01]; // SPKI only
     const OID_SHA224_WITH_RSA: &[u8] = &[0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0E];
     const OID_SHA256_WITH_RSA: &[u8] = &[0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x01, 0x0B];
@@ -1531,6 +1559,33 @@ mod c1_tests {
         assert!(info.has_signed_attrs);
         assert_eq!(info.dg_hash(1), Some(sha256_hash(FIXTURE_DG1).as_slice()));
         sod::verify_ds_signature(&info).expect("external fixture must VERIFY");
+    }
+
+    #[test]
+    fn h1_missing_device_rng_fails() {
+        let mut d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        d.device_rng_hex = None;
+        assert!(prove_passport(d).is_err(), "missing device_rng must hard-error (H1)");
+    }
+
+    #[test]
+    fn h1_short_device_rng_fails() {
+        let mut d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        d.device_rng_hex = Some("a1b2c3d4".into()); // 4 bytes < 16
+        assert!(prove_passport(d).is_err(), "short device_rng must hard-error (H1)");
+    }
+
+    #[test]
+    fn h1_missing_or_zero_pubkey_fails() {
+        let mut d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        d.device_pubkey_hex = None;
+        assert!(prove_passport(d).is_err(), "missing pubkey must hard-error (H1)");
+        d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        d.device_pubkey_hex = Some("00".into());
+        assert!(prove_passport(d).is_err(), "\"00\" pubkey must hard-error (H1)");
+        d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        d.device_pubkey_hex = Some("a1b2c3d4".into()); // 4 bytes < 32
+        assert!(prove_passport(d).is_err(), "short pubkey must hard-error (H1 contract)");
     }
 
 }
