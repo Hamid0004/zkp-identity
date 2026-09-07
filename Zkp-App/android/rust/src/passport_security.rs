@@ -1,8 +1,8 @@
 // passport_security.rs
 //
 // ╔══════════════════════════════════════════════════════════════════════════╗
-// ║         ZKAuth — Production ZK Passport Engine v5.1                    ║
-// ║         Pre-Build Audit Fixed Edition                                  ║
+// ║         ZKAuth — Production ZK Passport Engine v6.0                    ║
+// ║         Hardened Edition (C1-C4d, H3, M1, M4 resolved)                 ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ v5.0 → v5.1 Pre-Build Audit Fixes:                                     ║
 // ║                                                                         ║
@@ -44,7 +44,7 @@
 // ║  ✅ Age >= 18 in-circuit range_check                                    ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ Still pending (future PRs):                                             ║
-// ║  ⏳ Full ASN.1 CMS + CSCA chain (rasn + x509-parser)                  ║
+// ║  ⏳ CSCA chain + x509-parser + ECDSA (C4c-full) · H1/H2 · sim-removal  ║
 // ╠══════════════════════════════════════════════════════════════════════════╣
 // ║ Performance (Android aarch64):                                          ║
 // ║   Circuit build  : ~800ms once — inner + outer (warmup on app start)   ║
@@ -532,9 +532,14 @@ fn generate_zk_proof(
     };
 
     // [NEW v5.0] Hardware Binding
-    let device_pubkey = data.device_pubkey_hex.as_deref().unwrap_or("00");
+    // [H1] device_pubkey MANDATORY — "00" fallback makes hw_binding forgeable
+    let device_pubkey_hex = data.device_pubkey_hex.as_deref()
+        .filter(|s| !s.is_empty() && *s != "00")
+        .ok_or_else(|| anyhow!("device_pubkey_hex is required (H1)"))?;
+    let device_pubkey = hex::decode(device_pubkey_hex)
+        .map_err(|e| anyhow!("invalid device_pubkey_hex: {e}"))?;
     let mut hw_inputs = dg1_fields.clone();
-    hw_inputs.extend(bytes_to_field_elements(&hex::decode(device_pubkey).unwrap_or_default()));
+    hw_inputs.extend(bytes_to_field_elements(&device_pubkey));
     let hw_binding = PoseidonHash::hash_no_pad(&hw_inputs);
 
     // [NEW v5.0] Revocation ID
@@ -667,31 +672,30 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let dg1_hash  = sha256_hash(&dg1_bytes);
 
     
-    // [C4a] ICAO 9303 integrity: DG1 hash must match the CMS SOd's DG1 entry
-    let integrity_ok = match sod::parse_sod(&sod_bytes) {
+    // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
+    let (integrity_ok, signature_msg) = match sod::parse_sod(&sod_bytes) {
         Ok(info) => {
-            let m = info.dg_hash(1).map(|h| h == dg1_hash.as_slice()).unwrap_or(false);
-            if !m { error!("SOD integrity: DG1 hash mismatch or missing in SOd"); }
-            m
-        }
-        Err(e) => { error!("SOD parse failed: {}", e); false }
-    };
-    // [C4c] Trust tiers (H3): honest reporting + SIMULATED never = success
-    let signature_msg = match sod::parse_sod(&sod_bytes) {
-        Ok(info) => {
-            let is_placeholder = info.signer_info_sig.iter().all(|b| *b == 0);
-            if is_placeholder && info.ds_cert_der.is_empty() {
-                "SIMULATED"
-            } else {
-                match sod::sid_matches_cert(&info)
-                    .and_then(|_| sod::verify_ds_signature(&info))
-                {
-                    Ok(()) => "VERIFIED",
-                    Err(e) => { error!("DS verify: {}", e); "FAILED" }
+            let integrity = info.dg_hash(1)
+                .map(|h| h == dg1_hash.as_slice())
+                .unwrap_or(false);
+            if !integrity { error!("SOD integrity: DG1 hash mismatch or missing in SOd"); }
+            // [C4c] Trust tiers (H3): honest reporting + SIMULATED never = success
+            let sig_msg = {
+                let is_placeholder = info.signer_info_sig.iter().all(|b| *b == 0);
+                if is_placeholder && info.ds_cert_der.is_empty() {
+                    "SIMULATED"
+                } else {
+                    match sod::sid_matches_cert(&info)
+                        .and_then(|_| sod::verify_ds_signature(&info))
+                    {
+                        Ok(()) => "VERIFIED",
+                        Err(e) => { error!("DS verify: {}", e); "FAILED" }
+                    }
                 }
-            }
+            };
+            (integrity, sig_msg)
         }
-        Err(e) => { error!("SOD parse (sig): {}", e); "FAILED" }
+        Err(e) => { error!("SOD parse failed: {}", e); (false, "FAILED") }
     };
 
     // [C4c/H3] trust_level reflects ACTUAL guarantees — never overstated
@@ -700,9 +704,19 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
         "SIMULATED" => "SIMULATED",      // dev fixture — NOT production trust
         _ => "NONE",
     };
+    // [H1] device_rng is MANDATORY — missing/invalid => hard error.
+    // Doc-number-derived fallback randomness is FORBIDDEN: predictable salts
+    // make identity leaves linkable across verifiers (unlinkability loss).
     let device_rng = match data.device_rng_hex.as_deref() {
-        Some(hex_str) => hex::decode(hex_str).unwrap_or_else(|_| sha256_hash(data.document_number.as_bytes())),
-        None => sha256_hash(data.document_number.as_bytes())
+        Some(hex_str) => {
+            let rng = hex::decode(hex_str)
+                .map_err(|e| anyhow!("invalid device_rng_hex: {e}"))?;
+            if rng.len() < 16 {
+                return Err(anyhow!("device_rng_hex too short (min 16 bytes)"));
+            }
+            rng
+        }
+        None => return Err(anyhow!("device_rng_hex is required (H1)")),
     };
 
     let tree = build_merkle_tree(&data, &device_rng);
@@ -739,7 +753,7 @@ fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) ->
         dg1_hex: hex::encode(dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
         ds_cert_hex: None, claim_type, verifier_domain: domain.or(Some("sim.local".into())),
         device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),  // [FIX v5.1] 32 bytes
-        expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("00".into()),
+        expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("a1b2c3d4e5f6a7b8".into()), // [H1] realistic 8-byte key
     }
 }
 
