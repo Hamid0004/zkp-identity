@@ -337,8 +337,15 @@ pub enum InputMode { NfcPassport, SimulatedPassport }
 pub enum ClaimType { IsAdult, Nationality, IsHuman }
 
 impl ClaimType {
-    fn from_str(s: &str) -> Self {
-        match s { "is_adult" => ClaimType::IsAdult, "nationality" => ClaimType::Nationality, _ => ClaimType::IsHuman }
+    // [A-12] Strict parse: unknown claims are ERRORS, not silent IsHuman
+    // downgrades (a typo must never yield a weaker/weirder predicate).
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "is_adult" => Ok(ClaimType::IsAdult),
+            "nationality" => Ok(ClaimType::Nationality),
+            "is_human" => Ok(ClaimType::IsHuman),
+            other => Err(anyhow!("unknown claim_type '{other}' (expected: is_adult | nationality | is_human)")),
+        }
     }
     fn to_u64(&self) -> u64 {
         match self { ClaimType::IsAdult => 0, ClaimType::Nationality => 1, ClaimType::IsHuman => 2 }
@@ -396,9 +403,12 @@ pub struct PassportProofResult {
     pub signature_check: String,
     pub zk_proof_status: String,
     pub zk_proof_ms:     u64,
-    pub document_number: String,
-    pub holder_name:     String,
+    // [A-05] PII removed: document_number + holder_name were plaintext
+    // identity correlators in every proof response (H-04 finding).
     pub error_msg:       String,
+    // [A-04] When false, zk_output MUST be None and consumers MUST treat
+    // this result as non-identity evidence (PROTOCOL.md §6).
+    pub trusted:         bool,
     pub merkle_root:     String,
     pub trust_level:     String,
     pub nullifier:       String,
@@ -462,17 +472,58 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-fn calculate_age(dob: &str) -> u32 {
-    if dob.len() < 6 { return 0; }
-    let yy: u32 = dob[0..2].parse().unwrap_or(0);
-    let mm: u32 = dob[2..4].parse().unwrap_or(0);
-    let dd: u32 = dob[4..6].parse().unwrap_or(0);
-    let birth_year = if yy <= 30 { 2000 + yy } else { 1900 + yy };
+/// [A-08] Trusted current-date: fails hard on clock before 2020 (rollback /
+/// unsynced device) instead of silently producing now=0 garbage.
+fn trusted_now_secs() -> Result<u64> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow!("device clock error: {e}"))?
+        .as_secs();
+    if now < 1_577_836_800 { // 2020-01-01
+        return Err(anyhow!("device clock implausible (pre-2020) — set clock and retry"));
+    }
+    Ok(now)
+}
 
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+/// [A-08] Hardened DOB parse: exact 6-ASCII-digit YYMMDD, calendar-validated,
+/// explicit century policy. Returns Err on ANY anomaly (no synthetic dates,
+/// no panics on non-UTF-8, no silent zeros).
+fn parse_yymmdd(dob: &str) -> Result<(i64, u32, u32)> {
+    let b = dob.as_bytes();
+    if b.len() != 6 || !b.iter().all(|c| c.is_ascii_digit()) {
+        return Err(anyhow!("dob must be exactly 6 ASCII digits (YYMMDD)"));
+    }
+    let yy: u32 = dob[0..2].parse().unwrap();
+    let mm: u32 = dob[2..4].parse().unwrap();
+    let dd: u32 = dob[4..6].parse().unwrap();
+    if !(1..=12).contains(&mm) { return Err(anyhow!("dob month {mm} invalid")); }
+    if !(1..=31).contains(&dd) { return Err(anyhow!("dob day {dd} invalid")); }
+    // [Obs1] Dynamic century policy: birth year can't be in the future —
+    // yy > current-yy => previous century. No hardcoded cutoff time-bomb.
+    let now_y = civil_from_days((trusted_now_secs()? / 86_400) as i64).0;
+    let current_yy = (now_y % 100) as u32;
+    let birth_year: i64 = if yy > current_yy { 1900 + yy as i64 } else { 2000 + yy as i64 };
+    Ok((birth_year, mm, dd))
+}
+
+fn calculate_age(dob: &str) -> u32 {
+    // [A-08] Invalid DOB => age 0 is FORBIDDEN for identity claims.
+    // Caller path (prove_passport) surfaces hard errors via validate_dob;
+    // this fn retains the u32 signature for tree-building but only after
+    // parse_yymmdd validation. Non-validated callers are impossible by
+    // construction (single call-site, gated below).
+    let (birth_year, mm, dd) = match parse_yymmdd(dob) {
+        Ok(v) => v,
+        Err(_) => return 0, // tree leaf value; claim path rejects separately
+    };
+    let now = match trusted_now_secs() {
+        Ok(n) => n,
+        Err(_) => return 0,
+    };
     let (cy, cm, cd) = civil_from_days((now / 86_400) as i64);
 
-    let mut age = cy.saturating_sub(birth_year as i64) as u32;
+    // [A-08] negative-age overflow guard: future DOB => saturate, claim path rejects
+    if (cy as i64) < birth_year { return 0; }
+    let mut age = (cy as i64 - birth_year) as u32;
     if mm > cm || (mm == cm && dd > cd) { age = age.saturating_sub(1); }
     age
 }
@@ -524,7 +575,9 @@ fn generate_zk_proof(
     let dg1_fields = bytes_to_field_elements(dg1_hash);
     let dg1_anchor = PoseidonHash::hash_no_pad(&dg1_fields);
 
-    let now         = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    // [A-08/Gap2] Same trusted-clock contract as age path — rollback/unsynced
+    // device must NOT produce proofs with garbage valid_until.
+    let now         = trusted_now_secs()?;
     let valid_until = now + PROOF_TTL_SECS;
 
     let expected_nat_hash = match (claim, data.expected_nationality.as_deref()) {
@@ -652,9 +705,21 @@ fn validate_device_pubkey(data: &PassportData) -> Result<Vec<u8>> {
     Ok(key)
 }
 
+/// [A-12/Gap3] JNI string creation that NEVER panics across FFI.
+/// Returns null on failure — JNI side treats null as error.
+fn safe_new_string(env: &mut JNIEnv, s: String) -> jstring {
+    match env.new_string(&s) {
+        Ok(j) => j.into_raw(),
+        Err(e) => {
+            error!("new_string failed (len={}): {e}", s.len());
+            std::ptr::null_mut()
+        }
+    }
+}
+
 pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
-    let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"));
+    let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
 
     // ── [C1] Nationality input validation — fail-fast BEFORE any crypto work ──
     if claim_type == ClaimType::Nationality {
@@ -673,7 +738,17 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     }
     // ── [C1] end ───────────────────────────────────────────────────────────────
 
+    // [A-08] DOB must parse cleanly BEFORE any tree/proof work — synthetic
+    // dates (mm=0 etc.) must never silently become age-0 identities.
+    if let Err(e) = parse_yymmdd(&data.date_of_birth) {
+        return Err(anyhow!("invalid date_of_birth: {e}"));
+    }
+
     let domain     = data.verifier_domain.as_deref().unwrap_or("unknown.domain");
+
+    // [A-12] Input-size limits BEFORE decode/crypto (DoS + parser-robustness)
+    if data.dg1_hex.len() > 4096 { return Err(anyhow!("dg1_hex too large")); }
+    if data.sod_hex.len() > 65536 { return Err(anyhow!("sod_hex too large")); }
 
     let dg1_bytes = hex::decode(&data.dg1_hex)
         .map_err(|e| anyhow!("Invalid dg1_hex: {}", e))?;
@@ -744,10 +819,15 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
 
     let success = integrity_ok && signature_msg == "VERIFIED" && zk_status == "GENERATED";
 
+    // [A-04] zk_output is emitted ONLY when the full trusted path passed.
+    // Non-trusted results carry no proof blob — a consumer verifying only
+    // the Plonky2 blob can no longer authenticate failed/SIMULATED flows.
+    let zk_output = if success { zk_output } else { None };
+
     Ok(PassportProofResult {
-        success, input_mode: mode_str, integrity_check: if integrity_ok { "PASS".into() } else { "FAIL".into() },
+        success, trusted: success, input_mode: mode_str,
+        integrity_check: if integrity_ok { "PASS".into() } else { "FAIL".into() },
         signature_check: signature_msg.to_string(), zk_proof_status: zk_status, zk_proof_ms: zk_ms,
-        document_number: data.document_number.clone(), holder_name: format!("{} {}", data.first_name, data.last_name),
         error_msg: String::new(), merkle_root: hash_out_to_hex(&tree.root), trust_level: trust_level.to_string(),
         nullifier: hash_out_to_hex(&nullifier), zk_output,
     })
@@ -756,6 +836,8 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
 // Helpers
 fn sha256_hash(data: &[u8]) -> Vec<u8> { let mut h = Sha256::new(); h.update(data); h.finalize().to_vec() }
 
+// [A-07] Fixture stays compiled (tests use it). Production blocking happens
+// at the JNI boundary below — release builds expose NO simulated entrypoint.
 fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) -> PassportData {
     let dg1 = b"P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<AB1234567PAK9001011M2501010<<<<<<<<<<<<4";
     let hash = sha256_hash(dg1);
@@ -783,17 +865,37 @@ fn init_logger() {
 }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_warmupCircuit(_env: JNIEnv, _class: JClass) { init_logger(); let _ = get_circuits(); }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(mut env: JNIEnv, _c: JClass, p: JString) -> jstring { init_logger(); handle_req(&mut env, Some(p), false, None, None) }
+// [A-07] Simulated JNI entrypoints are DEBUG-ONLY — stripped from release
+// AAR. Production must never carry a synthetic trust path.
+#[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedProof(mut env: JNIEnv, _c: JClass, _u: JString) -> jstring { init_logger(); handle_req(&mut env, None, true, None, None) }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateClaimProof(mut env: JNIEnv, _c: JClass, p: JString, c: JString, d: JString) -> jstring {
-    init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
+    init_logger();
+    // [A-12] claim string read failure => error JSON, not silent default
+    let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
+        return safe_new_string(&mut env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
+    }};
+    let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, Some(p), false, Some(cl), dom)
 }
+#[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedClaimProof(mut env: JNIEnv, _c: JClass, c: JString, d: JString) -> jstring {
-    init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
+    init_logger();
+    // [A-12] same strictness for simulated claim path
+    let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
+        return safe_new_string(&mut env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
+    }};
+    let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, None, true, Some(cl), dom)
 }
 
 fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<String>, dom: Option<String>) -> jstring {
+    // [A-07] Simulation is a DEBUG-only path. In release builds the entrypoint
+    // does not exist AND any sim=true request fails closed here.
+    #[cfg(not(debug_assertions))]
+    if sim {
+        return safe_new_string(env, "{\"error\":\"simulation unavailable in release build\"}".to_string());
+    }
     let pd = if sim { get_simulated_passport(claim, dom) } else {
         match json {
             Some(p) => match env.get_string(&p) {
@@ -804,24 +906,20 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
                             if let Some(do_v) = dom   { d.verifier_domain = Some(do_v); }
                             d
                         }
-                        Err(e) => return env.new_string(
-                            format!("{{\"error\":\"JSON parse failed: {}\"}}", e)
-                        ).unwrap().into_raw(),
+                        Err(e) => return safe_new_string(env, format!("{{\"error\":\"JSON parse failed: {}\"}}", e)),
                     }
                 },
-                Err(e) => return env.new_string(  // [FIX v5.1] was silently swallowed
-                    format!("{{\"error\":\"JNI read failed: {}\"}}", e)
-                ).unwrap().into_raw(),
+                Err(e) => return safe_new_string(env, format!("{{\"error\":\"JNI read failed: {}\"}}", e)),
             },
-            None => return env.new_string("{\"error\":\"Null\"}").unwrap().into_raw(),
+            None => return safe_new_string(env, "{\"error\":\"Null\"}".to_string()),
         }
     };
     let res = prove_passport(pd).unwrap_or_else(|e| PassportProofResult {
         success: false, input_mode: "ERR".into(), integrity_check: "FAIL".into(), signature_check: "FAIL".into(),
-        zk_proof_status: "FAIL".into(), zk_proof_ms: 0, document_number: "".into(), holder_name: "".into(),
+        zk_proof_status: "FAIL".into(), zk_proof_ms: 0, trusted: false,
         error_msg: e.to_string(), merkle_root: "".into(), trust_level: "NONE".into(), nullifier: "".into(), zk_output: None,
     });
-    env.new_string(serde_json::to_string(&res).unwrap()).unwrap().into_raw()
+    safe_new_string(env, serde_json::to_string(&res).unwrap_or_else(|_| "{\"error\":\"serialize failed\"}".to_string()))
 }
 // ═════════════════════════════════════════════════════════════════════════════
 // [C4a] ICAO 9303 EF.SOD — strict-DER structural extraction (zero new deps)
@@ -885,6 +983,9 @@ mod sod {
         let first = buf[pos + 1];
         let (v_start, len) = if first < 0x80 {
             (pos + 2, first as usize)
+        } else if first == 0x80 {
+            // [A-09] Indefinite length (0x80) is BER-only — forbidden in DER
+            return Err(anyhow!("DER: indefinite length forbidden"));
         } else {
             let n = (first & 0x7F) as usize;
             if n == 0 || n > 4 { return Err(anyhow!("DER: bad long-form length")); }
@@ -903,16 +1004,29 @@ mod sod {
         let mut cur = s;
         while cur < e {
             let (t, vs, ve) = tlv(buf, cur)?;
+            // [A-09] Child must be fully contained within its parent container.
+            // Rejects overlong children (e.g. `30 02 04 01 41` — child ve=5 > e=4).
+            if ve > e {
+                return Err(anyhow!("DER: child exceeds parent boundary"));
+            }
             out.push((t, vs, ve));
             cur = ve;
         }
         Ok(out)
     }
 
-    fn read_uint(v: &[u8]) -> u64 {
+    fn read_uint(v: &[u8]) -> Result<u64> {
+        // [A-09] Reject oversized integers (would silently truncate) and
+        // leading-zero non-minimal encodings.
+        if v.len() > 8 {
+            return Err(anyhow!("DER: integer exceeds 8 bytes"));
+        }
+        if v.len() > 1 && v[0] == 0 {
+            return Err(anyhow!("DER: non-minimal integer encoding"));
+        }
         let mut n = 0u64;
         for b in v { n = (n << 8) | *b as u64; }
-        n
+        Ok(n)
     }
 
     fn first_oid(buf: &[u8], s: usize, _e: usize) -> Option<Vec<u8>> {
@@ -1014,8 +1128,15 @@ mod sod {
             let (t1, s1, e1) = gk[0];
             let (t2, s2, e2) = gk[1];
             if t1 == 0x02 && t2 == 0x04 {
+                let dg_num = read_uint(&sod_body[s1..e1])
+                    .map_err(|e| anyhow!("SOd DG number: {e}"))?;
+                // [A-09/Gap1] Duplicate DG number = profile-invalid SOD.
+                // Ambiguous dg_hash() lookups must fail closed.
+                if info.dg_hashes.iter().any(|x| x.number == dg_num) {
+                    return Err(anyhow!("SOd: duplicate DG{} entry", dg_num));
+                }
                 info.dg_hashes.push(DgHashEntry {
-                    number: read_uint(&sod_body[s1..e1]),
+                    number: dg_num,
                     hash: sod_body[s2..e2].to_vec(),
                 });
             }
