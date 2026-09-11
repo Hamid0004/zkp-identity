@@ -849,13 +849,19 @@ fn sha256_hash(data: &[u8]) -> Vec<u8> { let mut h = Sha256::new(); h.update(dat
 // [A-07] Fixture stays compiled (tests use it). Production blocking happens
 // at the JNI boundary below — release builds expose NO simulated entrypoint.
 fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) -> PassportData {
-    let dg1 = b"P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<AB1234567PAK9001011M2501010<<<<<<<<<<<<4";
-    let hash = sha256_hash(dg1);
+    // [A-01] Proper ICAO DG1: 61 12 5F 1F <len> <MRZ-88>
+    // MRZ line1+line2 with CORRECT check digits (7-3-1) — matches MRZ fixtures.
+    let mrz_text = crate::passport_security::MRZ_FIXTURE_L1.to_string()
+                 + &crate::passport_security::MRZ_FIXTURE_L2;
+    let mut dg1_vec: Vec<u8> = vec![0x61, 0x12, 0x5F, 0x1F, 0x58]; // 0x58 = 88
+    dg1_vec.extend_from_slice(mrz_text.as_bytes());
+    let dg1 = dg1_vec;
+    let hash = sha256_hash(&dg1);
     let sod = sod::build_simulated_sod(&hash);
     PassportData {
         mode: InputMode::SimulatedPassport, first_name: "ARSALAN".into(), last_name: "KHAN".into(),
         document_number: "AB1234567".into(), date_of_birth: "900101".into(), nationality: "PAK".into(),
-        dg1_hex: hex::encode(dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
+        dg1_hex: hex::encode(&dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
         ds_cert_hex: None, claim_type, verifier_domain: domain.or(Some("sim.local".into())),
         device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),  // [FIX v5.1] 32 bytes
         expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()), // [H1] 65-byte raw pubkey-shaped

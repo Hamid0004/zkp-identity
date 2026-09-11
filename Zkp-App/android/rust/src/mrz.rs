@@ -205,3 +205,95 @@ pub fn parse_td3(line1: &[u8], line2: &[u8]) -> Result<ParsedMrz> {
         personal_number,
     })
 }
+
+fn split_td3_lines(mrz: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+    // Accept 88 exact, or 88 + trailing CR/LF (tolerated read-variants)
+    let trimmed: Vec<u8> = mrz.iter()
+        .cloned()
+        .filter(|&c| c != b'\r' && c != b'\n')
+        .collect();
+    if trimmed.len() != 88 {
+        return Err(anyhow!("DG1: MRZ must be 88 chars for TD3 (got {})", trimmed.len()));
+    }
+    Ok((trimmed[..44].to_vec(), trimmed[44..].to_vec()))
+}
+
+/// [A-01 Phase C] Extract MRZ content from DG1 bytes.
+///
+/// ICAO 9303 Part 10 (LDS) — verified structure:
+///   EF.DG1 = 61 <DG1-len>
+///             5F 1F <MRZ-len>   (MRZ data object, Var)
+///             <MRZ bytes>
+/// TD3: MRZ = 2 × 44 = 88 bytes exactly (Part 10 Table 42; trailing CRLF is
+/// implementation leniency, not ICAO-required — tolerated on read only).
+///
+/// Proper nested TLV walk (61 → 5F1F → value); no arbitrary byte-search.
+/// Raw-MRZ input (starts "P<", 88 bytes) accepted for simulated/legacy paths.
+pub fn extract_mrz_from_dg1(dg1: &[u8]) -> Result<(Vec<u8>, Vec<u8>)> {
+    // Legacy/simulated: raw MRZ without LDS wrapper
+    if dg1.starts_with(b"P<") {
+        return split_td3_lines(dg1);
+    }
+
+    // 1) Outer DG1 template: tag 0x61
+    if dg1.is_empty() || dg1[0] != 0x61 {
+        return Err(anyhow!("DG1: outer template must start with 0x61 (got 0x{:02X})",
+            dg1.first().copied().unwrap_or(0)));
+    }
+    let (outer_v, outer_end) = read_tlv_value(dg1, 0)?;
+
+    // 2) Inside the 61-template: find the 5F1F data object (proper TLV walk,
+    //    bounded by the template's own value end — not arbitrary search)
+    let mut cur = outer_v;
+    while cur < outer_end {
+        let (tag_bytes, val_s, val_e) = read_tlv_generic(dg1, cur)?;
+        if tag_bytes == b"\x5F\x1F" {
+            // [TD3] MRZ must be exactly 88 bytes (2×44). Reject others.
+            if val_e - val_s != 88 {
+                return Err(anyhow!(
+                    "DG1: TD3 MRZ must be 88 bytes (got {})",
+                    val_e - val_s
+                ));
+            }
+            return split_td3_lines(&dg1[val_s..val_e]);
+        }
+        cur = val_e; // skip unknown sibling objects (defensive; ICAO says only one)
+    }
+    Err(anyhow!("DG1: 5F1F MRZ object not found inside 61 template"))
+}
+
+/// Generic TLV reader: returns (raw_tag_bytes, value_start, value_end).
+/// Supports 1-byte tags, 0x81/0x82-style long lengths — bounded by buffer.
+fn read_tlv_generic(buf: &[u8], pos: usize) -> Result<(Vec<u8>, usize, usize)> {
+    if pos + 2 > buf.len() { return Err(anyhow!("DG1: truncated TLV at {}", pos)); }
+    let t0 = buf[pos];
+    let mut tag = vec![t0];
+    let mut i = pos + 1;
+    if t0 & 0x1F == 0x1F {
+        // multi-byte tag: continue while low-bit set (max 2 here: 5F)
+        while i < buf.len() {
+            tag.push(buf[i]);
+            i += 1;
+            if buf[i - 1] & 0x80 == 0 { break; }
+            if tag.len() > 3 { return Err(anyhow!("DG1: tag too long")); }
+        }
+    }
+    if i >= buf.len() { return Err(anyhow!("DG1: truncated length")); }
+    let first = buf[i]; i += 1;
+    let len = if first < 0x80 { first as usize }
+        else if first == 0x81 { if i >= buf.len() { return Err(anyhow!("DG1: trunc")); } let b = buf[i]; i += 1; b as usize }
+        else if first == 0x82 { if i + 1 >= buf.len() { return Err(anyhow!("DG1: trunc")); }
+            let l = ((buf[i] as usize) << 8) | buf[i+1] as usize; i += 2; l }
+        else { return Err(anyhow!("DG1: length >2 bytes unsupported")); };
+    let val_s = i;
+    let val_e = val_s.checked_add(len).ok_or_else(|| anyhow!("DG1: len overflow"))?;
+    if val_e > buf.len() { return Err(anyhow!("DG1: value exceeds buffer")); }
+    Ok((tag, val_s, val_e))
+}
+
+fn read_tlv_value(buf: &[u8], pos: usize) -> Result<(usize, usize)> {
+    let (_tag, vs, ve) = read_tlv_generic(buf, pos)?;
+    Ok((vs, ve))
+}
+
+
