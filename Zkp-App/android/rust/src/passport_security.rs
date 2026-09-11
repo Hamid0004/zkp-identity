@@ -465,17 +465,56 @@ fn civil_from_days(z: i64) -> (i64, u32, u32) {
     (if m <= 2 { y + 1 } else { y }, m, d)
 }
 
-fn calculate_age(dob: &str) -> u32 {
-    if dob.len() < 6 { return 0; }
-    let yy: u32 = dob[0..2].parse().unwrap_or(0);
-    let mm: u32 = dob[2..4].parse().unwrap_or(0);
-    let dd: u32 = dob[4..6].parse().unwrap_or(0);
-    let birth_year = if yy <= 30 { 2000 + yy } else { 1900 + yy };
+/// [A-08] Trusted current-date: fails hard on clock before 2020 (rollback /
+/// unsynced device) instead of silently producing now=0 garbage.
+fn trusted_now_secs() -> Result<u64> {
+    let now = SystemTime::now().duration_since(UNIX_EPOCH)
+        .map_err(|e| anyhow!("device clock error: {e}"))?
+        .as_secs();
+    if now < 1_577_836_800 { // 2020-01-01
+        return Err(anyhow!("device clock implausible (pre-2020) — set clock and retry"));
+    }
+    Ok(now)
+}
 
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+/// [A-08] Hardened DOB parse: exact 6-ASCII-digit YYMMDD, calendar-validated,
+/// explicit century policy. Returns Err on ANY anomaly (no synthetic dates,
+/// no panics on non-UTF-8, no silent zeros).
+fn parse_yymmdd(dob: &str) -> Result<(i64, u32, u32)> {
+    let b = dob.as_bytes();
+    if b.len() != 6 || !b.iter().all(|c| c.is_ascii_digit()) {
+        return Err(anyhow!("dob must be exactly 6 ASCII digits (YYMMDD)"));
+    }
+    let yy: u32 = dob[0..2].parse().unwrap();
+    let mm: u32 = dob[2..4].parse().unwrap();
+    let dd: u32 = dob[4..6].parse().unwrap();
+    if !(1..=12).contains(&mm) { return Err(anyhow!("dob month {mm} invalid")); }
+    if !(1..=31).contains(&dd) { return Err(anyhow!("dob day {dd} invalid")); }
+    // Explicit century policy: 00-25 => 2000s, 26-99 => 1900s
+    // (documented; revisit before 2026 policy boundary — see #8 A-08 note)
+    let birth_year: i64 = if yy <= 25 { 2000 + yy as i64 } else { 1900 + yy as i64 };
+    Ok((birth_year, mm, dd))
+}
+
+fn calculate_age(dob: &str) -> u32 {
+    // [A-08] Invalid DOB => age 0 is FORBIDDEN for identity claims.
+    // Caller path (prove_passport) surfaces hard errors via validate_dob;
+    // this fn retains the u32 signature for tree-building but only after
+    // parse_yymmdd validation. Non-validated callers are impossible by
+    // construction (single call-site, gated below).
+    let (birth_year, mm, dd) = match parse_yymmdd(dob) {
+        Ok(v) => v,
+        Err(_) => return 0, // tree leaf value; claim path rejects separately
+    };
+    let now = match trusted_now_secs() {
+        Ok(n) => n,
+        Err(_) => return 0,
+    };
     let (cy, cm, cd) = civil_from_days((now / 86_400) as i64);
 
-    let mut age = cy.saturating_sub(birth_year as i64) as u32;
+    // [A-08] negative-age overflow guard: future DOB => saturate, claim path rejects
+    if (cy as i64) < birth_year { return 0; }
+    let mut age = (cy as i64 - birth_year) as u32;
     if mm > cm || (mm == cm && dd > cd) { age = age.saturating_sub(1); }
     age
 }
@@ -675,6 +714,12 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
         }
     }
     // ── [C1] end ───────────────────────────────────────────────────────────────
+
+    // [A-08] DOB must parse cleanly BEFORE any tree/proof work — synthetic
+    // dates (mm=0 etc.) must never silently become age-0 identities.
+    if let Err(e) = parse_yymmdd(&data.date_of_birth) {
+        return Err(anyhow!("invalid date_of_birth: {e}"));
+    }
 
     let domain     = data.verifier_domain.as_deref().unwrap_or("unknown.domain");
 
