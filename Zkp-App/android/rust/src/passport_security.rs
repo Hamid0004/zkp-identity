@@ -63,6 +63,16 @@ use android_logger::Config;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
+
+// [A-01a] ICAO 9303 TD3 MRZ parser (issue #8):
+// attributes MUST be extracted from authenticated DG1 bytes, not caller JSON.
+/// [A-01a] Shared test fixtures — 44-char ICAO TD3 MRZ lines (0-indexed:
+/// doc code 0-1, state 2-4, name 5-43). Single source of truth.
+pub const MRZ_FIXTURE_L1: &str = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<";
+pub const MRZ_FIXTURE_L2: &str = "AB12345677PAK9001019M2501015<<<<<<<<<<<<<<00";
+
+#[path = "mrz.rs"]
+pub mod mrz;
 use hex;
 use anyhow::{anyhow, Result};
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
@@ -1707,6 +1717,63 @@ mod c1_tests {
         d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
         d.device_pubkey_hex = Some("a1b2c3d4".into()); // 4 bytes < 32
         assert!(prove_passport(d).is_err(), "short pubkey must hard-error (H1 contract)");
+    }
+
+    #[test]
+    fn mrz_td3_valid_fixture_parses() {
+        // ICAO 9303 TD3 valid fixture — check digits per 7-3-9:
+        // doc# AB1234567 => 7 · DOB 900101 => 9 · expiry 250101 => 5
+        // personal (14x<) => 0 · composite (39 chars) => 0
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        let l2 = crate::passport_security::MRZ_FIXTURE_L2;
+        assert_eq!(l1.len(), 44);
+        assert_eq!(l2.len(), 44);
+        let m = mrz::parse_td3(l1.as_bytes(), l2.as_bytes()).expect("valid fixture must parse");
+        assert_eq!(m.document_number, "AB1234567");
+        assert_eq!(m.nationality, "PAK");
+        assert_eq!(m.date_of_birth, "900101");
+        assert_eq!(m.sex, "M");
+        assert_eq!(m.date_of_expiry, "250101");
+        assert_eq!(m.surname, "ARSALAN");
+        assert_eq!(m.given_names, "KHAN");
+    }
+
+    #[test]
+    fn mrz_tampered_dob_check_digit_rejected() {
+        // Flip a DOB digit — check digit at idx 19 must no longer match
+        let mut l2 = MRZ_FIXTURE_L2.as_bytes().to_vec();
+        l2[14] = b'1'; // 900101 -> 910101
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        assert!(mrz::parse_td3(l1.as_bytes(), &l2).is_err(), "tampered DOB must fail check digit");
+    }
+
+    #[test]
+    fn mrz_tampered_doc_number_rejected() {
+        let mut l2 = MRZ_FIXTURE_L2.as_bytes().to_vec();
+        l2[0] = b'X';
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        assert!(mrz::parse_td3(l1.as_bytes(), &l2).is_err(), "tampered doc# must fail check digit");
+    }
+
+    #[test]
+    fn mrz_wrong_length_rejected() {
+        // Deliberately malformed lengths — 43 (short) and 45 (long).
+        // Length gate must reject BEFORE any field parsing.
+        let l1_short = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<"; // 43
+        let l1_long  = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<X"; // 45
+        let l2 = MRZ_FIXTURE_L2;
+        assert!(mrz::parse_td3(l1_short.as_bytes(), l2.as_bytes()).is_err(), "43-char line must fail");
+        assert!(mrz::parse_td3(l1_long.as_bytes(), l2.as_bytes()).is_err(), "45-char line must fail");
+    }
+
+    #[test]
+    fn mrz_non_td3_document_code_rejected() {
+        // 'I<' = TD1 (ID card) document code — exact 44 chars, so ONLY the
+        // doc-code check can reject (not the length gate).
+        let l1 = "I<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<"; // 45 -> pad down to 44
+        let l1_44 = &l1[..44];
+        let l2 = MRZ_FIXTURE_L2;
+        assert!(mrz::parse_td3(l1_44.as_bytes(), l2.as_bytes()).is_err(), "TD3 parser must reject non-P docs");
     }
 
 }
