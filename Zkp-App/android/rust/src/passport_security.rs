@@ -764,6 +764,8 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
 // Helpers
 fn sha256_hash(data: &[u8]) -> Vec<u8> { let mut h = Sha256::new(); h.update(data); h.finalize().to_vec() }
 
+// [A-07] Fixture stays compiled (tests use it). Production blocking happens
+// at the JNI boundary below — release builds expose NO simulated entrypoint.
 fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) -> PassportData {
     let dg1 = b"P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<AB1234567PAK9001011M2501010<<<<<<<<<<<<4";
     let hash = sha256_hash(dg1);
@@ -791,17 +793,29 @@ fn init_logger() {
 }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_warmupCircuit(_env: JNIEnv, _class: JClass) { init_logger(); let _ = get_circuits(); }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateProof(mut env: JNIEnv, _c: JClass, p: JString) -> jstring { init_logger(); handle_req(&mut env, Some(p), false, None, None) }
+// [A-07] Simulated JNI entrypoints are DEBUG-ONLY — stripped from release
+// AAR. Production must never carry a synthetic trust path.
+#[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedProof(mut env: JNIEnv, _c: JClass, _u: JString) -> jstring { init_logger(); handle_req(&mut env, None, true, None, None) }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateClaimProof(mut env: JNIEnv, _c: JClass, p: JString, c: JString, d: JString) -> jstring {
     init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, Some(p), false, Some(cl), dom)
 }
+#[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedClaimProof(mut env: JNIEnv, _c: JClass, c: JString, d: JString) -> jstring {
     init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, None, true, Some(cl), dom)
 }
 
 fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<String>, dom: Option<String>) -> jstring {
+    // [A-07] Simulation is a DEBUG-only path. In release builds the entrypoint
+    // does not exist AND any sim=true request fails closed here.
+    #[cfg(not(debug_assertions))]
+    if sim {
+        return env.new_string(
+            "{\"error\":\"simulation unavailable in release build\"}"
+        ).unwrap().into_raw();
+    }
     let pd = if sim { get_simulated_passport(claim, dom) } else {
         match json {
             Some(p) => match env.get_string(&p) {
