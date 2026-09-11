@@ -63,6 +63,16 @@ use android_logger::Config;
 use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use sha2::{Sha256, Digest};
+
+// [A-01a] ICAO 9303 TD3 MRZ parser (issue #8):
+// attributes MUST be extracted from authenticated DG1 bytes, not caller JSON.
+/// [A-01a] Shared test fixtures — 44-char ICAO TD3 MRZ lines (0-indexed:
+/// doc code 0-1, state 2-4, name 5-43). Single source of truth.
+pub const MRZ_FIXTURE_L1: &str = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<";
+pub const MRZ_FIXTURE_L2: &str = "AB12345671PAK9001011M2501017<<<<<<<<<<<<<<06";
+
+#[path = "mrz.rs"]
+pub mod mrz;
 use hex;
 use anyhow::{anyhow, Result};
 use std::time::{SystemTime, UNIX_EPOCH, Instant};
@@ -717,7 +727,7 @@ fn safe_new_string(env: &mut JNIEnv, s: String) -> jstring {
     }
 }
 
-pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
+pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
     let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
 
@@ -755,6 +765,26 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let sod_bytes = hex::decode(&data.sod_hex)
         .map_err(|e| anyhow!("Invalid sod_hex: {}", e))?;
     let dg1_hash  = sha256_hash(&dg1_bytes);
+
+    // ── [A-01 Phase C] Attributes from authenticated DG1 — not caller JSON ──
+    // Attribute-substitution P0 fix (3 reviews; issue #8). Parse MRZ from
+    // DG1 with ICAO check digits; JSON identity fields are transport-only.
+    let (mrz_l1, mrz_l2) = mrz::extract_mrz_from_dg1(&dg1_bytes)
+        .map_err(|e| anyhow!("DG1/MRZ extraction failed: {e}"))?;
+    let mrz_parsed = mrz::parse_td3(&mrz_l1, &mrz_l2)
+        .map_err(|e| anyhow!("DG1/MRZ parse failed: {e}"))?;
+    if !data.nationality.is_empty() && data.nationality != mrz_parsed.nationality {
+        return Err(anyhow!("nationality mismatch: JSON '{}' != DG1 '{}'",
+            data.nationality, mrz_parsed.nationality));
+    }
+    if !data.date_of_birth.is_empty() && data.date_of_birth != mrz_parsed.date_of_birth {
+        return Err(anyhow!("DOB mismatch: JSON '{}' != DG1 '{}'", data.date_of_birth, mrz_parsed.date_of_birth));
+    }
+    // [A-01] Override JSON identity fields in-place — downstream (tree, age,
+    // C1/C2 witnesses) must see MRZ-authoritative values only.
+    data.nationality = mrz_parsed.nationality.clone();
+    data.date_of_birth = mrz_parsed.date_of_birth.clone();
+    data.document_number = mrz_parsed.document_number.clone();
 
     
     // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
@@ -839,13 +869,19 @@ fn sha256_hash(data: &[u8]) -> Vec<u8> { let mut h = Sha256::new(); h.update(dat
 // [A-07] Fixture stays compiled (tests use it). Production blocking happens
 // at the JNI boundary below — release builds expose NO simulated entrypoint.
 fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) -> PassportData {
-    let dg1 = b"P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<AB1234567PAK9001011M2501010<<<<<<<<<<<<4";
-    let hash = sha256_hash(dg1);
+    // [A-01] Proper ICAO DG1: 61 12 5F 1F <len> <MRZ-88>
+    // MRZ line1+line2 with CORRECT check digits (7-3-1) — matches MRZ fixtures.
+    let mrz_text = crate::passport_security::MRZ_FIXTURE_L1.to_string()
+                 + &crate::passport_security::MRZ_FIXTURE_L2;
+    let mut dg1_vec: Vec<u8> = vec![0x61, 0x12, 0x5F, 0x1F, 0x58]; // 0x58 = 88
+    dg1_vec.extend_from_slice(mrz_text.as_bytes());
+    let dg1 = dg1_vec;
+    let hash = sha256_hash(&dg1);
     let sod = sod::build_simulated_sod(&hash);
     PassportData {
         mode: InputMode::SimulatedPassport, first_name: "ARSALAN".into(), last_name: "KHAN".into(),
         document_number: "AB1234567".into(), date_of_birth: "900101".into(), nationality: "PAK".into(),
-        dg1_hex: hex::encode(dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
+        dg1_hex: hex::encode(&dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
         ds_cert_hex: None, claim_type, verifier_domain: domain.or(Some("sim.local".into())),
         device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),  // [FIX v5.1] 32 bytes
         expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()), // [H1] 65-byte raw pubkey-shaped
@@ -1707,6 +1743,136 @@ mod c1_tests {
         d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
         d.device_pubkey_hex = Some("a1b2c3d4".into()); // 4 bytes < 32
         assert!(prove_passport(d).is_err(), "short pubkey must hard-error (H1 contract)");
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // [PHASE-4] A-01 fail-closed + adversarial suite
+    // ═══════════════════════════════════════════════════════════════
+
+    #[test]
+    fn phase4_json_nationality_mismatch_dg1_rejected() {
+        // [A-01 Phase-4] JSON nationality ≠ DG1-authenticated → reject
+        let d = get_simulated_passport(Some("nationality".into()), Some("test.domain".into()));
+        let mut d2 = d.clone();
+        d2.nationality = "USA".into();
+        d2.expected_nationality = Some("USA".into());
+        assert!(prove_passport(d2).is_err(),
+            "JSON nationality ≠ DG1 must fail closed (attribute substitution)");
+    }
+
+    #[test]
+    fn phase4_json_dob_mismatch_dg1_rejected() {
+        // [A-01 Phase-4] JSON DOB ≠ DG1-authenticated → reject
+        let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let mut d2 = d.clone();
+        d2.date_of_birth = "000101".into();   // JSON lie (MRZ has 900101)
+        assert!(prove_passport(d2).is_err(),
+            "JSON DOB ≠ DG1 must fail closed");
+    }
+
+    #[test]
+    fn phase4_pi_tamper_invalidates_proof() {
+        // [M-02] Proof PI tamper => plonky2 verify fails (recursive binding)
+        // NOTE: needs trusted==true => real-signed SOD (A-04 gates SIMULATED
+        // to zk_output=None). Build real-signed SOD like trust_tier test.
+        use rsa::pkcs8::EncodePublicKey;
+        let mut rng = rand::thread_rng();
+        let key = rsa::RsaPrivateKey::new(&mut rng, 2048).unwrap();
+        let spki = key.to_public_key().to_public_key_der().unwrap().as_bytes().to_vec();
+        let cert = sod::build_test_cert(&spki, &key).unwrap();
+        let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let dg1 = hex::decode(&d.dg1_hex).unwrap();
+        let sod_der = sod::build_signed_sod(&sha256_hash(&dg1), &cert, &key, true).unwrap();
+        let mut d = d;
+        d.sod_hex = hex::encode(&sod_der);
+        let res = prove_passport(d).expect("no hard error");
+        assert!(res.trusted, "fixture must produce trusted result");
+        let zk = res.zk_output.expect("trusted proof must have zk_output");
+        let mut proof_bytes = hex::decode(&zk.compressed_proof).unwrap();
+        let last = proof_bytes.len() - 1;
+        proof_bytes[last] ^= 0x01;
+        let circuits = get_circuits();
+        let parsed = plonky2::plonk::proof::ProofWithPublicInputs::<F, C, D>::from_bytes(
+            proof_bytes, &circuits.outer.data.common
+        );
+        match parsed {
+            Ok(p) => {
+                assert!(circuits.outer.data.verify(p).is_err(),
+                    "tampered proof must fail verification");
+            }
+            Err(_) => { /* deserialization failure = valid rejection */ }
+        }
+    }
+
+    // ⏳ Pending items — placeholders with reasons (enable as items ship):
+
+    #[test]
+    #[ignore = "A-01b pending: IsHuman leaf_t unconstrained (#8)"]
+    fn phase4_ishuman_arbitrary_leaf_must_be_bound() {}
+
+    #[test]
+    #[ignore = "A-03 pending: anchors unconstrained PIs (#8)"]
+    fn phase4_arbitrary_anchor_must_reject() {}
+
+    #[test]
+    #[ignore = "P1 pending: no verifier-challenge binding (#8)"]
+    fn phase4_cross_domain_replay_must_reject() {}
+
+    #[test]
+    fn mrz_td3_valid_fixture_parses() {
+        // ICAO 9303 TD3 valid fixture — check digits per 7-3-9:
+        // doc# AB1234567 => 1 · DOB 900101 => 1 · expiry 250101 => 7 (ICAO 7-3-1)
+        // personal (14x<) => 0 · composite (39 chars) => 6
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        let l2 = crate::passport_security::MRZ_FIXTURE_L2;
+        assert_eq!(l1.len(), 44);
+        assert_eq!(l2.len(), 44);
+        let m = mrz::parse_td3(l1.as_bytes(), l2.as_bytes()).expect("valid fixture must parse");
+        assert_eq!(m.document_number, "AB1234567");
+        assert_eq!(m.nationality, "PAK");
+        assert_eq!(m.date_of_birth, "900101");
+        assert_eq!(m.sex, "M");
+        assert_eq!(m.date_of_expiry, "250101");
+        assert_eq!(m.surname, "ARSALAN");
+        assert_eq!(m.given_names, "KHAN");
+    }
+
+    #[test]
+    fn mrz_tampered_dob_check_digit_rejected() {
+        // Flip a DOB digit — check digit at idx 19 must no longer match
+        let mut l2 = MRZ_FIXTURE_L2.as_bytes().to_vec();
+        l2[14] = b'1'; // 900101 -> 910101
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        assert!(mrz::parse_td3(l1.as_bytes(), &l2).is_err(), "tampered DOB must fail check digit");
+    }
+
+    #[test]
+    fn mrz_tampered_doc_number_rejected() {
+        let mut l2 = MRZ_FIXTURE_L2.as_bytes().to_vec();
+        l2[0] = b'X';
+        let l1 = crate::passport_security::MRZ_FIXTURE_L1;
+        assert!(mrz::parse_td3(l1.as_bytes(), &l2).is_err(), "tampered doc# must fail check digit");
+    }
+
+    #[test]
+    fn mrz_wrong_length_rejected() {
+        // Deliberately malformed lengths — 43 (short) and 45 (long).
+        // Length gate must reject BEFORE any field parsing.
+        let l1_short = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<"; // 43
+        let l1_long  = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<X"; // 45
+        let l2 = MRZ_FIXTURE_L2;
+        assert!(mrz::parse_td3(l1_short.as_bytes(), l2.as_bytes()).is_err(), "43-char line must fail");
+        assert!(mrz::parse_td3(l1_long.as_bytes(), l2.as_bytes()).is_err(), "45-char line must fail");
+    }
+
+    #[test]
+    fn mrz_non_td3_document_code_rejected() {
+        // 'I<' = TD1 (ID card) document code — exact 44 chars, so ONLY the
+        // doc-code check can reject (not the length gate).
+        let l1 = "I<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<<"; // 45 -> pad down to 44
+        let l1_44 = &l1[..44];
+        let l2 = MRZ_FIXTURE_L2;
+        assert!(mrz::parse_td3(l1_44.as_bytes(), l2.as_bytes()).is_err(), "TD3 parser must reject non-P docs");
     }
 
 }
