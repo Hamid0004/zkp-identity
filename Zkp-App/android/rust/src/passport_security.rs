@@ -952,6 +952,9 @@ mod sod {
         let first = buf[pos + 1];
         let (v_start, len) = if first < 0x80 {
             (pos + 2, first as usize)
+        } else if first == 0x80 {
+            // [A-09] Indefinite length (0x80) is BER-only — forbidden in DER
+            return Err(anyhow!("DER: indefinite length forbidden"));
         } else {
             let n = (first & 0x7F) as usize;
             if n == 0 || n > 4 { return Err(anyhow!("DER: bad long-form length")); }
@@ -970,16 +973,29 @@ mod sod {
         let mut cur = s;
         while cur < e {
             let (t, vs, ve) = tlv(buf, cur)?;
+            // [A-09] Child must be fully contained within its parent container.
+            // Rejects overlong children (e.g. `30 02 04 01 41` — child ve=5 > e=4).
+            if ve > e {
+                return Err(anyhow!("DER: child exceeds parent boundary"));
+            }
             out.push((t, vs, ve));
             cur = ve;
         }
         Ok(out)
     }
 
-    fn read_uint(v: &[u8]) -> u64 {
+    fn read_uint(v: &[u8]) -> Result<u64> {
+        // [A-09] Reject oversized integers (would silently truncate) and
+        // leading-zero non-minimal encodings.
+        if v.len() > 8 {
+            return Err(anyhow!("DER: integer exceeds 8 bytes"));
+        }
+        if v.len() > 1 && v[0] == 0 {
+            return Err(anyhow!("DER: non-minimal integer encoding"));
+        }
         let mut n = 0u64;
         for b in v { n = (n << 8) | *b as u64; }
-        n
+        Ok(n)
     }
 
     fn first_oid(buf: &[u8], s: usize, _e: usize) -> Option<Vec<u8>> {
@@ -1081,8 +1097,10 @@ mod sod {
             let (t1, s1, e1) = gk[0];
             let (t2, s2, e2) = gk[1];
             if t1 == 0x02 && t2 == 0x04 {
+                let dg_num = read_uint(&sod_body[s1..e1])
+                    .map_err(|e| anyhow!("SOd DG number: {e}"))?;
                 info.dg_hashes.push(DgHashEntry {
-                    number: read_uint(&sod_body[s1..e1]),
+                    number: dg_num,
                     hash: sod_body[s2..e2].to_vec(),
                 });
             }
