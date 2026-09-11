@@ -34,7 +34,11 @@ fn char_value(c: u8) -> Result<u32> {
 /// [ICAO 9303] 7-3-9 repeating weight check digit.
 /// data = raw field bytes (including '<' fillers).
 pub fn check_digit(data: &[u8]) -> Result<u8> {
-    const WEIGHTS: [u32; 3] = [7, 3, 9];
+    // [ICAO 9303 Part 3 §4.9] Weighting cycle is 7, 3, 1 — NOT 7,3,9.
+    // (Previous 7,3,9 was transcribed from an unverified external review;
+    //  fixtures were generated with the same wrong formula, so tests
+    //  self-agreed while being wrong — caught in post-fix review.)
+    const WEIGHTS: [u32; 3] = [7, 3, 1];
     let mut sum = 0u32;
     for (i, &c) in data.iter().enumerate() {
         sum += char_value(c)? * WEIGHTS[i % 3];
@@ -161,7 +165,11 @@ pub fn parse_td3(line1: &[u8], line2: &[u8]) -> Result<ParsedMrz> {
     let personal_check = field_bytes(line2, 42, 1, "personal_check")?[0];
     // Some passports leave personal number empty; '<'-only field has check '0'.
     let personal_clean = clean(personal_raw);
-    if !personal_clean.is_empty() || personal_check != b'0' {
+    // [ICAO 9303 Part 4 §4.2.2] If personal number is unused, field is
+    // '<'-filled AND its check digit may be '<' OR '0' — both valid.
+    let personal_all_filler = personal_raw.iter().all(|&c| c == b'<');
+    let empty_ok = personal_check == b'0' || personal_check == b'<';
+    if !(personal_all_filler && empty_ok) {
         verify_field(personal_raw, personal_check, "personal_number")?;
     }
     let personal_number = personal_clean.replace('<', " ");

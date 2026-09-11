@@ -69,7 +69,7 @@ use sha2::{Sha256, Digest};
 /// [A-01a] Shared test fixtures — 44-char ICAO TD3 MRZ lines (0-indexed:
 /// doc code 0-1, state 2-4, name 5-43). Single source of truth.
 pub const MRZ_FIXTURE_L1: &str = "P<PAKARSALAN<<KHAN<<<<<<<<<<<<<<<<<<<<<<<<<<";
-pub const MRZ_FIXTURE_L2: &str = "AB12345677PAK9001019M2501015<<<<<<<<<<<<<<00";
+pub const MRZ_FIXTURE_L2: &str = "AB12345671PAK9001011M2501017<<<<<<<<<<<<<<06";
 
 #[path = "mrz.rs"]
 pub mod mrz;
@@ -1722,8 +1722,8 @@ mod c1_tests {
     #[test]
     fn mrz_td3_valid_fixture_parses() {
         // ICAO 9303 TD3 valid fixture — check digits per 7-3-9:
-        // doc# AB1234567 => 7 · DOB 900101 => 9 · expiry 250101 => 5
-        // personal (14x<) => 0 · composite (39 chars) => 0
+        // doc# AB1234567 => 1 · DOB 900101 => 1 · expiry 250101 => 7 (ICAO 7-3-1)
+        // personal (14x<) => 0 · composite (39 chars) => 6
         let l1 = crate::passport_security::MRZ_FIXTURE_L1;
         let l2 = crate::passport_security::MRZ_FIXTURE_L2;
         assert_eq!(l1.len(), 44);
