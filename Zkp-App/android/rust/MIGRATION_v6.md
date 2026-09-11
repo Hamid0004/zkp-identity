@@ -40,11 +40,11 @@ Therefore:
 - [ ] Verify end-to-end proof generation and verification after migration
 ## Addendum (Sprint 0 — century policy change)
 
-`parse_yymmdd` ab dynamic century heuristic use kerta hai
-(yy > current-yy => 1900s, warna 2000s) — pichla hardcoded `yy <= 25`
-cutoff hata diya gaya.
+`parse_yymmdd` now uses a dynamic century heuristic
+(yy > current-yy => 1900s, else 2000s) — the previous hardcoded
+`yy <= 25` cutoff was removed.
 
-Impact: identical DOB ke liye computed birth-year (aur age-leaf value +
-Merkle root) policy-boundary ke aas-paas change ho sakte hain. Roots
-cache karne wale consumers: Sprint-0-ke-baad proofs ke roots purane se
-match NAHI karenge — expected (VK digest bhi badal chuka hoga).
+**Impact:** for identical DOBs near the policy boundary, the computed
+birth year (and the derived age-leaf value + Merkle root) may change.
+Consumers caching roots: proofs generated post-Sprint-0 will NOT match
+previously-seen roots — expected (the VK digest changes too).
