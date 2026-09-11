@@ -337,8 +337,15 @@ pub enum InputMode { NfcPassport, SimulatedPassport }
 pub enum ClaimType { IsAdult, Nationality, IsHuman }
 
 impl ClaimType {
-    fn from_str(s: &str) -> Self {
-        match s { "is_adult" => ClaimType::IsAdult, "nationality" => ClaimType::Nationality, _ => ClaimType::IsHuman }
+    // [A-12] Strict parse: unknown claims are ERRORS, not silent IsHuman
+    // downgrades (a typo must never yield a weaker/weirder predicate).
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "is_adult" => Ok(ClaimType::IsAdult),
+            "nationality" => Ok(ClaimType::Nationality),
+            "is_human" => Ok(ClaimType::IsHuman),
+            other => Err(anyhow!("unknown claim_type '{other}' (expected: is_adult | nationality | is_human)")),
+        }
     }
     fn to_u64(&self) -> u64 {
         match self { ClaimType::IsAdult => 0, ClaimType::Nationality => 1, ClaimType::IsHuman => 2 }
@@ -696,7 +703,7 @@ fn validate_device_pubkey(data: &PassportData) -> Result<Vec<u8>> {
 
 pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
-    let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"));
+    let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
 
     // ── [C1] Nationality input validation — fail-fast BEFORE any crypto work ──
     if claim_type == ClaimType::Nationality {
@@ -722,6 +729,10 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     }
 
     let domain     = data.verifier_domain.as_deref().unwrap_or("unknown.domain");
+
+    // [A-12] Input-size limits BEFORE decode/crypto (DoS + parser-robustness)
+    if data.dg1_hex.len() > 4096 { return Err(anyhow!("dg1_hex too large")); }
+    if data.sod_hex.len() > 65536 { return Err(anyhow!("sod_hex too large")); }
 
     let dg1_bytes = hex::decode(&data.dg1_hex)
         .map_err(|e| anyhow!("Invalid dg1_hex: {}", e))?;
@@ -843,12 +854,22 @@ fn init_logger() {
 #[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedProof(mut env: JNIEnv, _c: JClass, _u: JString) -> jstring { init_logger(); handle_req(&mut env, None, true, None, None) }
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateClaimProof(mut env: JNIEnv, _c: JClass, p: JString, c: JString, d: JString) -> jstring {
-    init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
+    init_logger();
+    // [A-12] claim string read failure => error JSON, not silent default
+    let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
+        return env.new_string(format!("{{\"error\":\"claim read failed: {e}\"}}")).unwrap().into_raw()
+    }};
+    let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, Some(p), false, Some(cl), dom)
 }
 #[cfg(debug_assertions)]
 #[no_mangle] pub extern "system" fn Java_com_example_zkpapp_SecurityGate_generateSimulatedClaimProof(mut env: JNIEnv, _c: JClass, c: JString, d: JString) -> jstring {
-    init_logger(); let cl = env.get_string(&c).map(|j| j.into()).unwrap_or("is_adult".into()); let dom = env.get_string(&d).map(|j| j.into()).ok();
+    init_logger();
+    // [A-12] same strictness for simulated claim path
+    let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
+        return env.new_string(format!("{{\"error\":\"claim read failed: {e}\"}}")).unwrap().into_raw()
+    }};
+    let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, None, true, Some(cl), dom)
 }
 
