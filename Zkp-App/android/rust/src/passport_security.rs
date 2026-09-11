@@ -399,6 +399,9 @@ pub struct PassportProofResult {
     // [A-05] PII removed: document_number + holder_name were plaintext
     // identity correlators in every proof response (H-04 finding).
     pub error_msg:       String,
+    // [A-04] When false, zk_output MUST be None and consumers MUST treat
+    // this result as non-identity evidence (PROTOCOL.md §6).
+    pub trusted:         bool,
     pub merkle_root:     String,
     pub trust_level:     String,
     pub nullifier:       String,
@@ -744,8 +747,14 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
 
     let success = integrity_ok && signature_msg == "VERIFIED" && zk_status == "GENERATED";
 
+    // [A-04] zk_output is emitted ONLY when the full trusted path passed.
+    // Non-trusted results carry no proof blob — a consumer verifying only
+    // the Plonky2 blob can no longer authenticate failed/SIMULATED flows.
+    let zk_output = if success { zk_output } else { None };
+
     Ok(PassportProofResult {
-        success, input_mode: mode_str, integrity_check: if integrity_ok { "PASS".into() } else { "FAIL".into() },
+        success, trusted: success, input_mode: mode_str,
+        integrity_check: if integrity_ok { "PASS".into() } else { "FAIL".into() },
         signature_check: signature_msg.to_string(), zk_proof_status: zk_status, zk_proof_ms: zk_ms,
         error_msg: String::new(), merkle_root: hash_out_to_hex(&tree.root), trust_level: trust_level.to_string(),
         nullifier: hash_out_to_hex(&nullifier), zk_output,
@@ -817,7 +826,7 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
     };
     let res = prove_passport(pd).unwrap_or_else(|e| PassportProofResult {
         success: false, input_mode: "ERR".into(), integrity_check: "FAIL".into(), signature_check: "FAIL".into(),
-        zk_proof_status: "FAIL".into(), zk_proof_ms: 0,
+        zk_proof_status: "FAIL".into(), zk_proof_ms: 0, trusted: false,
         error_msg: e.to_string(), merkle_root: "".into(), trust_level: "NONE".into(), nullifier: "".into(), zk_output: None,
     });
     env.new_string(serde_json::to_string(&res).unwrap()).unwrap().into_raw()
