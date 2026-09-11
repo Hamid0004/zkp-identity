@@ -727,7 +727,7 @@ fn safe_new_string(env: &mut JNIEnv, s: String) -> jstring {
     }
 }
 
-pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
+pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
     let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
 
@@ -765,6 +765,26 @@ pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
     let sod_bytes = hex::decode(&data.sod_hex)
         .map_err(|e| anyhow!("Invalid sod_hex: {}", e))?;
     let dg1_hash  = sha256_hash(&dg1_bytes);
+
+    // ── [A-01 Phase C] Attributes from authenticated DG1 — not caller JSON ──
+    // Attribute-substitution P0 fix (3 reviews; issue #8). Parse MRZ from
+    // DG1 with ICAO check digits; JSON identity fields are transport-only.
+    let (mrz_l1, mrz_l2) = mrz::extract_mrz_from_dg1(&dg1_bytes)
+        .map_err(|e| anyhow!("DG1/MRZ extraction failed: {e}"))?;
+    let mrz_parsed = mrz::parse_td3(&mrz_l1, &mrz_l2)
+        .map_err(|e| anyhow!("DG1/MRZ parse failed: {e}"))?;
+    if !data.nationality.is_empty() && data.nationality != mrz_parsed.nationality {
+        return Err(anyhow!("nationality mismatch: JSON '{}' != DG1 '{}'",
+            data.nationality, mrz_parsed.nationality));
+    }
+    if !data.date_of_birth.is_empty() && data.date_of_birth != mrz_parsed.date_of_birth {
+        return Err(anyhow!("DOB mismatch: JSON '{}' != DG1 '{}'", data.date_of_birth, mrz_parsed.date_of_birth));
+    }
+    // [A-01] Override JSON identity fields in-place — downstream (tree, age,
+    // C1/C2 witnesses) must see MRZ-authoritative values only.
+    data.nationality = mrz_parsed.nationality.clone();
+    data.date_of_birth = mrz_parsed.date_of_birth.clone();
+    data.document_number = mrz_parsed.document_number.clone();
 
     
     // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
@@ -1724,6 +1744,79 @@ mod c1_tests {
         d.device_pubkey_hex = Some("a1b2c3d4".into()); // 4 bytes < 32
         assert!(prove_passport(d).is_err(), "short pubkey must hard-error (H1 contract)");
     }
+
+    // ═══════════════════════════════════════════════════════════════
+    // [PHASE-4] A-01 fail-closed + adversarial suite
+    // ═══════════════════════════════════════════════════════════════
+
+    #[test]
+    fn phase4_json_nationality_mismatch_dg1_rejected() {
+        // [A-01 Phase-4] JSON nationality ≠ DG1-authenticated → reject
+        let d = get_simulated_passport(Some("nationality".into()), Some("test.domain".into()));
+        let mut d2 = d.clone();
+        d2.nationality = "USA".into();
+        d2.expected_nationality = Some("USA".into());
+        assert!(prove_passport(d2).is_err(),
+            "JSON nationality ≠ DG1 must fail closed (attribute substitution)");
+    }
+
+    #[test]
+    fn phase4_json_dob_mismatch_dg1_rejected() {
+        // [A-01 Phase-4] JSON DOB ≠ DG1-authenticated → reject
+        let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let mut d2 = d.clone();
+        d2.date_of_birth = "000101".into();   // JSON lie (MRZ has 900101)
+        assert!(prove_passport(d2).is_err(),
+            "JSON DOB ≠ DG1 must fail closed");
+    }
+
+    #[test]
+    fn phase4_pi_tamper_invalidates_proof() {
+        // [M-02] Proof PI tamper => plonky2 verify fails (recursive binding)
+        // NOTE: needs trusted==true => real-signed SOD (A-04 gates SIMULATED
+        // to zk_output=None). Build real-signed SOD like trust_tier test.
+        use rsa::pkcs8::EncodePublicKey;
+        let mut rng = rand::thread_rng();
+        let key = rsa::RsaPrivateKey::new(&mut rng, 2048).unwrap();
+        let spki = key.to_public_key().to_public_key_der().unwrap().as_bytes().to_vec();
+        let cert = sod::build_test_cert(&spki, &key).unwrap();
+        let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let dg1 = hex::decode(&d.dg1_hex).unwrap();
+        let sod_der = sod::build_signed_sod(&sha256_hash(&dg1), &cert, &key, true).unwrap();
+        let mut d = d;
+        d.sod_hex = hex::encode(&sod_der);
+        let res = prove_passport(d).expect("no hard error");
+        assert!(res.trusted, "fixture must produce trusted result");
+        let zk = res.zk_output.expect("trusted proof must have zk_output");
+        let mut proof_bytes = hex::decode(&zk.compressed_proof).unwrap();
+        let last = proof_bytes.len() - 1;
+        proof_bytes[last] ^= 0x01;
+        let circuits = get_circuits();
+        let parsed = plonky2::plonk::proof::ProofWithPublicInputs::<F, C, D>::from_bytes(
+            proof_bytes, &circuits.outer.data.common
+        );
+        match parsed {
+            Ok(p) => {
+                assert!(circuits.outer.data.verify(p).is_err(),
+                    "tampered proof must fail verification");
+            }
+            Err(_) => { /* deserialization failure = valid rejection */ }
+        }
+    }
+
+    // ⏳ Pending items — placeholders with reasons (enable as items ship):
+
+    #[test]
+    #[ignore = "A-01b pending: IsHuman leaf_t unconstrained (#8)"]
+    fn phase4_ishuman_arbitrary_leaf_must_be_bound() {}
+
+    #[test]
+    #[ignore = "A-03 pending: anchors unconstrained PIs (#8)"]
+    fn phase4_arbitrary_anchor_must_reject() {}
+
+    #[test]
+    #[ignore = "P1 pending: no verifier-challenge binding (#8)"]
+    fn phase4_cross_domain_replay_must_reject() {}
 
     #[test]
     fn mrz_td3_valid_fixture_parses() {
