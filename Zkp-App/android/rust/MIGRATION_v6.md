@@ -38,3 +38,13 @@ Therefore:
 - [ ] Kotlin side: reject any proof whose version is not `"6.0"`
 - [ ] Update server/verifier deployments before the mobile v6.0 release
 - [ ] Verify end-to-end proof generation and verification after migration
+## Addendum (Sprint 0 — century policy change)
+
+`parse_yymmdd` ab dynamic century heuristic use kerta hai
+(yy > current-yy => 1900s, warna 2000s) — pichla hardcoded `yy <= 25`
+cutoff hata diya gaya.
+
+Impact: identical DOB ke liye computed birth-year (aur age-leaf value +
+Merkle root) policy-boundary ke aas-paas change ho sakte hain. Roots
+cache karne wale consumers: Sprint-0-ke-baad proofs ke roots purane se
+match NAHI karenge — expected (VK digest bhi badal chuka hoga).

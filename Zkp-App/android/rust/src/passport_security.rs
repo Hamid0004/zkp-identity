@@ -497,9 +497,11 @@ fn parse_yymmdd(dob: &str) -> Result<(i64, u32, u32)> {
     let dd: u32 = dob[4..6].parse().unwrap();
     if !(1..=12).contains(&mm) { return Err(anyhow!("dob month {mm} invalid")); }
     if !(1..=31).contains(&dd) { return Err(anyhow!("dob day {dd} invalid")); }
-    // Explicit century policy: 00-25 => 2000s, 26-99 => 1900s
-    // (documented; revisit before 2026 policy boundary — see #8 A-08 note)
-    let birth_year: i64 = if yy <= 25 { 2000 + yy as i64 } else { 1900 + yy as i64 };
+    // [Obs1] Dynamic century policy: birth year can't be in the future —
+    // yy > current-yy => previous century. No hardcoded cutoff time-bomb.
+    let now_y = civil_from_days((trusted_now_secs()? / 86_400) as i64).0;
+    let current_yy = (now_y % 100) as u32;
+    let birth_year: i64 = if yy > current_yy { 1900 + yy as i64 } else { 2000 + yy as i64 };
     Ok((birth_year, mm, dd))
 }
 
@@ -573,7 +575,9 @@ fn generate_zk_proof(
     let dg1_fields = bytes_to_field_elements(dg1_hash);
     let dg1_anchor = PoseidonHash::hash_no_pad(&dg1_fields);
 
-    let now         = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+    // [A-08/Gap2] Same trusted-clock contract as age path — rollback/unsynced
+    // device must NOT produce proofs with garbage valid_until.
+    let now         = trusted_now_secs()?;
     let valid_until = now + PROOF_TTL_SECS;
 
     let expected_nat_hash = match (claim, data.expected_nationality.as_deref()) {
@@ -699,6 +703,18 @@ fn validate_device_pubkey(data: &PassportData) -> Result<Vec<u8>> {
         return Err(anyhow!("device_pubkey too short (min 32 bytes)"));
     }
     Ok(key)
+}
+
+/// [A-12/Gap3] JNI string creation that NEVER panics across FFI.
+/// Returns null on failure — JNI side treats null as error.
+fn safe_new_string(env: &mut JNIEnv, s: String) -> jstring {
+    match env.new_string(&s) {
+        Ok(j) => j.into_raw(),
+        Err(e) => {
+            error!("new_string failed (len={}): {e}", s.len());
+            std::ptr::null_mut()
+        }
+    }
 }
 
 pub fn prove_passport(data: PassportData) -> Result<PassportProofResult> {
@@ -857,7 +873,7 @@ fn init_logger() {
     init_logger();
     // [A-12] claim string read failure => error JSON, not silent default
     let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
-        return env.new_string(format!("{{\"error\":\"claim read failed: {e}\"}}")).unwrap().into_raw()
+        return safe_new_string(&mut env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
     }};
     let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, Some(p), false, Some(cl), dom)
@@ -867,7 +883,7 @@ fn init_logger() {
     init_logger();
     // [A-12] same strictness for simulated claim path
     let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
-        return env.new_string(format!("{{\"error\":\"claim read failed: {e}\"}}")).unwrap().into_raw()
+        return safe_new_string(env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
     }};
     let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, None, true, Some(cl), dom)
@@ -878,9 +894,7 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
     // does not exist AND any sim=true request fails closed here.
     #[cfg(not(debug_assertions))]
     if sim {
-        return env.new_string(
-            "{\"error\":\"simulation unavailable in release build\"}"
-        ).unwrap().into_raw();
+        return safe_new_string(env, "{\"error\":\"simulation unavailable in release build\"}".to_string());
     }
     let pd = if sim { get_simulated_passport(claim, dom) } else {
         match json {
@@ -892,16 +906,12 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
                             if let Some(do_v) = dom   { d.verifier_domain = Some(do_v); }
                             d
                         }
-                        Err(e) => return env.new_string(
-                            format!("{{\"error\":\"JSON parse failed: {}\"}}", e)
-                        ).unwrap().into_raw(),
+                        Err(e) => return safe_new_string(env, format!("{{\"error\":\"JSON parse failed: {}\"}}", e)),
                     }
                 },
-                Err(e) => return env.new_string(  // [FIX v5.1] was silently swallowed
-                    format!("{{\"error\":\"JNI read failed: {}\"}}", e)
-                ).unwrap().into_raw(),
+                Err(e) => return safe_new_string(env, format!("{{\"error\":\"JNI read failed: {}\"}}", e)),
             },
-            None => return env.new_string("{\"error\":\"Null\"}").unwrap().into_raw(),
+            None => return safe_new_string(env, "{\"error\":\"Null\"}".to_string()),
         }
     };
     let res = prove_passport(pd).unwrap_or_else(|e| PassportProofResult {
@@ -909,7 +919,7 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
         zk_proof_status: "FAIL".into(), zk_proof_ms: 0, trusted: false,
         error_msg: e.to_string(), merkle_root: "".into(), trust_level: "NONE".into(), nullifier: "".into(), zk_output: None,
     });
-    env.new_string(serde_json::to_string(&res).unwrap()).unwrap().into_raw()
+    safe_new_string(env, serde_json::to_string(&res).unwrap_or_else(|_| "{\"error\":\"serialize failed\"}".to_string()))
 }
 // ═════════════════════════════════════════════════════════════════════════════
 // [C4a] ICAO 9303 EF.SOD — strict-DER structural extraction (zero new deps)
@@ -1120,6 +1130,11 @@ mod sod {
             if t1 == 0x02 && t2 == 0x04 {
                 let dg_num = read_uint(&sod_body[s1..e1])
                     .map_err(|e| anyhow!("SOd DG number: {e}"))?;
+                // [A-09/Gap1] Duplicate DG number = profile-invalid SOD.
+                // Ambiguous dg_hash() lookups must fail closed.
+                if info.dg_hashes.iter().any(|x| x.number == dg_num) {
+                    return Err(anyhow!("SOd: duplicate DG{} entry", dg_num));
+                }
                 info.dg_hashes.push(DgHashEntry {
                     number: dg_num,
                     hash: sod_body[s2..e2].to_vec(),
