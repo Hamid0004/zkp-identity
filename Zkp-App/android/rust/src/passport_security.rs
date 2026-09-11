@@ -883,7 +883,7 @@ fn init_logger() {
     init_logger();
     // [A-12] same strictness for simulated claim path
     let cl = match env.get_string(&c) { Ok(j) => j.into(), Err(e) => {
-        return safe_new_string(env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
+        return safe_new_string(&mut env, format!("{{\"error\":\"claim read failed: {e}\"}}"))
     }};
     let dom = env.get_string(&d).map(|j| j.into()).ok();
     handle_req(&mut env, None, true, Some(cl), dom)
