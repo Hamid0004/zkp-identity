@@ -60,7 +60,10 @@ object SecurityGate {
     private const val TAG = "SecurityGate"
 
     // Rust proof version we accept — reject anything else
-    private val ACCEPTED_PROOF_VERSIONS = setOf("5.0", "5.1")
+    private val ACCEPTED_PROOF_VERSIONS = setOf("6.0")
+    // [K1] Expected BRIDGE_SCHEMA_DIGEST — VERIFIER_SPEC §6.5 published value.
+    // Rust computes from actual emitted keys; mismatch = schema drift.
+    private val EXPECTED_SCHEMA_DIGEST = "e04f05fb2a29949481825e02c044bad2a49a0b390205cc28b58484983213f2b3"  // [K1] v6.0 bridge sync
 
     // ── Library Load ──────────────────────────────────────────────────────────
     // [FIX] @Volatile — read on Dispatchers.Default (multi-core), must be visible
@@ -122,9 +125,11 @@ object SecurityGate {
         val signatureCheck: String,         // "VERIFIED" | "SIMULATED" | "FAILED"
         val zkProofStatus:  String,         // "GENERATED" | "FAILED" | "SKIPPED"
         val zkProofMs:      Long,           // Rust circuit time — surface in UI
-        val documentNumber: String,
-        val holderName:     String,
+        // [A-05] documentNumber/holderName removed — PII in proof bundle
         val errorMsg:       String,
+        val trusted:        Boolean,        // [A-04] false => zkOutput ignore
+        val bridgeSchemaDigest: String,     // [K1] schema anti-drift
+        val predicates:     PredicateFields?, // [A-02 shape] null => "unknown"
         val merkleRoot:     String,
         val trustLevel:     String,         // "MAXIMUM" | "NONE"
         val nullifier:      String,
@@ -146,6 +151,20 @@ object SecurityGate {
     data class ClaimOutput(
         val type:  String,  // "age" | "nationality" | "human"
         val value: Boolean
+    )
+
+    // [A-02 shape] Nullable — absent => null => UI renders "unknown", NEVER false
+    // (pre-A-02 window: 9 spurious failures would be a lie)
+    data class PredicateFields(
+        val integrityOk:   Boolean?,
+        val sigMathOk:     Boolean?,
+        val sigAttrsOk:    Boolean?,
+        val chainOk:       Boolean?,    // null until C4c-full
+        val profileOk:     Boolean?,
+        val issuerTrusted: Boolean?,    // null until CSCA
+        val revocationOk:  Boolean?,
+        val freshOk:       Boolean?,
+        val zkOk:          Boolean?
     )
 
     // ── Primary API: generateClaim() ──────────────────────────────────────────
@@ -340,6 +359,32 @@ object SecurityGate {
                 )
             } else null
 
+            // [K1] bridgeSchemaDigest pin-check (schema anti-drift)
+            val schemaDigest = root.optString("bridge_schema_digest", "")
+            if (EXPECTED_SCHEMA_DIGEST.isNotEmpty() && schemaDigest != EXPECTED_SCHEMA_DIGEST) {
+                return ProofResult.Failure(
+                    "Schema drift: digest '$schemaDigest' != expected. Rebuild Rust lib."
+                )
+            }
+            // [A-04] trusted=false => zkOutput gated (A-04 contract)
+            val trusted = root.optBoolean("trusted", false)
+            val gatedZkOutput = if (trusted) zkOutput else null
+
+            // [A-02 shape] nullable predicates — absent => null => "unknown"
+            val predicates = root.optJSONObject("predicates")?.let { p ->
+                PredicateFields(
+                    integrityOk   = p.optBoolean("integrity_ok").takeIf { p.has("integrity_ok") },
+                    sigMathOk     = p.optBoolean("sig_math_ok").takeIf { p.has("sig_math_ok") },
+                    sigAttrsOk    = p.optBoolean("sig_attrs_ok").takeIf { p.has("sig_attrs_ok") },
+                    chainOk       = p.optBoolean("chain_ok").takeIf { p.has("chain_ok") },
+                    profileOk     = p.optBoolean("profile_ok").takeIf { p.has("profile_ok") },
+                    issuerTrusted = p.optBoolean("issuer_trusted").takeIf { p.has("issuer_trusted") },
+                    revocationOk  = p.optBoolean("revocation_ok").takeIf { p.has("revocation_ok") },
+                    freshOk       = p.optBoolean("fresh_ok").takeIf { p.has("fresh_ok") },
+                    zkOk          = p.optBoolean("zk_ok").takeIf { p.has("zk_ok") }
+                )
+            }
+
             val result = PassportProofResult(
                 success        = root.optBoolean("success", false),
                 inputMode      = root.optString("input_mode", ""),
@@ -347,13 +392,14 @@ object SecurityGate {
                 signatureCheck = root.optString("signature_check", ""),
                 zkProofStatus  = root.optString("zk_proof_status", ""),
                 zkProofMs      = root.optLong("zk_proof_ms", 0L),
-                documentNumber = root.optString("document_number", ""),
-                holderName     = root.optString("holder_name", ""),
                 errorMsg       = root.optString("error_msg", ""),
                 merkleRoot     = root.optString("merkle_root", ""),
                 trustLevel     = root.optString("trust_level", ""),
                 nullifier      = root.optString("nullifier", ""),
-                zkOutput       = zkOutput
+                trusted        = trusted,
+                bridgeSchemaDigest = schemaDigest,
+                zkOutput       = gatedZkOutput,
+                predicates     = predicates
             )
 
             ProofResult.Success(result)

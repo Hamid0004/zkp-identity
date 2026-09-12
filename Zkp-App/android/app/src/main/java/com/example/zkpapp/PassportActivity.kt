@@ -371,7 +371,8 @@ class PassportActivity : AppCompatActivity() {
         // Integrity card
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text =
-            "👤  ${result.holderName.ifEmpty { "${data.firstName} ${data.lastName}" }}\n" +
+            // [A-05/K7] holderName gone from result — local PassportData only (no network)
+            "👤  ${data.firstName} ${data.lastName}\n" +
             "🔒  Integrity:  ${result.integrityCheck}\n" +
             "🛡️  Trust:      ${result.trustLevel}"
         animateFadeIn(cardIntegrity)
