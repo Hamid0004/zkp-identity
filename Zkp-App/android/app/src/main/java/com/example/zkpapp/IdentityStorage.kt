@@ -316,8 +316,16 @@ object IdentityStorage {
         domain:    String? = null,
         context:   Context? = null
     ): String? {
-        val devicePubkeyHex = context?.let { getOrCreateKeystorePubkeyHex(it) } ?: "00"
-        val deviceRngHex    = generateDeviceRngHex()
+        // [K2/H1] "00" fallback REMOVED — Rust hard-errors on it anyway;
+        // fail here with a CLEAR message instead of a confusing Rust rejection.
+        val ctx = context ?: throw IllegalStateException(
+            "buildPassportJson: context required for device_pubkey (H1)")
+        val devicePubkeyHex = getOrCreateKeystorePubkeyHex(ctx).also {
+            if (it == "00" || it.length < 64) {
+                throw IllegalStateException("device_pubkey invalid (H1) — Keystore failure")
+            }
+        }
+        val deviceRngHex = generateDeviceRngHex()
 
         lock.read {
             if (!hasIdentity()) { Log.e(TAG, "❌ buildPassportJson: no identity"); return null }
@@ -338,21 +346,18 @@ object IdentityStorage {
 
             val expectedNat = if (claimType == "nationality") nationalityCode else null
 
+            // [K2 v2] 7-field wire contract — mirror identity fields removed
+            // entirely (Rust derives attributes from DG1 post-A-01; mirrors add
+            // zero info + normalization-drift failure mode). deny_unknown
+            // Rust-side rejects anything else. mode dropped — entrypoint IS
+            // the mode (A-07).
             return JSONObject().apply {
-                put("mode",                 if (dg1.isEmpty()) "SIMULATED_PASSPORT" else "NFC_PASSPORT")
-                put("first_name",           firstName        ?: "")
-                put("last_name",            lastName         ?: "")
-                put("document_number",      documentNumber   ?: "")
-                put("date_of_birth",        birthDate        ?: "")
-                put("nationality",          nationalityCode  ?: countryCode)
                 put("dg1_hex",              dg1)
                 put("sod_hex",              sod)
-                put("mrz_line",             mrzLine          ?: "")
-                put("ds_cert_hex",          dsCertHex)
                 put("claim_type",           claimType)
                 put("verifier_domain",      activeDomain)
                 put("device_rng_hex",       deviceRngHex)
-                put("expected_nationality", expectedNat)
+                put("expected_nationality", expectedNat ?: "")
                 put("device_pubkey_hex",    devicePubkeyHex)
             }.toString()
         }
