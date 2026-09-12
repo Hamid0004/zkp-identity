@@ -337,10 +337,10 @@ fn build_recursive_circuit(inner: &UniversalCircuit) -> RecursiveCircuit {
 // DATA MODELS
 // ─────────────────────────────────────────────────────────────────────────────
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Default)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[derive(Clone)]
-pub enum InputMode { NfcPassport, SimulatedPassport }
+pub enum InputMode { #[default] NfcPassport, SimulatedPassport }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 #[serde(rename_all = "snake_case")]
@@ -364,22 +364,27 @@ impl ClaimType {
 
 #[derive(Serialize, Deserialize, Debug)]
 #[derive(Clone)]
+#[serde(deny_unknown_fields)]
 pub struct PassportData {
+    // [K2] Internal only — entrypoint selection IS the mode; never on wire.
+    #[serde(skip)]
     pub mode:                 InputMode,
-    pub first_name:           String,
-    pub last_name:            String,
-    pub document_number:      String,
-    pub date_of_birth:        String,
-    pub nationality:          String,
+    // [K2] Tripwire-only transport fields — NEVER attribute source.
+    // Kotlin sends none of these; DG1 is the source of truth (A-01).
+    // Semantics: Some+match -> accepted; Some+mismatch -> rejected; None -> ignored.
+    pub first_name:           Option<String>,
+    pub last_name:            Option<String>,
+    pub document_number:      Option<String>,
+    pub date_of_birth:        Option<String>,
+    pub nationality:          Option<String>,
+    // ── 7-field wire contract (VERIFIER_SPEC §6.5) ──
     pub dg1_hex:              String,
     pub sod_hex:              String,
-    pub mrz_line:             String,
-    pub ds_cert_hex:          Option<String>,
     pub claim_type:           Option<String>,
     pub verifier_domain:      Option<String>,
     pub device_rng_hex:       Option<String>,
     pub expected_nationality: Option<String>,
-    pub device_pubkey_hex:    Option<String>, // [NEW v5.0] Android Keystore PubKey
+    pub device_pubkey_hex:    Option<String>,
 }
 
 #[allow(dead_code)] // fields are used during tree construction but not read directly after
@@ -422,6 +427,8 @@ pub struct PassportProofResult {
     pub merkle_root:     String,
     pub trust_level:     String,
     pub nullifier:       String,
+    // [K1] Computed from actual emitted keys — Kotlin pins expected value
+    pub bridge_schema_digest: String,
     pub zk_output:       Option<ZkProofOutput>,
 }
 
@@ -538,19 +545,26 @@ fn calculate_age(dob: &str) -> u32 {
     age
 }
 
-fn build_merkle_tree(data: &PassportData, device_rng: &[u8]) -> IdentityMerkleTree {
-    let name_val = format!("{} {}", data.first_name, data.last_name);
-    let age      = calculate_age(&data.date_of_birth);
+fn build_merkle_tree(
+    first_name:      &str,   // [K2] from parsed MRZ (authoritative)
+    last_name:       &str,
+    document_number: &str,
+    date_of_birth:   &str,
+    nationality:     &str,
+    device_rng:      &[u8],
+) -> IdentityMerkleTree {
+    let name_val = format!("{} {}", first_name, last_name);
+    let age      = calculate_age(date_of_birth);
 
     let name_f = bytes_to_field_elements(name_val.as_bytes());
-    let dob_f  = bytes_to_field_elements(data.date_of_birth.as_bytes());
+    let dob_f  = bytes_to_field_elements(date_of_birth.as_bytes());
     let age_f  = bytes_to_field_elements(&age.to_le_bytes());
-    let nat_f  = bytes_to_field_elements(data.nationality.as_bytes());
+    let nat_f  = bytes_to_field_elements(nationality.as_bytes());
 
-    let s0 = generate_poseidon_salt(&data.document_number, "name", device_rng);
-    let s1 = generate_poseidon_salt(&data.document_number, "dob",  device_rng);
-    let s2 = generate_poseidon_salt(&data.document_number, "age",  device_rng);
-    let s3 = generate_poseidon_salt(&data.document_number, "nat",  device_rng);
+    let s0 = generate_poseidon_salt(document_number, "name", device_rng);
+    let s1 = generate_poseidon_salt(document_number, "dob",  device_rng);
+    let s2 = generate_poseidon_salt(document_number, "age",  device_rng);
+    let s3 = generate_poseidon_salt(document_number, "nat",  device_rng);
 
     let leaf0 = IdentityLeaf { label: "name", value: name_f.clone(), salt: s0, hash: poseidon_hash_leaf(&name_f, &s0) };
     let leaf1 = IdentityLeaf { label: "dob",  value: dob_f.clone(),  salt: s1, hash: poseidon_hash_leaf(&dob_f,  &s1) };
@@ -624,7 +638,11 @@ fn generate_zk_proof(
             pw.set_hash_target(inner_c.sibling_2_t, tree.node_l);
             pw.set_bool_target(inner_c.bit_0_t, false);
             pw.set_bool_target(inner_c.bit_1_t, true);
-            let age = calculate_age(&data.date_of_birth);
+            // [K2] DOB Option — Some(MRZ-authoritative, override se) hi aata hai
+            let age = match data.date_of_birth.as_deref() {
+                Some(d) => calculate_age(d),
+                None => return Err(anyhow!("age claim requires date_of_birth (K2 contract)")),
+            };
             if age < 18 { return Err(anyhow!("Age < 18")); }
             let age_leaf = &tree.leaves[2];
             pw.set_target(inner_c.age_t, age_leaf.value[0]);                             // [C2] from committed leaf
@@ -727,31 +745,49 @@ fn safe_new_string(env: &mut JNIEnv, s: String) -> jstring {
     }
 }
 
+/// [K1] BRIDGE_SCHEMA_DIGEST — computed from ACTUAL emitted keys at runtime.
+/// Never hardcoded (hardcoded = drift-theater — drift would still pass).
+/// Canonical form: sorted keys · unit-separator join · SHA-256 hex.
+/// A-02 field additions = deliberate v1→v2 bump (VERIFIER_SPEC §6 + Kotlin pin).
+fn bridge_schema_digest(result_json: &serde_json::Value) -> String {
+    let mut keys: Vec<String> = result_json
+        .as_object()
+        .map(|o| o.keys().cloned().collect())
+        .unwrap_or_default();
+    keys.sort();
+    let canonical = keys.join("\u{1F}");
+    sha256_hash(canonical.as_bytes())
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect()
+}
+
 pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
     let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
 
     // ── [C1] Nationality input validation — fail-fast BEFORE any crypto work ──
     if claim_type == ClaimType::Nationality {
-        let nat = data.nationality.as_bytes();
-        if nat.is_empty() || nat.len() > 7 {
-            return Err(anyhow!("nationality must be 1..=7 bytes"));
+        if let Some(ref nat) = data.nationality {
+            if nat.as_bytes().is_empty() || nat.as_bytes().len() > 7 {
+                return Err(anyhow!("nationality must be 1..=7 bytes"));
+            }
         }
         let expected = data.expected_nationality.as_deref()
             .ok_or_else(|| anyhow!("nationality claim requires expected_nationality"))?;
         if expected.as_bytes().is_empty() || expected.len() > 7 {
             return Err(anyhow!("expected_nationality must be 1..=7 bytes"));
         }
-        if data.nationality != expected {
-            return Err(anyhow!("nationality mismatch"));
-        }
+        // JSON-vs-JSON removed — authority is MRZ (A-01); tripwire wiring pe
     }
     // ── [C1] end ───────────────────────────────────────────────────────────────
 
     // [A-08] DOB must parse cleanly BEFORE any tree/proof work — synthetic
     // dates (mm=0 etc.) must never silently become age-0 identities.
-    if let Err(e) = parse_yymmdd(&data.date_of_birth) {
-        return Err(anyhow!("invalid date_of_birth: {e}"));
+    if let Some(ref dob) = data.date_of_birth {
+        if let Err(e) = parse_yymmdd(dob) {
+            return Err(anyhow!("invalid date_of_birth: {e}"));
+        }
     }
 
     let domain     = data.verifier_domain.as_deref().unwrap_or("unknown.domain");
@@ -773,18 +809,40 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
         .map_err(|e| anyhow!("DG1/MRZ extraction failed: {e}"))?;
     let mrz_parsed = mrz::parse_td3(&mrz_l1, &mrz_l2)
         .map_err(|e| anyhow!("DG1/MRZ parse failed: {e}"))?;
-    if !data.nationality.is_empty() && data.nationality != mrz_parsed.nationality {
-        return Err(anyhow!("nationality mismatch: JSON '{}' != DG1 '{}'",
-            data.nationality, mrz_parsed.nationality));
+    if let Some(ref nat) = data.nationality {
+        if !nat.is_empty() && *nat != mrz_parsed.nationality {
+            return Err(anyhow!("nationality mismatch: JSON '{}' != DG1 '{}'",
+                nat, mrz_parsed.nationality));
+        }
     }
-    if !data.date_of_birth.is_empty() && data.date_of_birth != mrz_parsed.date_of_birth {
-        return Err(anyhow!("DOB mismatch: JSON '{}' != DG1 '{}'", data.date_of_birth, mrz_parsed.date_of_birth));
+    if let Some(ref dob) = data.date_of_birth {
+        if !dob.is_empty() && *dob != mrz_parsed.date_of_birth {
+            return Err(anyhow!("DOB mismatch: JSON '{}' != DG1 '{}'",
+                dob, mrz_parsed.date_of_birth));
+        }
+    }
+
+    // [K2] Fail-fast: expected_nationality MUST match MRZ-authenticated
+    // nationality — warna expected_nat_hash pe witness-conflict panic hoga
+    // (valid proof kabhi nahi banta). Early clear error better hai.
+    if claim_type == ClaimType::Nationality {
+        let expected = data.expected_nationality.as_deref()
+            .ok_or_else(|| anyhow!("nationality claim requires expected_nationality"))?;
+        if expected != mrz_parsed.nationality {
+            return Err(anyhow!(
+                "expected_nationality '{}' does not match authenticated nationality '{}'",
+                expected, mrz_parsed.nationality
+            ));
+        }
     }
     // [A-01] Override JSON identity fields in-place — downstream (tree, age,
     // C1/C2 witnesses) must see MRZ-authoritative values only.
-    data.nationality = mrz_parsed.nationality.clone();
-    data.date_of_birth = mrz_parsed.date_of_birth.clone();
-    data.document_number = mrz_parsed.document_number.clone();
+    // [K2] In-place Option values — MRZ-authoritative
+    data.nationality = Some(mrz_parsed.nationality.clone());
+    data.date_of_birth = Some(mrz_parsed.date_of_birth.clone());
+    data.document_number = Some(mrz_parsed.document_number.clone());
+    data.first_name = Some(mrz_parsed.given_names.clone());
+    data.last_name = Some(mrz_parsed.surname.clone());
 
     
     // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
@@ -837,7 +895,15 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     // [H1] single validation boundary — decoded bytes flow onward as params
     let device_pubkey = validate_device_pubkey(&data)?;
 
-    let tree = build_merkle_tree(&data, &device_rng);
+    // [K2] Tree from MRZ-AUTHORITATIVE values (A-01 Phase C)
+    let tree = build_merkle_tree(
+        &mrz_parsed.surname,       // first_name position — purana "ARSALAN KHAN" order
+        &mrz_parsed.given_names,   // last_name position
+        &mrz_parsed.document_number,
+        &mrz_parsed.date_of_birth,
+        &mrz_parsed.nationality,
+        &device_rng,
+    );
     let nullifier = generate_domain_nullifier(&dg1_hash, domain); // v5 uses DG1 Hash instead of doc#
 
     let (zk_status, zk_ms, zk_output) = if integrity_ok {
@@ -854,13 +920,19 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     // the Plonky2 blob can no longer authenticate failed/SIMULATED flows.
     let zk_output = if success { zk_output } else { None };
 
-    Ok(PassportProofResult {
+    let mut res = PassportProofResult {
         success, trusted: success, input_mode: mode_str,
         integrity_check: if integrity_ok { "PASS".into() } else { "FAIL".into() },
         signature_check: signature_msg.to_string(), zk_proof_status: zk_status, zk_proof_ms: zk_ms,
         error_msg: String::new(), merkle_root: hash_out_to_hex(&tree.root), trust_level: trust_level.to_string(),
         nullifier: hash_out_to_hex(&nullifier), zk_output,
-    })
+        bridge_schema_digest: String::new(), // computed below
+    };
+    // [K1] Digest over actual emitted keys (response plane anti-drift)
+    res.bridge_schema_digest = bridge_schema_digest(
+        &serde_json::to_value(&res).unwrap_or(serde_json::Value::Null)
+    );
+    Ok(res)
 }
 
 // Helpers
@@ -879,12 +951,16 @@ fn get_simulated_passport(claim_type: Option<String>, domain: Option<String>) ->
     let hash = sha256_hash(&dg1);
     let sod = sod::build_simulated_sod(&hash);
     PassportData {
-        mode: InputMode::SimulatedPassport, first_name: "ARSALAN".into(), last_name: "KHAN".into(),
-        document_number: "AB1234567".into(), date_of_birth: "900101".into(), nationality: "PAK".into(),
-        dg1_hex: hex::encode(&dg1), sod_hex: hex::encode(&sod), mrz_line: "AB1234567PAK9001011M2501010<<<<<<<<<<<<4".into(),
-        ds_cert_hex: None, claim_type, verifier_domain: domain.or(Some("sim.local".into())),
-        device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),  // [FIX v5.1] 32 bytes
-        expected_nationality: Some("PAK".into()), device_pubkey_hex: Some("02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()), // [H1] 65-byte raw pubkey-shaped
+        mode: InputMode::SimulatedPassport,
+        // [K2] Mirror fields = Some() — tripwire test ke liye (match => accepted)
+        first_name: Some("ARSALAN".into()), last_name: Some("KHAN".into()),
+        document_number: Some("AB1234567".into()), date_of_birth: Some("900101".into()),
+        nationality: Some("PAK".into()),
+        dg1_hex: hex::encode(&dg1), sod_hex: hex::encode(&sod),
+        claim_type, verifier_domain: domain.or(Some("sim.local".into())),
+        device_rng_hex: Some("a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),
+        expected_nationality: Some("PAK".into()),
+        device_pubkey_hex: Some("02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2".into()),
     }
 }
 
@@ -953,6 +1029,7 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
     let res = prove_passport(pd).unwrap_or_else(|e| PassportProofResult {
         success: false, input_mode: "ERR".into(), integrity_check: "FAIL".into(), signature_check: "FAIL".into(),
         zk_proof_status: "FAIL".into(), zk_proof_ms: 0, trusted: false,
+        bridge_schema_digest: String::new(), // error path — no schema to digest
         error_msg: e.to_string(), merkle_root: "".into(), trust_level: "NONE".into(), nullifier: "".into(), zk_output: None,
     });
     safe_new_string(env, serde_json::to_string(&res).unwrap_or_else(|_| "{\"error\":\"serialize failed\"}".to_string()))
@@ -1471,7 +1548,7 @@ mod c1_tests {
     #[test]
     fn non_nat_claims_unaffected() {
         let mut d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
-        d.nationality = "PAK".into();
+        d.nationality = Some("PAK".into());
         let res = prove_passport(d).expect("no hard error");
         assert_eq!(res.zk_proof_status, "GENERATED");
         assert!(!res.success); // [C4c] SIMULATED tier by design
@@ -1485,8 +1562,16 @@ mod c1_tests {
         // hai (C2 ka design goal hi yehi hai), hum negative case ke liye prove()
         // ko directly call kerte hain manually-built witness ke saath.
         let data = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
-        let device_rng = sha256_hash(data.document_number.as_bytes());
-        let tree = build_merkle_tree(&data, &device_rng);
+        let device_rng = sha256_hash(data.document_number.as_deref().unwrap_or("AB1234567").as_bytes());
+        // [K2] build_merkle_tree ab 6-arg (parsed identity values) — sim mirrors Some() me hain
+        let tree = build_merkle_tree(
+            data.first_name.as_deref().unwrap_or("ARSALAN"),
+            data.last_name.as_deref().unwrap_or("KHAN"),
+            data.document_number.as_deref().unwrap_or("AB1234567"),
+            data.date_of_birth.as_deref().unwrap_or("900101"),
+            data.nationality.as_deref().unwrap_or("PAK"),
+            &device_rng,
+        );
 
         let circuits = get_circuits();
         let inner_c = &circuits.inner;
@@ -1696,7 +1781,6 @@ mod c1_tests {
         let sod_der = sod::build_signed_sod(&sha256_hash(&dg1), &cert, &key, true).unwrap();
         let mut d2 = d.clone();
         d2.sod_hex = hex::encode(&sod_der);
-        d2.ds_cert_hex = Some(hex::encode(&cert)); // production input present
         let res = prove_passport(d2).expect("no hard error");
         assert_eq!(res.signature_check, "VERIFIED");
         assert_eq!(res.trust_level, "VERIFIED_ONLY");
@@ -1750,11 +1834,24 @@ mod c1_tests {
     // ═══════════════════════════════════════════════════════════════
 
     #[test]
+    
+    #[test]
+    fn bridge_schema_digest_deterministic() {
+        // [K1] Same schema => same digest (drift detection ki foundation)
+        let d1 = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let r1 = prove_passport(d1).expect("proof ok");
+        let d2 = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let r2 = prove_passport(d2).expect("proof ok");
+        assert_eq!(r1.bridge_schema_digest, r2.bridge_schema_digest,
+            "same schema => same digest");
+        assert_eq!(r1.bridge_schema_digest.len(), 64, "SHA-256 hex");
+    }
+
     fn phase4_json_nationality_mismatch_dg1_rejected() {
         // [A-01 Phase-4] JSON nationality ≠ DG1-authenticated → reject
         let d = get_simulated_passport(Some("nationality".into()), Some("test.domain".into()));
         let mut d2 = d.clone();
-        d2.nationality = "USA".into();
+        d2.nationality = Some("USA".into());
         d2.expected_nationality = Some("USA".into());
         assert!(prove_passport(d2).is_err(),
             "JSON nationality ≠ DG1 must fail closed (attribute substitution)");
@@ -1765,7 +1862,7 @@ mod c1_tests {
         // [A-01 Phase-4] JSON DOB ≠ DG1-authenticated → reject
         let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
         let mut d2 = d.clone();
-        d2.date_of_birth = "000101".into();   // JSON lie (MRZ has 900101)
+        d2.date_of_birth = Some("000101".into());   // JSON lie (MRZ has 900101)
         assert!(prove_passport(d2).is_err(),
             "JSON DOB ≠ DG1 must fail closed");
     }
