@@ -762,6 +762,22 @@ fn bridge_schema_digest(result_json: &serde_json::Value) -> String {
         .collect()
 }
 
+/// [B5] Unified error-result — SAME 13-key schema, digest COMPUTED (not "")
+fn error_result(msg: String) -> PassportProofResult {
+    let mut res = PassportProofResult {
+        success: false, input_mode: "ERR".into(), integrity_check: "FAIL".into(),
+        signature_check: "FAIL".into(), zk_proof_status: "FAIL".into(), zk_proof_ms: 0,
+        trusted: false, bridge_schema_digest: String::new(),
+        error_msg: msg, merkle_root: String::new(), trust_level: "NONE".into(),
+        nullifier: String::new(), zk_output: None,
+    };
+    match serde_json::to_value(&res) {
+        Ok(v) => res.bridge_schema_digest = bridge_schema_digest(&v),
+        Err(e) => res.error_msg = format!("{} + [digest compute failed: {e}]", res.error_msg),
+    }
+    res
+}
+
 pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     let mode_str   = format!("{:?}", data.mode);
     let claim_type = ClaimType::from_str(data.claim_type.as_deref().unwrap_or("is_adult"))?;
@@ -929,9 +945,11 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
         bridge_schema_digest: String::new(), // computed below
     };
     // [K1] Digest over actual emitted keys (response plane anti-drift)
-    res.bridge_schema_digest = bridge_schema_digest(
-        &serde_json::to_value(&res).unwrap_or(serde_json::Value::Null)
-    );
+    if let Ok(v) = serde_json::to_value(&res) {
+        res.bridge_schema_digest = bridge_schema_digest(&v);
+    } else {
+        res.error_msg = format!("{} + [digest serialize failed]", res.error_msg);
+    }
     Ok(res)
 }
 
@@ -1029,7 +1047,7 @@ fn handle_req(env: &mut JNIEnv, json: Option<JString>, sim: bool, claim: Option<
     let res = prove_passport(pd).unwrap_or_else(|e| PassportProofResult {
         success: false, input_mode: "ERR".into(), integrity_check: "FAIL".into(), signature_check: "FAIL".into(),
         zk_proof_status: "FAIL".into(), zk_proof_ms: 0, trusted: false,
-        bridge_schema_digest: String::new(), // error path — no schema to digest
+        bridge_schema_digest: String::new(), // [B5] computed below
         error_msg: e.to_string(), merkle_root: "".into(), trust_level: "NONE".into(), nullifier: "".into(), zk_output: None,
     });
     safe_new_string(env, serde_json::to_string(&res).unwrap_or_else(|_| "{\"error\":\"serialize failed\"}".to_string()))
