@@ -138,9 +138,9 @@ object SecurityGate {
         val issuerTrusted:  Boolean?,    // null until CSCA
         val revocationOk:   Boolean?,
         val freshOk:        Boolean?,
-        val zkOk:           Boolean?
+        val zkOk:           Boolean?,
         val merkleRoot:     String,
-        val trustLevel:     String,         // "MAXIMUM" | "NONE"
+        val trustLevel:     String,         // "VERIFIED_ONLY" | "SIMULATED" | "NONE"
         val nullifier:      String,
         val zkOutput:       ZkProofOutput?  // null if proof not generated
     )
