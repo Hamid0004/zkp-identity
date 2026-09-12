@@ -105,3 +105,28 @@ accept
 Anything beyond this (device auth, CSCA, freshness) is future work
 tracked in #8 — accepting proofs without those is demo-grade by
 definition.
+
+
+## 6. Bridge Schema Contract (BRIDGE_SCHEMA_DIGEST)
+
+### 6.1 Canonical form
+Sorted keys · UTF-8 · unit-separator join · SHA-256 hex.
+
+### 6.2 Digest source of truth
+Computed by Rust from **actual emitted keys at runtime** — never hardcoded
+(drift-theater). Kotlin pins expected value; mismatch = explicit Failure.
+
+### 6.3 v1 field list (13 keys — sorted)
+`bridge_schema_digest, error_msg, input_mode, integrity_check, merkle_root,
+nullifier, signature_check, success, trust_level, trusted, zk_output,
+zk_proof_ms, zk_proof_status`
+
+**Self-reference note:** `bridge_schema_digest` is itself in the key-set
+(value `""` at compute time) — intended, not off-by-one.
+
+### 6.4 Bump protocol
+Field add/remove/rename ⇒ digest bump ⇒ spec entry (one line) ⇒ Kotlin
+constant update (one line). Same discipline as VK digest.
+
+### 6.5 Published value (v1)
+`e04f05fb2a29949481825e02c044bad2a49a0b390205cc28b58484983213f2b3`

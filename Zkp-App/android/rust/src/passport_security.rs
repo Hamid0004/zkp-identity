@@ -546,14 +546,14 @@ fn calculate_age(dob: &str) -> u32 {
 }
 
 fn build_merkle_tree(
-    first_name:      &str,   // [K2] from parsed MRZ (authoritative)
-    last_name:       &str,
+    surname:         &str,   // [B6] renamed — semantic clarity (pehle first_name tha, ulta use hota tha)
+    given_names:     &str,
     document_number: &str,
     date_of_birth:   &str,
     nationality:     &str,
     device_rng:      &[u8],
 ) -> IdentityMerkleTree {
-    let name_val = format!("{} {}", first_name, last_name);
+    let name_val = format!("{} {}", surname, given_names);
     let age      = calculate_age(date_of_birth);
 
     let name_f = bytes_to_field_elements(name_val.as_bytes());
@@ -841,8 +841,8 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
     data.nationality = Some(mrz_parsed.nationality.clone());
     data.date_of_birth = Some(mrz_parsed.date_of_birth.clone());
     data.document_number = Some(mrz_parsed.document_number.clone());
-    data.first_name = Some(mrz_parsed.given_names.clone());
-    data.last_name = Some(mrz_parsed.surname.clone());
+    // [B6] Name overrides deleted — tree explicit args leta hai, mirror
+    // fields ab dead (holder_name A-05 se gone). Inverted-semantics trap removed.
 
     
     // [C4a+C4c] Single SOD parse — integrity + signature dono isi se
@@ -897,8 +897,8 @@ pub fn prove_passport(mut data: PassportData) -> Result<PassportProofResult> {
 
     // [K2] Tree from MRZ-AUTHORITATIVE values (A-01 Phase C)
     let tree = build_merkle_tree(
-        &mrz_parsed.surname,       // first_name position — purana "ARSALAN KHAN" order
-        &mrz_parsed.given_names,   // last_name position
+        &mrz_parsed.surname,
+        &mrz_parsed.given_names,
         &mrz_parsed.document_number,
         &mrz_parsed.date_of_birth,
         &mrz_parsed.nationality,
@@ -1847,6 +1847,36 @@ mod c1_tests {
         assert_eq!(r1.bridge_schema_digest.len(), 64, "SHA-256 hex");
     }
 
+    #[test]
+    fn deny_unknown_novel_fields_rejected() {
+        // [B3a] Novel/mirror fields wire pe aaye → deny_unknown loud-reject
+        let json_with_novel = r#"{
+            "dg1_hex": "3161125f1f58",
+            "sod_hex": "3082",
+            "mode": "NFC_PASSPORT",
+            "mrz_line": "legacy-field",
+            "ds_cert_hex": "3082deadbeef",
+            "claim_type": "is_adult",
+            "verifier_domain": "test.domain",
+            "device_rng_hex": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2",
+            "device_pubkey_hex": "02a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2"
+        }"#;
+        let parsed: Result<PassportData, _> = serde_json::from_str(json_with_novel);
+        assert!(parsed.is_err(),
+            "novel fields (mode/mrz_line/ds_cert_hex) must be LOUDLY rejected");
+    }
+
+    #[test]
+    fn bridge_schema_digest_matches_published_spec_value() {
+        // [B3b] spec↔code binding — R5-class doc-vs-code drift ka antidote
+        const PUBLISHED_SPEC_DIGEST: &str = "e04f05fb2a29949481825e02c044bad2a49a0b390205cc28b58484983213f2b3";
+        let d = get_simulated_passport(Some("is_adult".into()), Some("test.domain".into()));
+        let r = prove_passport(d).expect("proof ok");
+        assert_eq!(r.bridge_schema_digest, PUBLISHED_SPEC_DIGEST,
+            "digest != published spec value — schema drifted WITHOUT deliberate bump");
+    }
+
+    #[test]
     fn phase4_json_nationality_mismatch_dg1_rejected() {
         // [A-01 Phase-4] JSON nationality ≠ DG1-authenticated → reject
         let d = get_simulated_passport(Some("nationality".into()), Some("test.domain".into()));
