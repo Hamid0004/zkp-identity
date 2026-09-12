@@ -129,7 +129,16 @@ object SecurityGate {
         val errorMsg:       String,
         val trusted:        Boolean,        // [A-04] false => zkOutput ignore
         val bridgeSchemaDigest: String,     // [K1] schema anti-drift
-        val predicates:     PredicateFields?, // [A-02 shape] null => "unknown"
+        // [A-02 absorption target — FLAT root-level, frozen names in #8]
+        val integrityOk:    Boolean?,
+        val sigMathOk:      Boolean?,
+        val sigAttrsOk:     Boolean?,
+        val chainOk:        Boolean?,    // null until C4c-full
+        val profileOk:      Boolean?,
+        val issuerTrusted:  Boolean?,    // null until CSCA
+        val revocationOk:   Boolean?,
+        val freshOk:        Boolean?,
+        val zkOk:           Boolean?
         val merkleRoot:     String,
         val trustLevel:     String,         // "MAXIMUM" | "NONE"
         val nullifier:      String,
@@ -155,17 +164,6 @@ object SecurityGate {
 
     // [A-02 shape] Nullable — absent => null => UI renders "unknown", NEVER false
     // (pre-A-02 window: 9 spurious failures would be a lie)
-    data class PredicateFields(
-        val integrityOk:   Boolean?,
-        val sigMathOk:     Boolean?,
-        val sigAttrsOk:    Boolean?,
-        val chainOk:       Boolean?,    // null until C4c-full
-        val profileOk:     Boolean?,
-        val issuerTrusted: Boolean?,    // null until CSCA
-        val revocationOk:  Boolean?,
-        val freshOk:       Boolean?,
-        val zkOk:          Boolean?
-    )
 
     // ── Primary API: generateClaim() ──────────────────────────────────────────
     //
@@ -371,19 +369,18 @@ object SecurityGate {
             val gatedZkOutput = if (trusted) zkOutput else null
 
             // [A-02 shape] nullable predicates — absent => null => "unknown"
-            val predicates = root.optJSONObject("predicates")?.let { p ->
-                PredicateFields(
-                    integrityOk   = p.optBoolean("integrity_ok").takeIf { p.has("integrity_ok") },
-                    sigMathOk     = p.optBoolean("sig_math_ok").takeIf { p.has("sig_math_ok") },
-                    sigAttrsOk    = p.optBoolean("sig_attrs_ok").takeIf { p.has("sig_attrs_ok") },
-                    chainOk       = p.optBoolean("chain_ok").takeIf { p.has("chain_ok") },
-                    profileOk     = p.optBoolean("profile_ok").takeIf { p.has("profile_ok") },
-                    issuerTrusted = p.optBoolean("issuer_trusted").takeIf { p.has("issuer_trusted") },
-                    revocationOk  = p.optBoolean("revocation_ok").takeIf { p.has("revocation_ok") },
-                    freshOk       = p.optBoolean("fresh_ok").takeIf { p.has("fresh_ok") },
-                    zkOk          = p.optBoolean("zk_ok").takeIf { p.has("zk_ok") }
-                )
-            }
+            // [A-02 absorption — FLAT root-level keys] absent => null => "unknown"
+            fun flatBool(key: String): Boolean? =
+                if (root.has(key)) root.optBoolean(key) else null
+            val integrityOk   = flatBool("integrity_ok")
+            val sigMathOk     = flatBool("sig_math_ok")
+            val sigAttrsOk    = flatBool("sig_attrs_ok")
+            val chainOk       = flatBool("chain_ok")
+            val profileOk     = flatBool("profile_ok")
+            val issuerTrusted = flatBool("issuer_trusted")
+            val revocationOk  = flatBool("revocation_ok")
+            val freshOk       = flatBool("fresh_ok")
+            val zkOk          = flatBool("zk_ok")
 
             val result = PassportProofResult(
                 success        = root.optBoolean("success", false),
@@ -399,7 +396,15 @@ object SecurityGate {
                 trusted        = trusted,
                 bridgeSchemaDigest = schemaDigest,
                 zkOutput       = gatedZkOutput,
-                predicates     = predicates
+                integrityOk    = integrityOk,
+                sigMathOk      = sigMathOk,
+                sigAttrsOk     = sigAttrsOk,
+                chainOk        = chainOk,
+                profileOk      = profileOk,
+                issuerTrusted  = issuerTrusted,
+                revocationOk   = revocationOk,
+                freshOk        = freshOk,
+                zkOk           = zkOk
             )
 
             ProofResult.Success(result)
