@@ -359,22 +359,28 @@ class PassportActivity : AppCompatActivity() {
 
     private fun showRustSuccess(data: PassportData, result: SecurityGate.PassportProofResult) {
         val modeLabel = if (result.inputMode == "NFC_PASSPORT") "REAL NFC" else "SIMULATED"
-        updateStatus("✅ PASSPORT AUTHENTIC", colorGreen, "$modeLabel · ZK PROOF GENERATED")
+        // [U-2/K7] Trust-honest wording — no overclaim (A-06)
+        val statusMsg = if (result.trusted) {
+            "✅ SIGNATURE VERIFIED"
+        } else {
+            "🧪 DEMO PROOF"
+        }
+        updateStatus(statusMsg, colorGreen, "$modeLabel · ZK PROOF GENERATED")
 
         // Proof bar
         cardProof.visibility = View.VISIBLE
         tvProofTime.text = "${result.zkProofMs}ms"
         val nullifierPrefix = result.nullifier.take(16).uppercase().ifEmpty { "ZK COMMITTED" }
-        tvProofHash.text = "Plonky2 · v5.1 · $nullifierPrefix…"
+        tvProofHash.text = "Plonky2 · ${result.bridgeSchemaDigest.take(8)} · $nullifierPrefix…"
         animateFadeIn(cardProof)
 
         // Integrity card
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text =
-            // [A-05/K7] holderName gone from result — local PassportData only (no network)
+            // [A-05/K7] Local identity display only — never sent to network
             "👤  ${data.firstName} ${data.lastName}\n" +
             "🔒  Integrity:  ${result.integrityCheck}\n" +
-            "🛡️  Trust:      ${result.trustLevel}"
+            "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}"
         animateFadeIn(cardIntegrity)
 
         // Crypto card
@@ -419,11 +425,29 @@ class PassportActivity : AppCompatActivity() {
         btnScanMrz.isEnabled  = true
         btnSimulate.isEnabled = true
 
+        // [U-6] Error-type discrimination — specific message + specific action
         val (msg, sub) = when (e) {
-            is TagLostException -> "⚠️ CHIP CONNECTION LOST" to "Hold phone steady & retry"
-            is IOException      -> "⚠️ READ FAILED"         to "Remove case & retry"
-            is SecurityException-> "❌ SECURITY ERROR"      to (e.message ?: "")
-            else                -> "❌ ENGINE ERROR"         to (e.localizedMessage ?: "Unknown")
+            is TagLostException    -> "⚠️ CHIP CONNECTION LOST" to "Hold phone steady & retry"
+            is IOException         -> "⚠️ READ FAILED"          to "Remove case & retry"
+            is SecurityException   -> "❌ SECURITY ERROR"        to (e.message ?: "")
+            else -> when {
+                e.message?.contains("BAC", ignoreCase = true) == true ->
+                    "🔐 CHIP UNLOCK FAILED" to "MRZ data mismatch — re-scan MRZ"
+                e.message?.contains("SOD", ignoreCase = true) == true ->
+                    "⚠️ SECURITY DATA INCOMPLETE" to "Passport may be damaged — retry"
+                e.message?.contains("check digit", ignoreCase = true) == true ->
+                    "📷 MRZ DATA CORRUPTED" to "Re-scan in better lighting"
+                e.message?.contains("date_of_birth", ignoreCase = true) == true ->
+                    "⚠️ INVALID DATE IN SCAN" to "Re-scan MRZ — OCR misread"
+                e.message?.contains("device_rng", ignoreCase = true) == true ->
+                    "📱 DEVICE REGISTRATION ERROR" to "Restart app and retry"
+                e.message?.contains("device_pubkey", ignoreCase = true) == true ->
+                    "📱 DEVICE KEY ERROR" to "Restart app — Keystore issue"
+                e.message?.contains("expected_nationality", ignoreCase = true) == true ->
+                    "🌍 NATIONALITY MISMATCH" to "Passport nationality doesn't match selection"
+                else ->
+                    "❌ ENGINE ERROR" to (e.localizedMessage?.take(60) ?: "Unknown")
+            }
         }
         // [SESSION v2.0] withError() — preserves mrzInfo, sets ERROR state + message
         session = session.withError("$msg — $sub")
@@ -848,6 +872,8 @@ class PassportActivity : AppCompatActivity() {
             }
         }
 
+        // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
+        if (BuildConfig.DEBUG) {
         btnSimulate = Button(this).apply {
             text = "🧪  SIMULATE SCAN"
             textSize = 11f
@@ -859,9 +885,9 @@ class PassportActivity : AppCompatActivity() {
             setPadding(0, 0, 0, 0)
             setOnClickListener { runSimulation() }
         }
+        } // [A-07/U-7] end BuildConfig.DEBUG gate
 
         col.addView(btnScanMrz)
-        col.addView(btnSimulate)
         return col
     }
 
