@@ -25,6 +25,87 @@ import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
+
+    // ═══ [B-STATE] Checklist data — 5-state rendering ka core ═══
+    private data class ChecklistItem(
+        val label: String,
+        val state: CheckState
+    )
+
+    private enum class CheckState { PENDING, ACTIVE, DONE, FAILED }
+
+    // SessionState -> checklist items mapping
+    private fun getChecklistForState(state: SessionState): List<ChecklistItem> {
+        val mrzDone = state.ordinal >= SessionState.MRZ_SCANNED.ordinal
+        val chipDone = state.ordinal >= SessionState.DONE.ordinal
+
+        return when (state) {
+            SessionState.IDLE ->
+                listOf(
+                    ChecklistItem("MRZ scan", CheckState.PENDING),
+                    ChecklistItem("Connect to chip", CheckState.PENDING),
+                    ChecklistItem("Unlock & read data", CheckState.PENDING),
+                    ChecklistItem("Verify signature", CheckState.PENDING)
+                )
+            SessionState.MRZ_SCANNED, SessionState.NFC_READY ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Connect to chip", CheckState.ACTIVE),
+                    ChecklistItem("Unlock & read data", CheckState.PENDING),
+                    ChecklistItem("Verify signature", CheckState.PENDING)
+                )
+            SessionState.CONNECTING, SessionState.ANALYZING_MRZ ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Chip connected", CheckState.DONE),
+                    ChecklistItem("Unlocking (BAC)", CheckState.ACTIVE),
+                    ChecklistItem("Read & verify data", CheckState.PENDING)
+                )
+            SessionState.BAC_AUTH ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Chip connected", CheckState.DONE),
+                    ChecklistItem("Unlocking (BAC)", CheckState.ACTIVE),
+                    ChecklistItem("Read & verify data", CheckState.PENDING)
+                )
+            SessionState.READING ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Chip unlocked", CheckState.DONE),
+                    ChecklistItem("Reading identity data", CheckState.ACTIVE),
+                    ChecklistItem("Verify signature", CheckState.PENDING)
+                )
+            SessionState.SOD_READING ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Chip unlocked", CheckState.DONE),
+                    ChecklistItem("Identity data read", CheckState.DONE),
+                    ChecklistItem("Verifying signature (SOD)", CheckState.ACTIVE)
+                )
+            SessionState.DONE ->
+                listOf(
+                    ChecklistItem("MRZ scanned", CheckState.DONE),
+                    ChecklistItem("Chip unlocked", CheckState.DONE),
+                    ChecklistItem("Identity data read", CheckState.DONE),
+                    ChecklistItem("Signature verified", CheckState.DONE)
+                )
+            SessionState.ZKP_GENERATING ->
+                listOf(
+                    ChecklistItem("Passport read", CheckState.DONE),
+                    ChecklistItem("ZK proof generating", CheckState.ACTIVE)
+                )
+            SessionState.ZKP_READY ->
+                listOf(
+                    ChecklistItem("Passport read", CheckState.DONE),
+                    ChecklistItem("ZK proof ready", CheckState.DONE)
+                )
+            SessionState.ERROR ->
+                listOf(
+                    ChecklistItem("Error occurred", CheckState.FAILED)
+                )
+        }
+    }
+
 class PassportActivity : AppCompatActivity() {
 
     // ── Security ──────────────────────────────────────────────────────────────
@@ -101,6 +182,7 @@ class PassportActivity : AppCompatActivity() {
             )
             // [SESSION v2.0] DRY strings from SessionState — no hardcoded text
             updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
+        renderChecklist(session.state)
             updateStepBar(session.state.stepIndex)
         }
 
@@ -184,6 +266,7 @@ class PassportActivity : AppCompatActivity() {
         // [SESSION v2.0] Advance to CONNECTING state — DRY status strings
         session = session.copy(state = SessionState.CONNECTING)
         updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
+        renderChecklist(session.state)
         updateStepBar(session.state.stepIndex)
 
         lifecycleScope.launch(Dispatchers.IO) {
@@ -214,6 +297,7 @@ class PassportActivity : AppCompatActivity() {
         session = session.copy(state = SessionState.DONE)
         performHapticFeedback()
         updateStatus(session.state.displayString, colorGreen, session.state.statusSub)
+        renderChecklist(session.state)
         updateStepBar(session.state.stepIndex)
 
         // Photo — use PassportData.getCachedPhoto() first (survives Parcel roundtrip)
@@ -319,6 +403,7 @@ class PassportActivity : AppCompatActivity() {
         rustJob?.cancel()
         session = session.copy(state = SessionState.ZKP_GENERATING)
         updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
+        renderChecklist(session.state)
         updateStepBar(session.state.stepIndex)
 
         rustJob = lifecycleScope.launch {
@@ -337,6 +422,7 @@ class PassportActivity : AppCompatActivity() {
                     is SecurityGate.ProofResult.Success -> {
                         session = session.copy(state = SessionState.ZKP_READY)
                         updateStatus(session.state.displayString, colorGreen, session.state.statusSub)
+        renderChecklist(session.state)
                         updateStepBar(session.state.stepIndex)
                         showRustSuccess(data, rustResult.result)
                         showToast("🦁 ZK Proof Ready · ${session.minutesRemaining}min session")
@@ -474,6 +560,7 @@ class PassportActivity : AppCompatActivity() {
 
         container.addView(buildHeader())
         container.addView(buildStepBar())
+        container.addView(buildChecklist())
         container.addView(buildStatusBanner())
         container.addView(buildPhotoIdentityRow())
         container.addView(buildProofBar())
@@ -898,6 +985,62 @@ class PassportActivity : AppCompatActivity() {
         tvStatusMsg.setTextColor(color)
         tvStatusDot.setTextColor(color)
         tvStatusSub.text = sub
+    }
+
+
+    // ═══ [B-STATE] Checklist UI renderer ═══
+    private lateinit var checklistContainer: LinearLayout
+
+    private fun buildChecklist(): View {
+        checklistContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(20), px(12), px(20), px(12))
+        }
+        return checklistContainer
+    }
+
+    private fun renderChecklist(state: SessionState) {
+        checklistContainer.removeAllViews()
+        val items = getChecklistForState(state)
+        items.forEach { item ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, px(6), 0, px(6))
+            }
+            val icon = TextView(this).apply {
+                textSize = 14f
+                when (item.state) {
+                    CheckState.DONE -> {
+                        text = "✅"
+                    }
+                    CheckState.ACTIVE -> {
+                        text = "⏳"
+                    }
+                    CheckState.FAILED -> {
+                        text = "❌"
+                    }
+                    CheckState.PENDING -> {
+                        text = "○"
+                    }
+                }
+                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(10), 0) }
+            }
+            val label = TextView(this).apply {
+                text = item.label
+                textSize = 12f
+                when (item.state) {
+                    CheckState.DONE -> setTextColor(colorGreen)
+                    CheckState.ACTIVE -> setTextColor(colorCyan)
+                    CheckState.FAILED -> setTextColor(colorRed)
+                    CheckState.PENDING -> setTextColor(Color.parseColor("#445566"))
+                }
+                typeface = if (item.state == CheckState.ACTIVE) Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            }
+            row.addView(icon)
+            row.addView(label)
+            checklistContainer.addView(row)
+        }
     }
 
     private fun updateStepBar(activeIndex: Int) {
