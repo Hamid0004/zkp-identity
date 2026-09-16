@@ -393,6 +393,8 @@ class PassportActivity : AppCompatActivity() {
             "🔑  Algorithm:  RSA-2048 + Poseidon\n" +
             "⚡  ZK Proof:   ${result.zkProofStatus}\n" +
             "📦  Proof Type: $proofType\n" +
+            "🏛️  Issuer:     PENDING (CSCA chain)\n" +
+            "🔒  Encrypted:  On device ✓\n" +
             if (zkOutput != null) "⏰  Expires:    ${
                 java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
                     .format(java.util.Date(zkOutput.validUntil * 1000))
@@ -420,39 +422,83 @@ class PassportActivity : AppCompatActivity() {
         return map[code.uppercase()] ?: "🌐 ${code.uppercase()}"
     }
 
+
+    // ═══ [B-STATE-5] Universal failure layout ═══
+    private data class FailureInfo(val what: String, val why: String, val action: String, val tip: String)
+
+    private fun renderFailureCard(what: String, why: String, action: String, tip: String) {
+        cardIntegrity.visibility = View.VISIBLE
+        tvIntegrityRows.text = buildString {
+            appendLine("⚠️  $what")
+            if (why.isNotEmpty()) appendLine("📋  $why")
+            if (action.isNotEmpty()) appendLine("➡️  Action: $action")
+            if (tip.isNotEmpty()) appendLine("💡  Tip: $tip")
+        }
+        session = session.withError(what)
+        updateStatus(what, colorRed, action.uppercase().take(50))
+        performErrorVibration()
+    }
+
+
     private fun handleError(e: Exception) {
         progressBar.visibility = View.GONE
         btnScanMrz.isEnabled  = true
-        btnSimulate.isEnabled = true
 
-        // [U-6] Error-type discrimination — specific message + specific action
-        val (msg, sub) = when (e) {
-            is TagLostException    -> "⚠️ CHIP CONNECTION LOST" to "Hold phone steady & retry"
-            is IOException         -> "⚠️ READ FAILED"          to "Remove case & retry"
-            is SecurityException   -> "❌ SECURITY ERROR"        to (e.message ?: "")
-            else -> when {
-                e.message?.contains("BAC", ignoreCase = true) == true ->
-                    "🔐 CHIP UNLOCK FAILED" to "MRZ data mismatch — re-scan MRZ"
-                e.message?.contains("SOD", ignoreCase = true) == true ->
-                    "⚠️ SECURITY DATA INCOMPLETE" to "Passport may be damaged — retry"
-                e.message?.contains("check digit", ignoreCase = true) == true ->
-                    "📷 MRZ DATA CORRUPTED" to "Re-scan in better lighting"
-                e.message?.contains("date_of_birth", ignoreCase = true) == true ->
-                    "⚠️ INVALID DATE IN SCAN" to "Re-scan MRZ — OCR misread"
-                e.message?.contains("device_rng", ignoreCase = true) == true ->
-                    "📱 DEVICE REGISTRATION ERROR" to "Restart app and retry"
-                e.message?.contains("device_pubkey", ignoreCase = true) == true ->
-                    "📱 DEVICE KEY ERROR" to "Restart app — Keystore issue"
-                e.message?.contains("expected_nationality", ignoreCase = true) == true ->
-                    "🌍 NATIONALITY MISMATCH" to "Passport nationality doesn't match selection"
-                else ->
-                    "❌ ENGINE ERROR" to (e.localizedMessage?.take(60) ?: "Unknown")
+        // [U-6/B-STATE-5] Error-type discrimination — universal failure layout
+        val (msg, why, action, tip) = when (e) {
+            is TagLostException ->
+                FailureInfo("📵 CONNECTION LOST",
+                    "The phone moved during reading.",
+                    "Retry chip", "Hold still — reading takes 3-5 seconds")
+            is IOException ->
+                FailureInfo("⚠️ READ FAILED",
+                    "NFC communication interrupted.",
+                    "Remove case & retry", "Hold phone against passport back")
+            is SecurityException ->
+                FailureInfo("❌ SECURITY ERROR",
+                    e.message ?: "Access denied",
+                    "Retry", "")
+            else -> {
+                val em = e.message ?: ""
+                when {
+                    em.contains("BAC", ignoreCase = true) ->
+                        FailureInfo("🔐 CHIP UNLOCK FAILED",
+                            "Chip rejected the access key — MRZ likely misread.",
+                            "Re-scan MRZ", "Even 1 wrong digit blocks access")
+                    em.contains("SOD", ignoreCase = true) ->
+                        FailureInfo("⚠️ SECURITY DATA INCOMPLETE",
+                            "Security signature (SOD) not found — passport may be damaged.",
+                            "Retry", "If this keeps happening, chip may be faulty")
+                    em.contains("check digit", ignoreCase = true) ->
+                        FailureInfo("📷 MRZ DATA CORRUPTED",
+                            "Check digit mismatch — OCR misread a character.",
+                            "Re-scan MRZ", "Scan in better lighting")
+                    em.contains("date_of_birth", ignoreCase = true) ->
+                        FailureInfo("⚠️ INVALID DATE",
+                            "The MRZ contains an impossible date (OCR misread).",
+                            "Re-scan MRZ", "Better lighting improves OCR accuracy")
+                    em.contains("device_rng", ignoreCase = true) ->
+                        FailureInfo("📱 DEVICE ERROR",
+                            "Device registration data invalid.",
+                            "Restart app and retry", "")
+                    em.contains("device_pubkey", ignoreCase = true) ->
+                        FailureInfo("🔑 DEVICE KEY ERROR",
+                            "Device key invalid or too short.",
+                            "Restart app", "")
+                    em.contains("expected_nationality", ignoreCase = true) ->
+                        FailureInfo("🌍 NATIONALITY MISMATCH",
+                            "Passport nationality doesn't match selection.",
+                            "Check selection and retry", "")
+                    else ->
+                        FailureInfo("❌ ENGINE ERROR",
+                            e.localizedMessage?.take(80) ?: "Unknown error",
+                            "Retry", "")
+                }
             }
         }
-        // [SESSION v2.0] withError() — preserves mrzInfo, sets ERROR state + message
-        session = session.withError("$msg — $sub")
-        updateStatus(msg, colorRed, sub.uppercase())
-        performErrorVibration()
+        renderFailureCard(msg, why, action, tip)
+        // [B-STATE-5] renderFailureCard handles: session.withError + updateStatus
+        // + performErrorVibration (unified — no separate msg/sub references)
     }
 
     // ── UI Builders ───────────────────────────────────────────────────────────
@@ -473,7 +519,10 @@ class PassportActivity : AppCompatActivity() {
         progressBar = ProgressBar(this).apply { visibility = View.GONE }
 
         container.addView(buildHeader())
-        container.addView(buildStepBar())
+        // [A-1/A-2/A-4] Screen A panel — privacy promise + step label + estimate
+        container.addView(buildScreenAPanel())
+        // [A-5] Step bar DEFERRED — visible only after MRZ scan
+        container.addView(buildStepBar().apply { visibility = View.GONE })
         container.addView(buildStatusBanner())
         container.addView(buildPhotoIdentityRow())
         container.addView(buildProofBar())
@@ -488,6 +537,73 @@ class PassportActivity : AppCompatActivity() {
         scrollView.addView(container)
         root.addView(scrollView)
         setContentView(root)
+    }
+
+
+    // ═══ [A-1/A-2/A-4] Screen A panel — privacy promise + step label ═══
+    private fun buildScreenAPanel(): View {
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(20), px(8), px(20), px(8))
+        }
+
+        // A-2: Step 1 of 2 label
+        val stepLabel = TextView(this).apply {
+            text = "STEP 1 OF 2"
+            textSize = 9f
+            setTextColor(Color.parseColor("#447788"))
+            letterSpacing = 0.2f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+
+        // A-1: Privacy promise panel
+        val privacyCard = CardView(this).apply {
+            radius = px(14).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(Color.parseColor("#040e1a"))
+        }
+        val privacyInner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(14), px(14), px(14), px(14))
+        }
+
+        val privacyTitle = TextView(this).apply {
+            text = "🔒 Zero-Knowledge Verification"
+            textSize = 12f
+            setTextColor(colorCyan)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val proveLine = TextView(this).apply {
+            text = "✓ Will be proven: Age 18+, Nationality"
+            textSize = 10f
+            setTextColor(colorGreen)
+        }
+        val hideLine = TextView(this).apply {
+            text = "🔒 Never leaves device: Name, Photo, Address"
+            textSize = 10f
+            setTextColor(Color.parseColor("#445566"))
+        }
+        privacyInner.addView(privacyTitle)
+        privacyInner.addView(spacer(8))
+        privacyInner.addView(proveLine)
+        privacyInner.addView(spacer(4))
+        privacyInner.addView(hideLine)
+
+        privacyCard.addView(privacyInner)
+
+        // A-4: Estimate
+        val estimate = TextView(this).apply {
+            text = "~2 minutes · Works offline · 🔒 Secure"
+            textSize = 9f
+            setTextColor(Color.parseColor("#445566"))
+            setPadding(0, px(8), 0, 0)
+        }
+
+        wrapper.addView(stepLabel)
+        wrapper.addView(spacer(6))
+        wrapper.addView(privacyCard)
+        wrapper.addView(estimate)
+        return wrapper
     }
 
     private fun buildHeader(): View {
@@ -555,6 +671,7 @@ class PassportActivity : AppCompatActivity() {
             orientation = LinearLayout.HORIZONTAL
             setPadding(px(16), px(12), px(16), px(4))
             gravity = Gravity.CENTER_VERTICAL
+            visibility = View.GONE  // [A-5] deferred — visible after MRZ scan
         }
         val steps = listOf("MRZ", "NFC", "READ", "SOD", "ZKP")
         steps.forEachIndexed { i, s ->
@@ -875,7 +992,8 @@ class PassportActivity : AppCompatActivity() {
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
         btnSimulate = Button(this).apply {
-            text = "🧪  SIMULATE SCAN"
+            text = "🧪  SIMULATE (demo — no passport)"
+            alpha = 0.55f
             textSize = 11f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.15f
