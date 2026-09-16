@@ -183,7 +183,7 @@ class PassportActivity : AppCompatActivity() {
             // [SESSION v2.0] DRY strings from SessionState — no hardcoded text
             updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
         renderChecklist(session.state)
-            updateStepBar(session.state.stepIndex)
+        updateStepBar(session.state.stepIndex)
         }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
