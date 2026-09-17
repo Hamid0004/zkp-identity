@@ -930,7 +930,7 @@ class PassportActivity : AppCompatActivity() {
 
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
-        btnSimulate = Button(this).apply {
+            btnSimulate = Button(this).apply {
             text = "🧪  SIMULATE (demo — no passport)"
             alpha = 0.55f  // [A-3] dimmed
             textSize = 11f
@@ -940,14 +940,15 @@ class PassportActivity : AppCompatActivity() {
             background = cyberBorder(colorBorder, 16f)
             layoutParams = LinearLayout.LayoutParams(MATCH, px(48))
             setPadding(0, 0, 0, 0)
-            col.addView(btnSimulate)
             setOnClickListener { runSimulation() }
         }
-        } // [A-07/U-7] end BuildConfig.DEBUG gate
+        col.addView(btnSimulate)  // ← ADD THIS LINE HERE
+}       // [A-07/U-7] end BuildConfig.DEBUG gate
 
-        col.addView(btnScanMrz)
-        return col
+col.addView(btnScanMrz)
+return col
     }
+
 
     // ── UI Helpers ────────────────────────────────────────────────────────────
 
