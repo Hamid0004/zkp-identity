@@ -221,7 +221,11 @@ data class MrzInfo(
 
             return when {
                 // ── TD3: International Passport (88 chars, 2 lines of 44) ──
-                normalized.length >= 88 -> parseTd3(normalized)
+                // Allow 84+ chars with OCR error tolerance
+                normalized.length >= 84 -> {
+                    val padded = normalized.padEnd(88, '<')
+                    parseTd3(padded)
+                }
 
                 // ── TD1: National ID card (90 chars, 3 lines of 30) ──
                 normalized.length >= 90 -> parseTd1(normalized)
