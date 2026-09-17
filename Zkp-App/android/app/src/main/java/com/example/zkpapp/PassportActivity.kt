@@ -66,6 +66,7 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var tvCryptoRows:    TextView
     private lateinit var progressBar:     ProgressBar
     private lateinit var phoneIndicator:  LinearLayout
+    private lateinit var progressIndicator: ProgressBar
     private lateinit var stepBar:         LinearLayout
     private lateinit var btnScanMrz:      Button
     private var btnSimulate: Button? = null
@@ -537,6 +538,7 @@ class PassportActivity : AppCompatActivity() {
         // [A-5] Step bar DEFERRED — visible only after MRZ scan
         container.addView(buildStepBar().apply { visibility = View.GONE })
         container.addView(buildPhoneIndicator())  // Phone positioning visual
+        container.addView(buildProgressIndicator())  // Reading progress
         container.addView(buildStatusBanner())
         // [B-STATE] Morphing checklist
         container.addView(buildChecklist())
@@ -700,6 +702,16 @@ class PassportActivity : AppCompatActivity() {
         wrapper.addView(instruction)
         wrapper.addView(tip)
         return wrapper
+    }
+
+    // ═══ Progress indicator for READING state (B-STATE-3) ═══
+    private fun buildProgressIndicator(): View {
+        progressIndicator = ProgressBar(this).apply {
+            isIndeterminate = true
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(4))
+        }
+        return progressIndicator
     }
 
     private fun buildStatusBanner(): View {
@@ -1147,6 +1159,16 @@ return col
     }
 
     private fun renderChecklist(state: SessionState) {
+        // Show/hide progress indicator based on state
+        when (state) {
+            SessionState.READING, SessionState.SOD_READING -> {
+                progressIndicator.visibility = View.VISIBLE
+            }
+            else -> {
+                progressIndicator.visibility = View.GONE
+            }
+        }
+        
         checklistContainer.removeAllViews()
         val items = getChecklistForState(state)
         items.forEach { item ->
