@@ -921,7 +921,7 @@ class PassportActivity : AppCompatActivity() {
             letterSpacing = 0.2f
             setTextColor(Color.WHITE)
             background = gradientBg(Color.parseColor("#0055cc"), Color.parseColor("#00bcd4"), 16f)
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(52)).apply { setMargins(0,0,0,px(10)) }
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(52)).apply { setMargins(0, 0, 0, px(12)) }
             setPadding(0, 0, 0, 0)
             setOnClickListener {
                 cameraLauncher.launch(Intent(this@PassportActivity, CameraActivity::class.java))
@@ -936,9 +936,14 @@ class PassportActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
             setTextColor(Color.parseColor("#66aacc"))
-            background = cyberBorder(Color.parseColor("#1a3a4a"), 14f)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = px(14).toFloat()
+                setStroke(px(1), Color.parseColor("#2a5a6a"))
+                setColor(Color.parseColor("#0a1a2a"))
+            }
             layoutParams = LinearLayout.LayoutParams(MATCH, px(44)).apply { 
-                setMargins(0, px(6), 0, 0) 
+                setMargins(0, px(8), 0, 0) 
             }
             setPadding(px(16), px(10), px(16), px(10))
             elevation = 0f
