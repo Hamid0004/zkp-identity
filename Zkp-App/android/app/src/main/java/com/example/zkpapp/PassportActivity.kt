@@ -1163,6 +1163,8 @@ return col
         when (state) {
             SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
                 phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
+                phoneIndicator.alpha = 0f
+                phoneIndicator.animate().alpha(1f).setDuration(300).start()
                 progressIndicator.visibility = View.GONE
             }
             SessionState.READING, SessionState.SOD_READING -> {
@@ -1170,7 +1172,13 @@ return col
                 progressIndicator.visibility = View.VISIBLE
             }
             else -> {
-                phoneIndicator.visibility = View.GONE
+                // Fade out before hiding
+                if (phoneIndicator.visibility == View.VISIBLE) {
+                    phoneIndicator.animate().alpha(0f).setDuration(200).withEndAction {
+                        phoneIndicator.visibility = View.GONE
+                        phoneIndicator.alpha = 1f
+                    }.start()
+                }
                 progressIndicator.visibility = View.GONE
             }
         }
