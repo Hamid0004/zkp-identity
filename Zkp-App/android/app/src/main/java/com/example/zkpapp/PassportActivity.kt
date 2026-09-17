@@ -67,7 +67,7 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var progressBar:     ProgressBar
     private lateinit var stepBar:         LinearLayout
     private lateinit var btnScanMrz:      Button
-    private lateinit var btnSimulate:     Button
+    private var btnSimulate: Button? = null
     private lateinit var scrollView:      ScrollView
 
     // Colors
@@ -102,6 +102,8 @@ class PassportActivity : AppCompatActivity() {
             // [SESSION v2.0] DRY strings from SessionState — no hardcoded text
             updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
             updateStepBar(session.state.stepIndex)
+            stepBar.visibility = View.VISIBLE  // [A-5] reveal after MRZ
+        renderChecklist(session.state)
         }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -179,12 +181,13 @@ class PassportActivity : AppCompatActivity() {
         resetResultUI()
         progressBar.visibility = View.VISIBLE
         btnScanMrz.isEnabled  = false
-        btnSimulate.isEnabled = false
+        btnSimulate?.isEnabled = false
 
         // [SESSION v2.0] Advance to CONNECTING state — DRY status strings
         session = session.copy(state = SessionState.CONNECTING)
         updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
         updateStepBar(session.state.stepIndex)
+        renderChecklist(session.state)
 
         lifecycleScope.launch(Dispatchers.IO) {
             try {
@@ -208,13 +211,14 @@ class PassportActivity : AppCompatActivity() {
     private fun handleSuccess(data: PassportData) {
         progressBar.visibility = View.GONE
         btnScanMrz.isEnabled  = true
-        btnSimulate.isEnabled = true
+        btnSimulate?.isEnabled = true
 
         // [SESSION v2.0] DONE state
         session = session.copy(state = SessionState.DONE)
         performHapticFeedback()
         updateStatus(session.state.displayString, colorGreen, session.state.statusSub)
         updateStepBar(session.state.stepIndex)
+        renderChecklist(session.state)
 
         // Photo — use PassportData.getCachedPhoto() first (survives Parcel roundtrip)
         val photo = data.facePhoto
@@ -320,6 +324,7 @@ class PassportActivity : AppCompatActivity() {
         session = session.copy(state = SessionState.ZKP_GENERATING)
         updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
         updateStepBar(session.state.stepIndex)
+        renderChecklist(session.state)
 
         rustJob = lifecycleScope.launch {
             try {
@@ -338,6 +343,7 @@ class PassportActivity : AppCompatActivity() {
                         session = session.copy(state = SessionState.ZKP_READY)
                         updateStatus(session.state.displayString, colorGreen, session.state.statusSub)
                         updateStepBar(session.state.stepIndex)
+        renderChecklist(session.state)
                         showRustSuccess(data, rustResult.result)
                         showToast("🦁 ZK Proof Ready · ${session.minutesRemaining}min session")
                     }
@@ -420,40 +426,85 @@ class PassportActivity : AppCompatActivity() {
         return map[code.uppercase()] ?: "🌐 ${code.uppercase()}"
     }
 
+    // ═══ [B-STATE-5] Universal failure layout ═══
+    private data class FailureInfo(
+        val what: String, val why: String,
+        val action: String, val tip: String
+    )
+
+    private fun renderFailureCard(info: FailureInfo) {
+        cardIntegrity.visibility = View.VISIBLE
+        tvIntegrityRows.text = buildString {
+            appendLine("⚠️  ${info.what}")
+            if (info.why.isNotEmpty())    appendLine("📋  ${info.why}")
+            if (info.action.isNotEmpty()) appendLine("➡️  Action: ${info.action}")
+            if (info.tip.isNotEmpty())    appendLine("💡  Tip: ${info.tip}")
+        }
+        animateFadeIn(cardIntegrity)
+    }
+
     private fun handleError(e: Exception) {
         progressBar.visibility = View.GONE
         btnScanMrz.isEnabled  = true
-        btnSimulate.isEnabled = true
+        btnSimulate?.isEnabled = true
 
-        // [U-6] Error-type discrimination — specific message + specific action
-        val (msg, sub) = when (e) {
-            is TagLostException    -> "⚠️ CHIP CONNECTION LOST" to "Hold phone steady & retry"
-            is IOException         -> "⚠️ READ FAILED"          to "Remove case & retry"
-            is SecurityException   -> "❌ SECURITY ERROR"        to (e.message ?: "")
-            else -> when {
-                e.message?.contains("BAC", ignoreCase = true) == true ->
-                    "🔐 CHIP UNLOCK FAILED" to "MRZ data mismatch — re-scan MRZ"
-                e.message?.contains("SOD", ignoreCase = true) == true ->
-                    "⚠️ SECURITY DATA INCOMPLETE" to "Passport may be damaged — retry"
-                e.message?.contains("check digit", ignoreCase = true) == true ->
-                    "📷 MRZ DATA CORRUPTED" to "Re-scan in better lighting"
-                e.message?.contains("date_of_birth", ignoreCase = true) == true ->
-                    "⚠️ INVALID DATE IN SCAN" to "Re-scan MRZ — OCR misread"
-                e.message?.contains("device_rng", ignoreCase = true) == true ->
-                    "📱 DEVICE REGISTRATION ERROR" to "Restart app and retry"
-                e.message?.contains("device_pubkey", ignoreCase = true) == true ->
-                    "📱 DEVICE KEY ERROR" to "Restart app — Keystore issue"
-                e.message?.contains("expected_nationality", ignoreCase = true) == true ->
-                    "🌍 NATIONALITY MISMATCH" to "Passport nationality doesn't match selection"
-                else ->
-                    "❌ ENGINE ERROR" to (e.localizedMessage?.take(60) ?: "Unknown")
+        val failure = when (e) {
+            is TagLostException ->
+                FailureInfo("📵 CONNECTION LOST",
+                    "The phone moved during reading.",
+                    "Retry chip", "Hold still — reading takes 3-5 seconds")
+            is IOException ->
+                FailureInfo("⚠️ READ FAILED",
+                    "NFC communication interrupted.",
+                    "Remove case & retry", "Hold phone against passport back")
+            is SecurityException ->
+                FailureInfo("❌ SECURITY ERROR",
+                    e.message ?: "Access denied", "Retry", "")
+            else -> {
+                val em = e.message ?: ""
+                when {
+                    em.contains("BAC", ignoreCase = true) ->
+                        FailureInfo("🔐 CHIP UNLOCK FAILED",
+                            "Chip rejected the access key — MRZ likely misread.",
+                            "Re-scan MRZ", "Even 1 wrong digit blocks access")
+                    em.contains("SOD", ignoreCase = true) ->
+                        FailureInfo("⚠️ SECURITY DATA INCOMPLETE",
+                            "Security signature (SOD) not found — passport may be damaged.",
+                            "Retry", "If this keeps happening, chip may be faulty")
+                    em.contains("check digit", ignoreCase = true) ->
+                        FailureInfo("📷 MRZ DATA CORRUPTED",
+                            "Check digit mismatch — OCR misread a character.",
+                            "Re-scan MRZ", "Scan in better lighting")
+                    em.contains("date_of_birth", ignoreCase = true) ->
+                        FailureInfo("⚠️ INVALID DATE",
+                            "The MRZ contains an impossible date (OCR misread).",
+                            "Re-scan MRZ", "Better lighting improves OCR accuracy")
+                    em.contains("device_rng", ignoreCase = true) ->
+                        FailureInfo("📱 DEVICE ERROR",
+                            "Device registration data invalid.",
+                            "Restart app and retry", "")
+                    em.contains("device_pubkey", ignoreCase = true) ->
+                        FailureInfo("🔑 DEVICE KEY ERROR",
+                            "Device key invalid or too short.",
+                            "Restart app", "")
+                    em.contains("expected_nationality", ignoreCase = true) ->
+                        FailureInfo("🌍 NATIONALITY MISMATCH",
+                            "Passport nationality doesn't match selection.",
+                            "Check selection and retry", "")
+                    else ->
+                        FailureInfo("❌ ENGINE ERROR",
+                            e.localizedMessage?.take(80) ?: "Unknown error",
+                            "Retry", "")
+                }
             }
         }
-        // [SESSION v2.0] withError() — preserves mrzInfo, sets ERROR state + message
-        session = session.withError("$msg — $sub")
-        updateStatus(msg, colorRed, sub.uppercase())
+        session = session.withError("${failure.what} — ${failure.why}")
+        updateStatus(failure.what, colorRed, failure.action.uppercase())
         performErrorVibration()
+        renderChecklist(SessionState.ERROR)
+        renderFailureCard(failure)
     }
+
 
     // ── UI Builders ───────────────────────────────────────────────────────────
 
@@ -473,8 +524,13 @@ class PassportActivity : AppCompatActivity() {
         progressBar = ProgressBar(this).apply { visibility = View.GONE }
 
         container.addView(buildHeader())
-        container.addView(buildStepBar())
+        // [A-1/A-2/A-4] Screen A panel
+        container.addView(buildScreenAPanel())
+        // [A-5] Step bar DEFERRED — visible only after MRZ scan
+        container.addView(buildStepBar().apply { visibility = View.GONE })
         container.addView(buildStatusBanner())
+        // [B-STATE] Morphing checklist
+        container.addView(buildChecklist())
         container.addView(buildPhotoIdentityRow())
         container.addView(buildProofBar())
         container.addView(buildSectionLabel("RUST INTEGRITY REPORT"))
@@ -865,7 +921,7 @@ class PassportActivity : AppCompatActivity() {
             letterSpacing = 0.2f
             setTextColor(Color.WHITE)
             background = gradientBg(Color.parseColor("#0055cc"), Color.parseColor("#00bcd4"), 16f)
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(52)).apply { setMargins(0,0,0,px(10)) }
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(52)).apply { setMargins(0, 0, 0, px(12)) }
             setPadding(0, 0, 0, 0)
             setOnClickListener {
                 cameraLauncher.launch(Intent(this@PassportActivity, CameraActivity::class.java))
@@ -874,24 +930,191 @@ class PassportActivity : AppCompatActivity() {
 
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
-        btnSimulate = Button(this).apply {
-            text = "🧪  SIMULATE SCAN"
-            textSize = 11f
+            btnSimulate = Button(this).apply {
+            text = "🧪  SIMULATE (demo — no passport)"
+            textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.15f
-            setTextColor(colorCyan)
-            background = cyberBorder(colorBorder, 16f)
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(48))
-            setPadding(0, 0, 0, 0)
+            letterSpacing = 0.12f
+            setTextColor(Color.parseColor("#66aacc"))
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = px(14).toFloat()
+                setStroke(px(1), Color.parseColor("#2a5a6a"))
+                setColor(Color.parseColor("#0a1a2a"))
+            }
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(44)).apply { 
+                setMargins(0, px(8), 0, 0) 
+            }
+            setPadding(px(16), px(10), px(16), px(10))
+            elevation = 0f
+            stateListAnimator = null
             setOnClickListener { runSimulation() }
         }
-        } // [A-07/U-7] end BuildConfig.DEBUG gate
+        col.addView(btnSimulate)
+        }
 
-        col.addView(btnScanMrz)
-        return col
+col.addView(btnScanMrz)
+return col
     }
 
+
     // ── UI Helpers ────────────────────────────────────────────────────────────
+
+
+    // ═══ [A-1/A-2/A-4] Screen A panel — privacy promise + step label ═══
+    private fun buildScreenAPanel(): View {
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(20), px(8), px(20), px(8))
+        }
+        // A-2: Step 1 of 2 label
+        val stepLabel = TextView(this).apply {
+            text = "STEP 1 OF 2"
+            textSize = 9f
+            setTextColor(Color.parseColor("#447788"))
+            letterSpacing = 0.2f
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        // A-1: Privacy promise panel
+        val privacyCard = CardView(this).apply {
+            radius = px(14).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(Color.parseColor("#040e1a"))
+        }
+        val privacyInner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(14), px(14), px(14), px(14))
+        }
+        val privacyTitle = TextView(this).apply {
+            text = "🔒 Zero-Knowledge Verification"
+            textSize = 12f
+            setTextColor(colorCyan)
+            typeface = Typeface.DEFAULT_BOLD
+        }
+        val proveLine = TextView(this).apply {
+            text = "✓ Will be proven: Age 18+, Nationality"
+            textSize = 10f
+            setTextColor(colorGreen)
+        }
+        val hideLine = TextView(this).apply {
+            text = "🔒 Never leaves device: Name, Photo, Address"
+            textSize = 10f
+            setTextColor(Color.parseColor("#445566"))
+        }
+        privacyInner.addView(privacyTitle)
+        privacyInner.addView(spacer(8))
+        privacyInner.addView(proveLine)
+        privacyInner.addView(spacer(4))
+        privacyInner.addView(hideLine)
+        privacyCard.addView(privacyInner)
+        // A-4: Time/offline estimate
+        val estimate = TextView(this).apply {
+            text = "~2 minutes · Works offline · 🔒 Secure"
+            textSize = 9f
+            setTextColor(Color.parseColor("#445566"))
+            setPadding(0, px(8), 0, 0)
+        }
+        wrapper.addView(stepLabel)
+        wrapper.addView(spacer(6))
+        wrapper.addView(privacyCard)
+        wrapper.addView(estimate)
+        return wrapper
+    }
+
+    // ═══ [B-STATE] Checklist — morphing state renderer ═══
+    private data class ChecklistItem(val label: String, val state: CheckState)
+    private enum class CheckState { PENDING, ACTIVE, DONE, FAILED }
+
+    private fun getChecklistForState(state: SessionState): List<ChecklistItem> {
+        return when (state) {
+            SessionState.IDLE -> listOf(
+                ChecklistItem("MRZ scan", CheckState.PENDING),
+                ChecklistItem("Connect to chip", CheckState.PENDING),
+                ChecklistItem("Unlock & read data", CheckState.PENDING),
+                ChecklistItem("Verify signature", CheckState.PENDING))
+            SessionState.MRZ_SCANNED, SessionState.NFC_READY -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Connect to chip", CheckState.ACTIVE),
+                ChecklistItem("Unlock & read data", CheckState.PENDING),
+                ChecklistItem("Verify signature", CheckState.PENDING))
+            SessionState.CONNECTING, SessionState.ANALYZING_MRZ -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Chip connected", CheckState.DONE),
+                ChecklistItem("Unlocking (encrypted)", CheckState.ACTIVE),
+                ChecklistItem("Read & verify data", CheckState.PENDING))
+            SessionState.BAC_AUTH -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Chip connected", CheckState.DONE),
+                ChecklistItem("Unlocking (encrypted)", CheckState.ACTIVE),
+                ChecklistItem("Read & verify data", CheckState.PENDING))
+            SessionState.READING -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Chip unlocked", CheckState.DONE),
+                ChecklistItem("Reading identity data", CheckState.ACTIVE),
+                ChecklistItem("Verify signature", CheckState.PENDING))
+            SessionState.SOD_READING -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Chip unlocked", CheckState.DONE),
+                ChecklistItem("Identity data read", CheckState.DONE),
+                ChecklistItem("Verifying signature", CheckState.ACTIVE))
+            SessionState.DONE, SessionState.ZKP_GENERATING, SessionState.ZKP_READY -> listOf(
+                ChecklistItem("MRZ scanned", CheckState.DONE),
+                ChecklistItem("Chip unlocked", CheckState.DONE),
+                ChecklistItem("Identity data read", CheckState.DONE),
+                ChecklistItem("Signature verified", CheckState.DONE))
+            SessionState.ERROR -> listOf(
+                ChecklistItem("Error occurred", CheckState.FAILED))
+        }
+    }
+
+    private lateinit var checklistContainer: LinearLayout
+
+    private fun buildChecklist(): View {
+        checklistContainer = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(20), px(12), px(20), px(12))
+        }
+        return checklistContainer
+    }
+
+    private fun renderChecklist(state: SessionState) {
+        checklistContainer.removeAllViews()
+        val items = getChecklistForState(state)
+        items.forEach { item ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(0, px(6), 0, px(6))
+            }
+            val icon = TextView(this).apply {
+                textSize = 14f
+                text = when (item.state) {
+                    CheckState.DONE    -> "✅"
+                    CheckState.ACTIVE  -> "⏳"
+                    CheckState.FAILED  -> "❌"
+                    CheckState.PENDING -> "○"
+                }
+                layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
+                    setMargins(0, 0, px(10), 0)
+                }
+            }
+            val label = TextView(this).apply {
+                text = item.label
+                textSize = 12f
+                when (item.state) {
+                    CheckState.DONE    -> setTextColor(colorGreen)
+                    CheckState.ACTIVE  -> setTextColor(colorCyan)
+                    CheckState.FAILED  -> setTextColor(colorRed)
+                    CheckState.PENDING -> setTextColor(Color.parseColor("#445566"))
+                }
+                typeface = if (item.state == CheckState.ACTIVE)
+                    Typeface.DEFAULT_BOLD else Typeface.DEFAULT
+            }
+            row.addView(icon)
+            row.addView(label)
+            checklistContainer.addView(row)
+        }
+    }
 
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg

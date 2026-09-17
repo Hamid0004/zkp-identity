@@ -221,7 +221,11 @@ data class MrzInfo(
 
             return when {
                 // ── TD3: International Passport (88 chars, 2 lines of 44) ──
-                normalized.length >= 88 -> parseTd3(normalized)
+                // Allow 84+ chars with OCR error tolerance
+                normalized.length >= 84 -> {
+                    val padded = normalized.padEnd(88, '<')
+                    parseTd3(padded)
+                }
 
                 // ── TD1: National ID card (90 chars, 3 lines of 30) ──
                 normalized.length >= 90 -> parseTd1(normalized)
@@ -257,12 +261,14 @@ data class MrzInfo(
          */
         private fun parseTd3(mrz: String): MrzInfo {
             val line2 = mrz.substring(44, minOf(88, mrz.length))
+            
 
             val docNum  = line2.substring(0,  minOf(9,  line2.length)).trimEnd('<')
             val nat     = line2.substring(10, minOf(13, line2.length)).trimEnd('<')
             val dob     = line2.substring(13, minOf(19, line2.length))
             val gender  = if (line2.length > 20) line2[20].toString() else ""
             val expiry  = line2.substring(21, minOf(27, line2.length))
+            
 
             return MrzInfo(
                 raw            = mrz,
