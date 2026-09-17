@@ -1214,6 +1214,20 @@ return col
         tvPhotoLabel.visibility = View.VISIBLE
     }
 
+    // ═══ Pulse animation for chip connection feedback ═══
+    private fun animatePulse(v: View) {
+        val animator = ObjectAnimator.ofFloat(v, "scaleX", 1f, 1.1f, 1f)
+        animator.duration = 300
+        animator.repeatCount = 2
+        animator.interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+        animator.start()
+        
+        val alphaAnim = ObjectAnimator.ofFloat(v, "alpha", 1f, 0.6f, 1f)
+        alphaAnim.duration = 300
+        alphaAnim.repeatCount = 2
+        alphaAnim.start()
+    }
+
     private fun animateFadeIn(v: View) {
         v.visibility = View.VISIBLE
         v.alpha = 0f
