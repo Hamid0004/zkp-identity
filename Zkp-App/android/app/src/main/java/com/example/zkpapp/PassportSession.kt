@@ -257,12 +257,22 @@ data class MrzInfo(
          */
         private fun parseTd3(mrz: String): MrzInfo {
             val line2 = mrz.substring(44, minOf(88, mrz.length))
+            
+            android.util.Log.d("MRZ_PARSE", "mrz.length = ${mrz.length}")
+            android.util.Log.d("MRZ_PARSE", "line2 = [$line2]")
+            android.util.Log.d("MRZ_PARSE", "line2.length = ${line2.length}")
 
             val docNum  = line2.substring(0,  minOf(9,  line2.length)).trimEnd('<')
             val nat     = line2.substring(10, minOf(13, line2.length)).trimEnd('<')
             val dob     = line2.substring(13, minOf(19, line2.length))
             val gender  = if (line2.length > 20) line2[20].toString() else ""
             val expiry  = line2.substring(21, minOf(27, line2.length))
+            
+            android.util.Log.d("MRZ_PARSE", "docNum = [$docNum]")
+            android.util.Log.d("MRZ_PARSE", "nat = [$nat]")
+            android.util.Log.d("MRZ_PARSE", "dob = [$dob]")
+            android.util.Log.d("MRZ_PARSE", "gender = [$gender]")
+            android.util.Log.d("MRZ_PARSE", "expiry = [$expiry]")
 
             return MrzInfo(
                 raw            = mrz,
