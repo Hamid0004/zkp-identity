@@ -932,18 +932,21 @@ class PassportActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) {
             btnSimulate = Button(this).apply {
             text = "🧪  SIMULATE (demo — no passport)"
-            alpha = 0.55f  // [A-3] dimmed
-            textSize = 11f
+            textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.15f
-            setTextColor(colorCyan)
-            background = cyberBorder(colorBorder, 16f)
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(48))
-            setPadding(0, 0, 0, 0)
+            letterSpacing = 0.12f
+            setTextColor(Color.parseColor("#66aacc"))
+            background = cyberBorder(Color.parseColor("#1a3a4a"), 14f)
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(44)).apply { 
+                setMargins(0, px(6), 0, 0) 
+            }
+            setPadding(px(16), px(10), px(16), px(10))
+            elevation = 0f
+            stateListAnimator = null
             setOnClickListener { runSimulation() }
         }
-        col.addView(btnSimulate)  // ← ADD THIS LINE HERE
-}       // [A-07/U-7] end BuildConfig.DEBUG gate
+        col.addView(btnSimulate)
+        }
 
 col.addView(btnScanMrz)
 return col
