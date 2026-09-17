@@ -1159,12 +1159,18 @@ return col
     }
 
     private fun renderChecklist(state: SessionState) {
-        // Show/hide progress indicator based on state
+        // Show/hide phone indicator and progress indicator based on state
         when (state) {
+            SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
+                phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
+                progressIndicator.visibility = View.GONE
+            }
             SessionState.READING, SessionState.SOD_READING -> {
+                phoneIndicator.visibility = View.GONE
                 progressIndicator.visibility = View.VISIBLE
             }
             else -> {
+                phoneIndicator.visibility = View.GONE
                 progressIndicator.visibility = View.GONE
             }
         }
