@@ -117,7 +117,7 @@ class PassportActivity : AppCompatActivity() {
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         if (nfcAdapter == null) {
-            updateStatus("⚠️ NFC NOT AVAILABLE", colorRed, "SIMULATION MODE ONLY")
+            updateStatus("NFC NOT AVAILABLE", colorRed, "SIMULATION MODE ONLY")
             btnScanMrz.isEnabled = false
             btnScanMrz.alpha = 0.4f
         }
@@ -164,7 +164,7 @@ class PassportActivity : AppCompatActivity() {
         }
         val tag: Tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG) ?: return
         val isoDep = IsoDep.get(tag) ?: run {
-            updateStatus("❌ NOT AN E-PASSPORT", colorRed, "ISO DEP NOT FOUND")
+            updateStatus("NOT AN E-PASSPORT", colorRed, "ISO DEP NOT FOUND")
             return
         }
         startEngine(PassportMode.REAL, isoDep)
@@ -367,9 +367,9 @@ class PassportActivity : AppCompatActivity() {
         val modeLabel = if (result.inputMode == "NFC_PASSPORT") "REAL NFC" else "SIMULATED"
         // [U-2/K7] Trust-honest wording — no overclaim (A-06)
         val statusMsg = if (result.trusted) {
-            "✅ SIGNATURE VERIFIED"
+            "SIGNATURE VERIFIED"
         } else {
-            "🧪 DEMO PROOF"
+            "DEMO PROOF"
         }
         updateStatus(statusMsg, colorGreen, "$modeLabel · ZK PROOF GENERATED")
 
@@ -435,10 +435,10 @@ class PassportActivity : AppCompatActivity() {
     private fun renderFailureCard(info: FailureInfo) {
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text = buildString {
-            appendLine("⚠️  ${info.what}")
-            if (info.why.isNotEmpty())    appendLine("📋  ${info.why}")
-            if (info.action.isNotEmpty()) appendLine("➡️  Action: ${info.action}")
-            if (info.tip.isNotEmpty())    appendLine("💡  Tip: ${info.tip}")
+            appendLine("ERROR: ${info.what}")
+            if (info.why.isNotEmpty())    appendLine("CAUSE: ${info.why}")
+            if (info.action.isNotEmpty()) appendLine("ACTION: ${info.action}")
+            if (info.tip.isNotEmpty())    appendLine("TIP: ${info.tip}")
         }
         animateFadeIn(cardIntegrity)
     }
@@ -931,7 +931,7 @@ class PassportActivity : AppCompatActivity() {
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
             btnSimulate = Button(this).apply {
-            text = "🧪  SIMULATE (demo — no passport)"
+            text = "SIMULATE (demo — no passport)"
             textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
@@ -986,18 +986,18 @@ return col
             setPadding(px(14), px(14), px(14), px(14))
         }
         val privacyTitle = TextView(this).apply {
-            text = "🔒 Zero-Knowledge Verification"
+            text = "Zero-Knowledge Verification"
             textSize = 12f
             setTextColor(colorCyan)
             typeface = Typeface.DEFAULT_BOLD
         }
         val proveLine = TextView(this).apply {
-            text = "✓ Will be proven: Age 18+, Nationality"
+            text = "Will be proven: Age 18+, Nationality"
             textSize = 10f
             setTextColor(colorGreen)
         }
         val hideLine = TextView(this).apply {
-            text = "🔒 Never leaves device: Name, Photo, Address"
+            text = "Never leaves device: Name, Photo, Address"
             textSize = 10f
             setTextColor(Color.parseColor("#445566"))
         }
@@ -1009,7 +1009,7 @@ return col
         privacyCard.addView(privacyInner)
         // A-4: Time/offline estimate
         val estimate = TextView(this).apply {
-            text = "~2 minutes · Works offline · 🔒 Secure"
+            text = "~2 minutes · Works offline · Secure"
             textSize = 9f
             setTextColor(Color.parseColor("#445566"))
             setPadding(0, px(8), 0, 0)
@@ -1089,10 +1089,10 @@ return col
             val icon = TextView(this).apply {
                 textSize = 14f
                 text = when (item.state) {
-                    CheckState.DONE    -> "✅"
-                    CheckState.ACTIVE  -> "⏳"
-                    CheckState.FAILED  -> "❌"
-                    CheckState.PENDING -> "○"
+                    CheckState.DONE    -> "✓"
+                    CheckState.ACTIVE  -> "•"
+                    CheckState.FAILED  -> "✗"
+                    CheckState.PENDING -> ""
                 }
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
                     setMargins(0, 0, px(10), 0)
