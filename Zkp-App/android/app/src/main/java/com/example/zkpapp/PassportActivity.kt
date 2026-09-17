@@ -65,6 +65,7 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var cardCrypto:      CardView
     private lateinit var tvCryptoRows:    TextView
     private lateinit var progressBar:     ProgressBar
+    private lateinit var phoneIndicator:  LinearLayout
     private lateinit var stepBar:         LinearLayout
     private lateinit var btnScanMrz:      Button
     private var btnSimulate: Button? = null
@@ -535,6 +536,7 @@ class PassportActivity : AppCompatActivity() {
         container.addView(buildScreenAPanel())
         // [A-5] Step bar DEFERRED — visible only after MRZ scan
         container.addView(buildStepBar().apply { visibility = View.GONE })
+        container.addView(buildPhoneIndicator())  // Phone positioning visual
         container.addView(buildStatusBanner())
         // [B-STATE] Morphing checklist
         container.addView(buildChecklist())
@@ -638,6 +640,66 @@ class PassportActivity : AppCompatActivity() {
         }
         updateStepBar(0)
         return stepBar
+    }
+
+    // ═══ Phone positioning indicator (B-STATE-1) ═══
+    private fun buildPhoneIndicator(): View {
+        val wrapper = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(16), px(12), px(16), px(8))
+            gravity = Gravity.CENTER
+            visibility = View.GONE  // Hidden initially, shown in WAITING_CHIP state
+        }
+        
+        // Phone + passport visual
+        val visual = TextView(this).apply {
+            text = """
+                ┌─────────┐
+                │  📱     │
+                │         │
+                └─────────┘
+                   ↓↓
+                ┌─────────┐
+                │PASSPORT │
+                │  NFC    │
+                │  chip   │
+                └─────────┘
+            """.trimIndent()
+            textSize = 10f
+            setTextColor(colorCyan)
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(px(12), px(8), px(12), px(8))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#0a141f"))
+                setStroke(1, Color.parseColor("#1a3a4a"))
+                cornerRadius = px(8).toFloat()
+            }
+        }
+        
+        // Instruction text
+        val instruction = TextView(this).apply {
+            text = "Hold phone steady against passport back"
+            textSize = 11f
+            setTextColor(Color.parseColor("#88ccee"))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, px(8), 0, 0)
+        }
+        
+        // Remove case tip
+        val tip = TextView(this).apply {
+            text = "Remove phone case if NFC not detecting"
+            textSize = 9f
+            setTextColor(Color.parseColor("#667788"))
+            gravity = Gravity.CENTER
+            setPadding(0, px(4), 0, 0)
+        }
+        
+        wrapper.addView(visual)
+        wrapper.addView(instruction)
+        wrapper.addView(tip)
+        return wrapper
     }
 
     private fun buildStatusBanner(): View {
