@@ -185,7 +185,7 @@ class PassportActivity : AppCompatActivity() {
 
         // [SESSION v2.0] Advance to CONNECTING state — DRY status strings
         session = session.copy(state = SessionState.CONNECTING)
-        updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
+        updateStatus("CHIP FOUND — UNLOCKING", colorCyan, "Encrypted channel · Keep phone still")
         updateStepBar(session.state.stepIndex)
         renderChecklist(session.state)
 
@@ -248,6 +248,12 @@ class PassportActivity : AppCompatActivity() {
             val cipher    = keyStoreManager.getCipherForEncryption()
             val cryptoObj = androidx.biometric.BiometricPrompt.CryptoObject(cipher)
 
+            // Announce next phase before biometric prompt
+            updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
+            
+            // Announce next phase before biometric prompt
+            updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
+            
             biometricManager.authenticateUser(
                 activity     = this,
                 cryptoObject = cryptoObj,
@@ -383,10 +389,11 @@ class PassportActivity : AppCompatActivity() {
         // Integrity card
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text =
-            // [A-05/K7] Local identity display only — never sent to network
-            "👤  ${data.firstName} ${data.lastName}\n" +
-            "🔒  Integrity:  ${result.integrityCheck}\n" +
-            "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}"
+        // [A-05/K7] Local identity display only — never sent to network
+        "👤  ${data.firstName} ${data.lastName}\n" +
+        "🔒  Integrity:  ${result.integrityCheck}\n" +
+        "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}\n" +
+        "🔒  Data:       Encrypted on device"
         animateFadeIn(cardIntegrity)
 
         // Crypto card
