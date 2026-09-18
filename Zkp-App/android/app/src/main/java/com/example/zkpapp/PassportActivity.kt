@@ -65,6 +65,8 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var cardCrypto:      CardView
     private lateinit var tvCryptoRows:    TextView
     private lateinit var progressBar:     ProgressBar
+    private lateinit var phoneIndicator:  LinearLayout
+    private lateinit var progressIndicator: ProgressBar
     private lateinit var stepBar:         LinearLayout
     private lateinit var btnScanMrz:      Button
     private var btnSimulate: Button? = null
@@ -117,7 +119,7 @@ class PassportActivity : AppCompatActivity() {
 
         nfcAdapter = NfcAdapter.getDefaultAdapter(this)
         if (nfcAdapter == null) {
-            updateStatus("⚠️ NFC NOT AVAILABLE", colorRed, "SIMULATION MODE ONLY")
+            updateStatus("NFC NOT AVAILABLE", colorRed, "SIMULATION MODE ONLY")
             btnScanMrz.isEnabled = false
             btnScanMrz.alpha = 0.4f
         }
@@ -164,7 +166,7 @@ class PassportActivity : AppCompatActivity() {
         }
         val tag: Tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG) ?: return
         val isoDep = IsoDep.get(tag) ?: run {
-            updateStatus("❌ NOT AN E-PASSPORT", colorRed, "ISO DEP NOT FOUND")
+            updateStatus("NOT AN E-PASSPORT", colorRed, "ISO DEP NOT FOUND")
             return
         }
         startEngine(PassportMode.REAL, isoDep)
@@ -185,7 +187,7 @@ class PassportActivity : AppCompatActivity() {
 
         // [SESSION v2.0] Advance to CONNECTING state — DRY status strings
         session = session.copy(state = SessionState.CONNECTING)
-        updateStatus(session.state.displayString, colorCyan, session.state.statusSub)
+        updateStatus("CHIP FOUND — UNLOCKING", colorCyan, "Encrypted channel · Keep phone still")
         updateStepBar(session.state.stepIndex)
         renderChecklist(session.state)
 
@@ -248,6 +250,12 @@ class PassportActivity : AppCompatActivity() {
             val cipher    = keyStoreManager.getCipherForEncryption()
             val cryptoObj = androidx.biometric.BiometricPrompt.CryptoObject(cipher)
 
+            // Announce next phase before biometric prompt
+            updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
+            
+            // Announce next phase before biometric prompt
+            updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
+            
             biometricManager.authenticateUser(
                 activity     = this,
                 cryptoObject = cryptoObj,
@@ -367,9 +375,9 @@ class PassportActivity : AppCompatActivity() {
         val modeLabel = if (result.inputMode == "NFC_PASSPORT") "REAL NFC" else "SIMULATED"
         // [U-2/K7] Trust-honest wording — no overclaim (A-06)
         val statusMsg = if (result.trusted) {
-            "✅ SIGNATURE VERIFIED"
+            "SIGNATURE VERIFIED"
         } else {
-            "🧪 DEMO PROOF"
+            "DEMO PROOF"
         }
         updateStatus(statusMsg, colorGreen, "$modeLabel · ZK PROOF GENERATED")
 
@@ -383,10 +391,11 @@ class PassportActivity : AppCompatActivity() {
         // Integrity card
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text =
-            // [A-05/K7] Local identity display only — never sent to network
-            "👤  ${data.firstName} ${data.lastName}\n" +
-            "🔒  Integrity:  ${result.integrityCheck}\n" +
-            "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}"
+        // [A-05/K7] Local identity display only — never sent to network
+        "👤  ${data.firstName} ${data.lastName}\n" +
+        "🔒  Integrity:  ${result.integrityCheck}\n" +
+        "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}\n" +
+        "🔒  Data:       Encrypted on device"
         animateFadeIn(cardIntegrity)
 
         // Crypto card
@@ -435,10 +444,10 @@ class PassportActivity : AppCompatActivity() {
     private fun renderFailureCard(info: FailureInfo) {
         cardIntegrity.visibility = View.VISIBLE
         tvIntegrityRows.text = buildString {
-            appendLine("⚠️  ${info.what}")
-            if (info.why.isNotEmpty())    appendLine("📋  ${info.why}")
-            if (info.action.isNotEmpty()) appendLine("➡️  Action: ${info.action}")
-            if (info.tip.isNotEmpty())    appendLine("💡  Tip: ${info.tip}")
+            appendLine("ERROR: ${info.what}")
+            if (info.why.isNotEmpty())    appendLine("CAUSE: ${info.why}")
+            if (info.action.isNotEmpty()) appendLine("ACTION: ${info.action}")
+            if (info.tip.isNotEmpty())    appendLine("TIP: ${info.tip}")
         }
         animateFadeIn(cardIntegrity)
     }
@@ -528,6 +537,8 @@ class PassportActivity : AppCompatActivity() {
         container.addView(buildScreenAPanel())
         // [A-5] Step bar DEFERRED — visible only after MRZ scan
         container.addView(buildStepBar().apply { visibility = View.GONE })
+        container.addView(buildPhoneIndicator())  // Phone positioning visual
+        container.addView(buildProgressIndicator())  // Reading progress
         container.addView(buildStatusBanner())
         // [B-STATE] Morphing checklist
         container.addView(buildChecklist())
@@ -633,6 +644,77 @@ class PassportActivity : AppCompatActivity() {
         return stepBar
     }
 
+    // ═══ Phone positioning indicator (B-STATE-1) ═══
+    private fun buildPhoneIndicator(): View {
+        phoneIndicator = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(16), px(12), px(16), px(8))
+            gravity = Gravity.CENTER
+            visibility = View.GONE  // Hidden initially, shown in WAITING_CHIP state
+        }
+        val wrapper = phoneIndicator
+        
+        // Phone + passport visual
+        val visual = TextView(this).apply {
+            text = """
+                ┌─────────┐
+                │  📱     │
+                │         │
+                └─────────┘
+                   ↓↓
+                ┌─────────┐
+                │PASSPORT │
+                │  NFC    │
+                │  chip   │
+                └─────────┘
+            """.trimIndent()
+            textSize = 10f
+            setTextColor(colorCyan)
+            typeface = Typeface.MONOSPACE
+            gravity = Gravity.CENTER
+            setPadding(px(12), px(8), px(12), px(8))
+            background = GradientDrawable().apply {
+                setColor(Color.parseColor("#0a141f"))
+                setStroke(1, Color.parseColor("#1a3a4a"))
+                cornerRadius = px(8).toFloat()
+            }
+        }
+        
+        // Instruction text
+        val instruction = TextView(this).apply {
+            text = "Hold phone steady against passport back"
+            textSize = 11f
+            setTextColor(Color.parseColor("#88ccee"))
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+            setPadding(0, px(8), 0, 0)
+        }
+        
+        // Remove case tip
+        val tip = TextView(this).apply {
+            text = "Remove phone case if NFC not detecting"
+            textSize = 9f
+            setTextColor(Color.parseColor("#667788"))
+            gravity = Gravity.CENTER
+            setPadding(0, px(4), 0, 0)
+        }
+        
+        wrapper.addView(visual)
+        wrapper.addView(instruction)
+        wrapper.addView(tip)
+        return wrapper
+    }
+
+    // ═══ Progress indicator for READING state (B-STATE-3) ═══
+    private fun buildProgressIndicator(): View {
+        progressIndicator = ProgressBar(this).apply {
+            isIndeterminate = true
+            visibility = View.GONE
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(4))
+        }
+        return progressIndicator
+    }
+
     private fun buildStatusBanner(): View {
         val wrapper = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -650,9 +732,9 @@ class PassportActivity : AppCompatActivity() {
         }
         tvStatusDot = TextView(this).apply {
             text = "●"
-            textSize = 10f
+            textSize = 14f
             setTextColor(Color.GRAY)
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(10), 0) }
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(12), 0) }
         }
         val textCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -661,16 +743,16 @@ class PassportActivity : AppCompatActivity() {
         tvStatusMsg = TextView(this).apply {
             // [SESSION v2.0] Initial text from SessionState.IDLE.displayString
             text = SessionState.IDLE.displayString
-            textSize = 11f
+            textSize = 14f
             setTextColor(Color.GRAY)
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.12f
+            letterSpacing = 0.05f
         }
         tvStatusSub = TextView(this).apply {
             text = SessionState.IDLE.statusSub
-            textSize = 9f
-            setTextColor(Color.parseColor("#334455"))
-            letterSpacing = 0.08f
+            textSize = 12f
+            setTextColor(Color.parseColor("#445566"))
+            letterSpacing = 0.03f
         }
         textCol.addView(tvStatusMsg)
         textCol.addView(tvStatusSub)
@@ -931,7 +1013,7 @@ class PassportActivity : AppCompatActivity() {
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
             btnSimulate = Button(this).apply {
-            text = "🧪  SIMULATE (demo — no passport)"
+            text = "SIMULATE (demo — no passport)"
             textSize = 10f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
@@ -986,18 +1068,18 @@ return col
             setPadding(px(14), px(14), px(14), px(14))
         }
         val privacyTitle = TextView(this).apply {
-            text = "🔒 Zero-Knowledge Verification"
+            text = "Zero-Knowledge Verification"
             textSize = 12f
             setTextColor(colorCyan)
             typeface = Typeface.DEFAULT_BOLD
         }
         val proveLine = TextView(this).apply {
-            text = "✓ Will be proven: Age 18+, Nationality"
+            text = "Will be proven: Age 18+, Nationality"
             textSize = 10f
             setTextColor(colorGreen)
         }
         val hideLine = TextView(this).apply {
-            text = "🔒 Never leaves device: Name, Photo, Address"
+            text = "Never leaves device: Name, Photo, Address"
             textSize = 10f
             setTextColor(Color.parseColor("#445566"))
         }
@@ -1009,7 +1091,7 @@ return col
         privacyCard.addView(privacyInner)
         // A-4: Time/offline estimate
         val estimate = TextView(this).apply {
-            text = "~2 minutes · Works offline · 🔒 Secure"
+            text = "~2 minutes · Works offline · Secure"
             textSize = 9f
             setTextColor(Color.parseColor("#445566"))
             setPadding(0, px(8), 0, 0)
@@ -1078,21 +1160,59 @@ return col
     }
 
     private fun renderChecklist(state: SessionState) {
+        // Show/hide phone indicator and progress indicator based on state
+        when (state) {
+            SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
+                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
+                phoneIndicator.alpha = 0f
+                phoneIndicator.animate().alpha(1f).setDuration(300).start()
+                progressIndicator.visibility = View.GONE
+            }
+            SessionState.READING, SessionState.SOD_READING -> {
+                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.GONE
+                progressIndicator.visibility = View.VISIBLE
+            }
+            else -> {
+                // Fade out before hiding
+                if (phoneIndicator.visibility == View.VISIBLE) {
+                    phoneIndicator.animate().alpha(0f).setDuration(200).withEndAction {
+                        phoneIndicator.visibility = View.GONE
+                        phoneIndicator.alpha = 1f
+                    }.start()
+                }
+                progressIndicator.visibility = View.GONE
+            }
+        }
+        
         checklistContainer.removeAllViews()
         val items = getChecklistForState(state)
         items.forEach { item ->
+            val bgColor = when (item.state) {
+                CheckState.DONE -> Color.parseColor("#0a2a1a")
+                CheckState.ACTIVE -> Color.parseColor("#0a1a2a")
+                CheckState.FAILED -> Color.parseColor("#2a0a0a")
+                CheckState.PENDING -> Color.parseColor("#0a0f1a")
+            }
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, px(6), 0, px(6))
+                setPadding(px(12), px(10), px(12), px(10))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = px(8).toFloat()
+                    setColor(bgColor)
+                }
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                    setMargins(0, 0, 0, px(4))
+                }
             }
             val icon = TextView(this).apply {
                 textSize = 14f
                 text = when (item.state) {
-                    CheckState.DONE    -> "✅"
-                    CheckState.ACTIVE  -> "⏳"
-                    CheckState.FAILED  -> "❌"
-                    CheckState.PENDING -> "○"
+                    CheckState.DONE    -> "✓"
+                    CheckState.ACTIVE  -> "•"
+                    CheckState.FAILED  -> "✗"
+                    CheckState.PENDING -> ""
                 }
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
                     setMargins(0, 0, px(10), 0)
@@ -1100,7 +1220,7 @@ return col
             }
             val label = TextView(this).apply {
                 text = item.label
-                textSize = 12f
+                textSize = 14f
                 when (item.state) {
                     CheckState.DONE    -> setTextColor(colorGreen)
                     CheckState.ACTIVE  -> setTextColor(colorCyan)
@@ -1143,6 +1263,20 @@ return col
         photoView.setImageDrawable(null)
         photoView.visibility    = View.GONE
         tvPhotoLabel.visibility = View.VISIBLE
+    }
+
+    // ═══ Pulse animation for chip connection feedback ═══
+    private fun animatePulse(v: View) {
+        val animator = ObjectAnimator.ofFloat(v, "scaleX", 1f, 1.1f, 1f)
+        animator.duration = 300
+        animator.repeatCount = 2
+        animator.interpolator = android.view.animation.AccelerateDecelerateInterpolator()
+        animator.start()
+        
+        val alphaAnim = ObjectAnimator.ofFloat(v, "alpha", 1f, 0.6f, 1f)
+        alphaAnim.duration = 300
+        alphaAnim.repeatCount = 2
+        alphaAnim.start()
     }
 
     private fun animateFadeIn(v: View) {
