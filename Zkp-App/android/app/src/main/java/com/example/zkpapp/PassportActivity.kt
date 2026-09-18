@@ -732,9 +732,9 @@ class PassportActivity : AppCompatActivity() {
         }
         tvStatusDot = TextView(this).apply {
             text = "●"
-            textSize = 10f
+            textSize = 14f
             setTextColor(Color.GRAY)
-            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(10), 0) }
+            layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(12), 0) }
         }
         val textCol = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -743,16 +743,16 @@ class PassportActivity : AppCompatActivity() {
         tvStatusMsg = TextView(this).apply {
             // [SESSION v2.0] Initial text from SessionState.IDLE.displayString
             text = SessionState.IDLE.displayString
-            textSize = 11f
+            textSize = 14f
             setTextColor(Color.GRAY)
             typeface = Typeface.DEFAULT_BOLD
-            letterSpacing = 0.12f
+            letterSpacing = 0.05f
         }
         tvStatusSub = TextView(this).apply {
             text = SessionState.IDLE.statusSub
-            textSize = 9f
-            setTextColor(Color.parseColor("#334455"))
-            letterSpacing = 0.08f
+            textSize = 12f
+            setTextColor(Color.parseColor("#445566"))
+            letterSpacing = 0.03f
         }
         textCol.addView(tvStatusMsg)
         textCol.addView(tvStatusSub)
@@ -1187,10 +1187,24 @@ return col
         checklistContainer.removeAllViews()
         val items = getChecklistForState(state)
         items.forEach { item ->
+            val bgColor = when (item.state) {
+                CheckState.DONE -> Color.parseColor("#0a2a1a")
+                CheckState.ACTIVE -> Color.parseColor("#0a1a2a")
+                CheckState.FAILED -> Color.parseColor("#2a0a0a")
+                CheckState.PENDING -> Color.parseColor("#0a0f1a")
+            }
             val row = LinearLayout(this).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, px(6), 0, px(6))
+                setPadding(px(12), px(10), px(12), px(10))
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = px(8).toFloat()
+                    setColor(bgColor)
+                }
+                layoutParams = LinearLayout.LayoutParams(MATCH, WRAP).apply {
+                    setMargins(0, 0, 0, px(4))
+                }
             }
             val icon = TextView(this).apply {
                 textSize = 14f
@@ -1206,7 +1220,7 @@ return col
             }
             val label = TextView(this).apply {
                 text = item.label
-                textSize = 12f
+                textSize = 14f
                 when (item.state) {
                     CheckState.DONE    -> setTextColor(colorGreen)
                     CheckState.ACTIVE  -> setTextColor(colorCyan)
