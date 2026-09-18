@@ -646,12 +646,13 @@ class PassportActivity : AppCompatActivity() {
 
     // ═══ Phone positioning indicator (B-STATE-1) ═══
     private fun buildPhoneIndicator(): View {
-        val wrapper = LinearLayout(this).apply {
+        phoneIndicator = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(px(16), px(12), px(16), px(8))
             gravity = Gravity.CENTER
             visibility = View.GONE  // Hidden initially, shown in WAITING_CHIP state
         }
+        val wrapper = phoneIndicator
         
         // Phone + passport visual
         val visual = TextView(this).apply {
@@ -1162,13 +1163,13 @@ return col
         // Show/hide phone indicator and progress indicator based on state
         when (state) {
             SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
-                phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
+                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
                 phoneIndicator.alpha = 0f
                 phoneIndicator.animate().alpha(1f).setDuration(300).start()
                 progressIndicator.visibility = View.GONE
             }
             SessionState.READING, SessionState.SOD_READING -> {
-                phoneIndicator.visibility = View.GONE
+                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.GONE
                 progressIndicator.visibility = View.VISIBLE
             }
             else -> {
