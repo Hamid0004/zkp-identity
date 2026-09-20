@@ -72,6 +72,7 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var cardProof:       CardView
     private lateinit var tvProofHash:     TextView
     private lateinit var tvProofTime:     TextView
+    private lateinit var tvCountdown:   TextView
     private lateinit var cardIntegrity:   CardView
     private lateinit var tvIntegrityRows: TextView
     private lateinit var cardCrypto:      CardView
@@ -420,11 +421,29 @@ class PassportActivity : AppCompatActivity() {
             "🔑  Algorithm:  RSA-2048 + Poseidon\n" +
             "⚡  ZK Proof:   ${result.zkProofStatus}\n" +
             "📦  Proof Type: $proofType\n" +
-            if (zkOutput != null) "⏰  Expires:    ${
-                java.text.SimpleDateFormat("HH:mm:ss", java.util.Locale.getDefault())
-                    .format(java.util.Date(zkOutput.validUntil * 1000))
-            }" else "🔗  HW Binding: NONE"
+            if (zkOutput != null) "HW Binding: ACTIVE" else "HW Binding: NONE"
         animateFadeIn(cardCrypto)
+        
+        // Phase 3: Start Live Countdown Timer
+        if (zkOutput != null) {
+            val endTime = zkOutput.validUntil * 1000L
+            lifecycleScope.launch {
+                while (System.currentTimeMillis() < endTime && !isFinishing) {
+                    val remaining = endTime - System.currentTimeMillis()
+                    val mins = (remaining / 1000) / 60
+                    val secs = (remaining / 1000) % 60
+                    tvCountdown.text = String.format("Valid for %02d:%02d", mins, secs)
+                    delay(1000)
+                }
+                if (!isFinishing) {
+                    tvCountdown.text = "EXPIRED"
+                    tvCountdown.setTextColor(colorError)
+                }
+            }
+        } else {
+            tvCountdown.text = "Session: Persistent"
+            tvCountdown.setTextColor(colorTextMuted)
+        }
 
         scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
     }
@@ -909,6 +928,14 @@ class PassportActivity : AppCompatActivity() {
         }
         timeCol.addView(tvProofTime)
         timeCol.addView(generatedLbl)
+        tvCountdown = TextView(this).apply {
+            text = "Valid for --:--"
+            textSize = 11f
+            setTextColor(colorAccent)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.END
+        }
+        timeCol.addView(tvCountdown)
 
         inner.addView(icon)
         inner.addView(infoCol)
@@ -972,7 +999,13 @@ class PassportActivity : AppCompatActivity() {
                 20f
             )
         }
-        header.addView(icon); header.addView(title); header.addView(badge)
+        val chevron = TextView(this).apply {
+            text = "▼"
+            textSize = 14f
+            setTextColor(colorTextMuted)
+            setPadding(px(8), 0, px(4), 0)
+        }
+        header.addView(icon); header.addView(title); header.addView(badge); header.addView(chevron)
 
         val div = View(this).apply {
             layoutParams = LinearLayout.LayoutParams(MATCH, 1)
@@ -992,6 +1025,13 @@ class PassportActivity : AppCompatActivity() {
         body.addView(tv)
 
         inner.addView(header); inner.addView(div); inner.addView(body)
+        
+        header.setOnClickListener {
+            val isVisible = body.visibility == View.VISIBLE
+            body.visibility = if (isVisible) View.GONE else View.VISIBLE
+            div.visibility = if (isVisible) View.GONE else View.VISIBLE
+            chevron.text = if (isVisible) "▶" else "▼"
+        }
         card.addView(inner)
         wrapper.addView(card)
 
