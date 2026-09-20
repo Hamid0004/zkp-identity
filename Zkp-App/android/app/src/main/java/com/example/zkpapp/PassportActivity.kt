@@ -940,6 +940,7 @@ class PassportActivity : AppCompatActivity() {
         inner.addView(icon)
         inner.addView(infoCol)
         inner.addView(timeCol)
+        cardProof.contentDescription = "Zero Knowledge Proof generation status and countdown timer"
         cardProof.addView(inner)
         wrapper.addView(cardProof)
         return wrapper
@@ -1329,6 +1330,14 @@ return col
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg
         tvStatusMsg.setTextColor(color)
+        
+        // Phase 4: Accessibility - Announce state changes to screen readers
+        if (::statusBanner.isInitialized) {
+            statusBanner.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
+        }
+        if (::tvStatusMsg.isInitialized) {
+            tvStatusMsg.announceForAccessibility("$msg. $sub")
+        }
         tvStatusDot.setTextColor(color)
         tvStatusSub.text = sub
     }
