@@ -27,7 +27,6 @@ import java.util.concurrent.atomic.AtomicLong
 
 class PassportActivity : AppCompatActivity() {
 
-
     // ── Phase 1 Design Tokens (WCAG AA compliant) ──────────────────────────
     private val colorBgDark      = Color.parseColor("#020810")
     private val colorSurface     = Color.parseColor("#040e1a")
@@ -200,6 +199,7 @@ class PassportActivity : AppCompatActivity() {
         // [SESSION v2.0] Advance to CONNECTING state — DRY status strings
         session = session.copy(state = SessionState.CONNECTING)
         updateStatus("CHIP FOUND — UNLOCKING", colorCyan, "Encrypted channel · Keep phone still")
+        performHaptic(HapticType.CHIP_CONNECT)
         updateStepBar(session.state.stepIndex)
         renderChecklist(session.state)
 
@@ -229,7 +229,7 @@ class PassportActivity : AppCompatActivity() {
 
         // [SESSION v2.0] DONE state
         session = session.copy(state = SessionState.DONE)
-        performHapticFeedback()
+        performHaptic(HapticType.SUCCESS)
         updateStatus(session.state.displayString, colorGreen, session.state.statusSub)
         updateStepBar(session.state.stepIndex)
         renderChecklist(session.state)
@@ -369,13 +369,13 @@ class PassportActivity : AppCompatActivity() {
                     }
                     is SecurityGate.ProofResult.Failure -> {
                         showRustError(rustResult.reason)
-                        performErrorVibration()
+                        performHaptic(HapticType.ERROR)
                     }
                 }
             } catch (e: Exception) {
                 if (!isFinishing && !isDestroyed) {
                     showRustError(e.message ?: "Proof generation failed")
-                    performErrorVibration()
+                    performHaptic(HapticType.ERROR)
                 }
             } finally {
                 isNfcBusy.set(false)
@@ -521,11 +521,10 @@ class PassportActivity : AppCompatActivity() {
         }
         session = session.withError("${failure.what} — ${failure.why}")
         updateStatus(failure.what, colorRed, failure.action.uppercase())
-        performErrorVibration()
+        performHaptic(HapticType.ERROR)
         renderChecklist(SessionState.ERROR)
         renderFailureCard(failure)
     }
-
 
     // ── UI Builders ───────────────────────────────────────────────────────────
 
@@ -1051,9 +1050,7 @@ col.addView(btnScanMrz)
 return col
     }
 
-
     // ── UI Helpers ────────────────────────────────────────────────────────────
-
 
     // ═══ [A-1/A-2/A-4] Screen A panel — privacy promise + step label ═══
     private fun buildScreenAPanel(): View {
@@ -1248,6 +1245,46 @@ return col
         }
     }
 
+    // ── Phase 2: State-Specific Haptics ───────────────────────────────────────
+    enum class HapticType { SUCCESS, ERROR, CHIP_CONNECT, STEP_COMPLETE, PROOF_READY }
+    
+    private fun performHaptic(type: HapticType) {
+        try {
+            val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val effect = when (type) {
+                    HapticType.SUCCESS -> VibrationEffect.createOneShot(40, 255)
+                    HapticType.ERROR -> VibrationEffect.createWaveform(longArrayOf(0, 100, 50, 100), -1)
+                    HapticType.CHIP_CONNECT -> VibrationEffect.createOneShot(20, 120)
+                    HapticType.STEP_COMPLETE -> VibrationEffect.createOneShot(15, 200)
+                    HapticType.PROOF_READY -> VibrationEffect.createWaveform(longArrayOf(0, 30, 50, 30, 50, 30), -1)
+                }
+                v.vibrate(effect)
+            } else {
+                v.vibrate(if (type == HapticType.ERROR) 300 else 40)
+            }
+        } catch (_: Exception) {}
+    }
+
+    // ── Phase 2: Status Dot Pulse Animation ───────────────────────────────────
+    private var dotPulseAnimator: ObjectAnimator? = null
+
+    private fun startDotPulse() {
+        dotPulseAnimator?.cancel()
+        if (!::tvStatusDot.isInitialized) return
+        dotPulseAnimator = ObjectAnimator.ofFloat(tvStatusDot, "alpha", 1f, 0.2f).apply {
+            duration = 600
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            start()
+        }
+    }
+
+    private fun stopDotPulse() {
+        dotPulseAnimator?.cancel()
+        if (::tvStatusDot.isInitialized) tvStatusDot.alpha = 1f
+    }
+
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg
         tvStatusMsg.setTextColor(color)
@@ -1326,21 +1363,4 @@ return col
 
     // ── Haptics ───────────────────────────────────────────────────────────────
 
-    private fun performHapticFeedback() {
-        try {
-            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                v.vibrate(VibrationEffect.createOneShot(200, VibrationEffect.DEFAULT_AMPLITUDE))
-            else v.vibrate(200)
-        } catch (_: Exception) {}
-    }
-
-    private fun performErrorVibration() {
-        try {
-            val v = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                v.vibrate(VibrationEffect.createWaveform(longArrayOf(0,100,100,100), -1))
-            else v.vibrate(300)
-        } catch (_: Exception) {}
-    }
 }
