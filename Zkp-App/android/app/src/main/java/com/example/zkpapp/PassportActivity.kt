@@ -27,6 +27,19 @@ import java.util.concurrent.atomic.AtomicLong
 
 class PassportActivity : AppCompatActivity() {
 
+
+    // ── Phase 1 Design Tokens (WCAG AA compliant) ──────────────────────────
+    private val colorBgDark      = Color.parseColor("#020810")
+    private val colorSurface     = Color.parseColor("#040e1a")
+    private val colorAccent      = Color.parseColor("#00e5ff")
+    private val colorSuccess     = Color.parseColor("#00e676")
+    private val colorError       = Color.parseColor("#ff1744")
+    private val colorWarning     = Color.parseColor("#ff9100")
+    private val colorInfo        = Color.parseColor("#00b8d4")
+    private val colorTextMain    = Color.parseColor("#e8f4f8")
+    private val colorTextMuted   = Color.parseColor("#8B98A8")
+    private val colorTextFaint   = Color.parseColor("#5a6878")
+    private val colorBorder      = Color.parseColor("#1a3a4a")
     // ── Security ──────────────────────────────────────────────────────────────
     private val keyStoreManager  = com.example.zkpapp.security.KeyStoreManager()
     private val biometricManager by lazy { com.example.zkpapp.security.ZkBiometricManager(this) }
@@ -79,7 +92,6 @@ class PassportActivity : AppCompatActivity() {
     private val colorGreen    = Color.parseColor("#00ff88")
     private val colorRed      = Color.parseColor("#ff3366")
     private val colorGold     = Color.parseColor("#ffd700")
-    private val colorBorder   = Color.parseColor("#1a3a4a")
     private val colorCardBg   = Color.parseColor("#070e1a")
 
     // ── Camera Launcher ───────────────────────────────────────────────────────
@@ -587,7 +599,7 @@ class PassportActivity : AppCompatActivity() {
         }
         tvSubHeader = TextView(this).apply {
             text = "ICAO 9303  ·  BAC  ·  ZK PROOF"
-            textSize = 9f
+            textSize = 12f
             setTextColor(Color.parseColor("#447788"))
             letterSpacing = 0.1f
         }
@@ -627,10 +639,10 @@ class PassportActivity : AppCompatActivity() {
         steps.forEachIndexed { i, s ->
             val chip = TextView(this).apply {
                 text = s
-                textSize = 9f
+                textSize = 12f
                 typeface = Typeface.DEFAULT_BOLD
                 setPadding(px(12), px(6), px(12), px(6))
-                setTextColor(Color.parseColor("#334455"))
+                setTextColor(colorTextMuted)
                 background = cyberBorder(colorBorder, 20f)
                 letterSpacing = 0.1f
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
@@ -668,7 +680,7 @@ class PassportActivity : AppCompatActivity() {
                 │  chip   │
                 └─────────┘
             """.trimIndent()
-            textSize = 10f
+            textSize = 12f
             setTextColor(colorCyan)
             typeface = Typeface.MONOSPACE
             gravity = Gravity.CENTER
@@ -683,7 +695,7 @@ class PassportActivity : AppCompatActivity() {
         // Instruction text
         val instruction = TextView(this).apply {
             text = "Hold phone steady against passport back"
-            textSize = 11f
+            textSize = 13f
             setTextColor(Color.parseColor("#88ccee"))
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.CENTER
@@ -693,8 +705,8 @@ class PassportActivity : AppCompatActivity() {
         // Remove case tip
         val tip = TextView(this).apply {
             text = "Remove phone case if NFC not detecting"
-            textSize = 9f
-            setTextColor(Color.parseColor("#667788"))
+            textSize = 12f
+            setTextColor(colorTextMuted)
             gravity = Gravity.CENTER
             setPadding(0, px(4), 0, 0)
         }
@@ -751,7 +763,7 @@ class PassportActivity : AppCompatActivity() {
         tvStatusSub = TextView(this).apply {
             text = SessionState.IDLE.statusSub
             textSize = 12f
-            setTextColor(Color.parseColor("#445566"))
+            setTextColor(colorTextMuted)
             letterSpacing = 0.03f
         }
         textCol.addView(tvStatusMsg)
@@ -785,8 +797,8 @@ class PassportActivity : AppCompatActivity() {
         }
         tvPhotoLabel = TextView(this).apply {
             text = "👤\nPHOTO"
-            textSize = 10f
-            setTextColor(Color.parseColor("#334455"))
+            textSize = 12f
+            setTextColor(colorTextMuted)
             gravity = Gravity.CENTER
             letterSpacing = 0.1f
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER)
@@ -810,8 +822,8 @@ class PassportActivity : AppCompatActivity() {
         fun idRow(label: String): Pair<TextView, TextView> {
             val lbl = TextView(this).apply {
                 text = label
-                textSize = 9f
-                setTextColor(Color.parseColor("#445566"))
+                textSize = 12f
+                setTextColor(colorTextMuted)
                 letterSpacing = 0.1f
             }
             val `val` = TextView(this).apply {
@@ -830,8 +842,8 @@ class PassportActivity : AppCompatActivity() {
         val (_, nat) = idRow("NATIONALITY");  tvNationality = nat
         val (_, sod) = idRow("SOD STATUS");   tvSodStatus = sod
         val (_, mod) = idRow("MODE");         tvMode = mod
-        mod.textSize = 10f
-        mod.setTextColor(Color.parseColor("#445566"))
+        mod.textSize = 12f
+        mod.setTextColor(colorTextMuted)
 
         cardIdentity.addView(idInner)
         row.addView(photoFrame)
@@ -865,14 +877,14 @@ class PassportActivity : AppCompatActivity() {
         }
         val proofTitle = TextView(this).apply {
             text = "PLONKY2 ZK PROOF"
-            textSize = 9f
+            textSize = 12f
             setTextColor(colorGreen)
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.15f
         }
         tvProofHash = TextView(this).apply {
             text = "SHA256 · aarch64"
-            textSize = 9f
+            textSize = 12f
             setTextColor(Color.parseColor("#224433"))
         }
         infoCol.addView(proofTitle)
@@ -910,8 +922,8 @@ class PassportActivity : AppCompatActivity() {
     private fun buildSectionLabel(text: String): View {
         return TextView(this).apply {
             this.text = text
-            textSize = 9f
-            setTextColor(Color.parseColor("#445566"))
+            textSize = 12f
+            setTextColor(colorTextMuted)
             setPadding(px(16), px(14), px(16), px(6))
             letterSpacing = 0.2f
             typeface = Typeface.DEFAULT_BOLD
@@ -945,7 +957,7 @@ class PassportActivity : AppCompatActivity() {
         }
         val title = TextView(this).apply {
             text = if (isIntegrity) "PASSPORT ENGINE" else "CRYPTO ENGINE"
-            textSize = 10f
+            textSize = 12f
             setTextColor(colorCyan)
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.15f
@@ -953,7 +965,7 @@ class PassportActivity : AppCompatActivity() {
         }
         val badge = TextView(this).apply {
             text = if (isIntegrity) "VERIFIED" else "SIMULATED"
-            textSize = 9f
+            textSize = 12f
             setPadding(px(8), px(4), px(8), px(4))
             setTextColor(if (isIntegrity) colorGreen else colorCyan)
             background = cyberBorder(
@@ -975,7 +987,7 @@ class PassportActivity : AppCompatActivity() {
         val tv = TextView(this).apply {
             text = "—"
             textSize = 12f
-            setTextColor(Color.parseColor("#445566"))
+            setTextColor(colorTextMuted)
             lineHeight = (textSize * 2.2f).toInt()
         }
         body.addView(tv)
@@ -1014,7 +1026,7 @@ class PassportActivity : AppCompatActivity() {
         if (BuildConfig.DEBUG) {
             btnSimulate = Button(this).apply {
             text = "SIMULATE (demo — no passport)"
-            textSize = 10f
+            textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
             setTextColor(Color.parseColor("#66aacc"))
@@ -1052,7 +1064,7 @@ return col
         // A-2: Step 1 of 2 label
         val stepLabel = TextView(this).apply {
             text = "STEP 1 OF 2"
-            textSize = 9f
+            textSize = 12f
             setTextColor(Color.parseColor("#447788"))
             letterSpacing = 0.2f
             typeface = Typeface.DEFAULT_BOLD
@@ -1075,13 +1087,13 @@ return col
         }
         val proveLine = TextView(this).apply {
             text = "Will be proven: Age 18+, Nationality"
-            textSize = 10f
+            textSize = 12f
             setTextColor(colorGreen)
         }
         val hideLine = TextView(this).apply {
             text = "Never leaves device: Name, Photo, Address"
-            textSize = 10f
-            setTextColor(Color.parseColor("#445566"))
+            textSize = 12f
+            setTextColor(colorTextMuted)
         }
         privacyInner.addView(privacyTitle)
         privacyInner.addView(spacer(8))
@@ -1092,8 +1104,8 @@ return col
         // A-4: Time/offline estimate
         val estimate = TextView(this).apply {
             text = "~2 minutes · Works offline · Secure"
-            textSize = 9f
-            setTextColor(Color.parseColor("#445566"))
+            textSize = 12f
+            setTextColor(colorTextMuted)
             setPadding(0, px(8), 0, 0)
         }
         wrapper.addView(stepLabel)
@@ -1225,7 +1237,7 @@ return col
                     CheckState.DONE    -> setTextColor(colorGreen)
                     CheckState.ACTIVE  -> setTextColor(colorCyan)
                     CheckState.FAILED  -> setTextColor(colorRed)
-                    CheckState.PENDING -> setTextColor(Color.parseColor("#445566"))
+                    CheckState.PENDING -> setTextColor(colorTextMuted)
                 }
                 typeface = if (item.state == CheckState.ACTIVE)
                     Typeface.DEFAULT_BOLD else Typeface.DEFAULT
