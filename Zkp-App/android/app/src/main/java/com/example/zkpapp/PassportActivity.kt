@@ -1268,6 +1268,7 @@ return col
 
     // ── Phase 2: Status Dot Pulse Animation ───────────────────────────────────
     private var dotPulseAnimator: ObjectAnimator? = null
+    private val stepAnimators = mutableMapOf<Int, ObjectAnimator>()
 
     private fun startDotPulse() {
         dotPulseAnimator?.cancel()
@@ -1362,5 +1363,14 @@ return col
     private val WRAP  = LinearLayout.LayoutParams.WRAP_CONTENT
 
     // ── Haptics ───────────────────────────────────────────────────────────────
+
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Phase 2: Clean up step bar animations
+        stepAnimators.values.forEach { it.cancel() }
+        stepAnimators.clear()
+        dotPulseAnimator?.cancel()
+    }
 
 }
