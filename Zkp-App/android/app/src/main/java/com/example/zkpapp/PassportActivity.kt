@@ -39,6 +39,15 @@ class PassportActivity : AppCompatActivity() {
     private val colorTextMuted   = Color.parseColor("#8B98A8")
     private val colorTextFaint   = Color.parseColor("#5a6878")
     private val colorBorder      = Color.parseColor("#1a3a4a")
+    
+    // ── Legacy Aliases (backward compatibility) ─────────────────────────────
+    // Map old variable names to new Phase 1 tokens
+    private val colorCardBg     = colorSurface   // #040e1a
+    private val colorCyan       = colorAccent    // #00e5ff
+    private val colorGreen      = colorSuccess   // #00e676
+    private val colorRed        = colorError     // #ff1744
+    private val colorOrange     = colorWarning   // #ff9100
+    private val colorGold       = Color.parseColor("#ffd700")  // Keep for legacy use
     // ── Security ──────────────────────────────────────────────────────────────
     private val keyStoreManager  = com.example.zkpapp.security.KeyStoreManager()
     private val biometricManager by lazy { com.example.zkpapp.security.ZkBiometricManager(this) }
@@ -88,11 +97,6 @@ class PassportActivity : AppCompatActivity() {
     // Colors
     private val colorBg       = Color.parseColor("#020810")
     private val colorBg2      = Color.parseColor("#050f1e")
-    private val colorCyan     = Color.parseColor("#00f5ff")
-    private val colorGreen    = Color.parseColor("#00ff88")
-    private val colorRed      = Color.parseColor("#ff3366")
-    private val colorGold     = Color.parseColor("#ffd700")
-    private val colorCardBg   = Color.parseColor("#070e1a")
 
     // ── Camera Launcher ───────────────────────────────────────────────────────
     private val cameraLauncher =
