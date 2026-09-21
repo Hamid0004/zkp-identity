@@ -1,5 +1,7 @@
 package com.example.zkpapp
 
+import com.example.zkpapp.ui.DesignTokens
+
 import android.animation.*
 import android.app.PendingIntent
 import android.content.Context
@@ -27,27 +29,23 @@ import java.util.concurrent.atomic.AtomicLong
 
 class PassportActivity : AppCompatActivity() {
 
-    // ── Phase 1 Design Tokens (WCAG AA compliant) ──────────────────────────
-    private val colorBgDark      = Color.parseColor("#020810")
-    private val colorSurface     = Color.parseColor("#040e1a")
-    private val colorAccent      = Color.parseColor("#00e5ff")
-    private val colorSuccess     = Color.parseColor("#00e676")
-    private val colorError       = Color.parseColor("#ff1744")
-    private val colorWarning     = Color.parseColor("#ff9100")
-    private val colorInfo        = Color.parseColor("#00b8d4")
-    private val colorTextMain    = Color.parseColor("#e8f4f8")
-    private val colorTextMuted   = Color.parseColor("#8B98A8")
-    private val colorTextFaint   = Color.parseColor("#5a6878")
-    private val colorBorder      = Color.parseColor("#1a3a4a")
+    // ── Design Tokens ────────────────────────────────────────────────────────
+    private val colorBg        = DesignTokens.bgDark
+    private val colorBg2       = DesignTokens.bgElevated
+    private val colorSurface   = DesignTokens.surface
+    private val colorCardBg    = DesignTokens.surface
+    private val colorAccent    = DesignTokens.accent
+    private val colorCyan      = DesignTokens.accent
+    private val colorGreen     = DesignTokens.success
+    private val colorRed       = DesignTokens.error
+    private val colorOrange    = DesignTokens.warning
+    private val colorTextMain  = DesignTokens.textMain
+    private val colorTextMuted = DesignTokens.textMuted
+    private val colorTextFaint = DesignTokens.textFaint
+    private val colorBorder    = DesignTokens.border
+
+
     
-    // ── Legacy Aliases (backward compatibility) ─────────────────────────────
-    // Map old variable names to new Phase 1 tokens
-    private val colorCardBg     = colorSurface   // #040e1a
-    private val colorCyan       = colorAccent    // #00e5ff
-    private val colorGreen      = colorSuccess   // #00e676
-    private val colorRed        = colorError     // #ff1744
-    private val colorOrange     = colorWarning   // #ff9100
-    private val colorGold       = Color.parseColor("#ffd700")  // Keep for legacy use
     // ── Security ──────────────────────────────────────────────────────────────
     private val keyStoreManager  = com.example.zkpapp.security.KeyStoreManager()
     private val biometricManager by lazy { com.example.zkpapp.security.ZkBiometricManager(this) }
@@ -94,9 +92,6 @@ class PassportActivity : AppCompatActivity() {
     private var btnSimulate: Button? = null
     private lateinit var scrollView:      ScrollView
 
-    // Colors
-    private val colorBg       = Color.parseColor("#020810")
-    private val colorBg2      = Color.parseColor("#050f1e")
 
     // ── Camera Launcher ───────────────────────────────────────────────────────
     private val cameraLauncher =
@@ -441,7 +436,7 @@ class PassportActivity : AppCompatActivity() {
                 }
                 if (!isFinishing) {
                     tvCountdown.text = "EXPIRED"
-                    tvCountdown.setTextColor(colorError)
+                    tvCountdown.setTextColor(colorRed)
                 }
             }
         } else {
