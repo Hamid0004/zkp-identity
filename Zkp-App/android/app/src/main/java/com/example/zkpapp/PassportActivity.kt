@@ -299,7 +299,7 @@ class PassportActivity : AppCompatActivity() {
                     )
                     startZkProofGeneration(data)
                 },
-                onError = { errMsg ->
+                onError = { _ ->
                     // Biometric cancelled or failed — do NOT proceed to proof
                     // Identity saved to RAM only; user must re-authenticate to generate proof
                     saveIdentityRamOnly(data)
@@ -1272,6 +1272,7 @@ return col
     // ── Phase 2: State-Specific Haptics ───────────────────────────────────────
     enum class HapticType { SUCCESS, ERROR, CHIP_CONNECT, STEP_COMPLETE, PROOF_READY }
     
+    @Suppress("DEPRECATION")
     private fun performHaptic(type: HapticType) {
         try {
             val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
@@ -1433,10 +1434,7 @@ return col
     private val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
     private val WRAP  = LinearLayout.LayoutParams.WRAP_CONTENT
 
-    // ── Haptics ───────────────────────────────────────────────────────────────
-
-
-        override fun onDestroy() {
+    override fun onDestroy() {
         countdownJob?.cancel()
         super.onDestroy()
         // Phase 2: Clean up step bar animations
