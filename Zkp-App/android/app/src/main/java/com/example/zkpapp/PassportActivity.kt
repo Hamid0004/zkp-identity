@@ -905,7 +905,7 @@ class PassportActivity : AppCompatActivity() {
         }
         val generatedLbl = TextView(this).apply {
             text = "GENERATED"
-            textSize = 8f
+            textSize = 11f
             setTextColor(Color.parseColor("#224433"))
             letterSpacing = 0.1f
             gravity = Gravity.END
@@ -914,7 +914,7 @@ class PassportActivity : AppCompatActivity() {
         timeCol.addView(generatedLbl)
         tvCountdown = TextView(this).apply {
             text = "Valid for --:--"
-            textSize = 11f
+            textSize = 13f
             setTextColor(colorAccent)
             typeface = Typeface.DEFAULT_BOLD
             gravity = Gravity.END
