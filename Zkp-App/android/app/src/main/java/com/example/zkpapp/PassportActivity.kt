@@ -737,6 +737,7 @@ class PassportActivity : AppCompatActivity() {
             radius = px(14).toFloat()
             cardElevation = 0f
             setCardBackgroundColor(Color.parseColor("#040e1a"))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         val inner = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1352,16 +1353,9 @@ return col
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg
         tvStatusMsg.setTextColor(color)
-        
-        // Phase 4: Accessibility - Announce state changes to screen readers
-        if (::statusBanner.isInitialized) {
-            statusBanner.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
-        if (::tvStatusMsg.isInitialized) {
-            tvStatusMsg.announceForAccessibility("$msg. $sub")
-        }
         tvStatusDot.setTextColor(color)
         tvStatusSub.text = sub
+        // Live region (set in buildStatusBanner) handles screen reader announcement
     }
 
     private fun updateStepBar(activeIndex: Int) {
