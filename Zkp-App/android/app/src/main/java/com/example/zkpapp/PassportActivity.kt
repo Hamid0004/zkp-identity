@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.Lifecycle
 import kotlinx.coroutines.*
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
@@ -59,6 +60,7 @@ class PassportActivity : AppCompatActivity() {
     // ── Session ───────────────────────────────────────────────────────────────
     private var session  = PassportSession()
     private var rustJob: Job? = null
+    private var countdownJob: Job? = null
 
     // ── UI References ─────────────────────────────────────────────────────────
     private lateinit var tvHeader:        TextView
@@ -297,7 +299,7 @@ class PassportActivity : AppCompatActivity() {
                     )
                     startZkProofGeneration(data)
                 },
-                onError = { errMsg ->
+                onError = { _ ->
                     // Biometric cancelled or failed — do NOT proceed to proof
                     // Identity saved to RAM only; user must re-authenticate to generate proof
                     saveIdentityRamOnly(data)
@@ -423,26 +425,8 @@ class PassportActivity : AppCompatActivity() {
             if (zkOutput != null) "HW Binding: ACTIVE" else "HW Binding: NONE"
         animateFadeIn(cardCrypto)
         
-        // Phase 3: Start Live Countdown Timer
-        if (zkOutput != null) {
-            val endTime = zkOutput.validUntil * 1000L
-            lifecycleScope.launch {
-                while (System.currentTimeMillis() < endTime && !isFinishing) {
-                    val remaining = endTime - System.currentTimeMillis()
-                    val mins = (remaining / 1000) / 60
-                    val secs = (remaining / 1000) % 60
-                    tvCountdown.text = String.format("Valid for %02d:%02d", mins, secs)
-                    delay(1000)
-                }
-                if (!isFinishing) {
-                    tvCountdown.text = "EXPIRED"
-                    tvCountdown.setTextColor(colorRed)
-                }
-            }
-        } else {
-            tvCountdown.text = "Session: Persistent"
-            tvCountdown.setTextColor(colorTextMuted)
-        }
+                // Phase 1: Lifecycle-aware countdown
+        startCountdown(zkOutput?.validUntil)
 
         scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
     }
@@ -753,6 +737,7 @@ class PassportActivity : AppCompatActivity() {
             radius = px(14).toFloat()
             cardElevation = 0f
             setCardBackgroundColor(Color.parseColor("#040e1a"))
+            accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
         }
         val inner = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -1004,6 +989,7 @@ class PassportActivity : AppCompatActivity() {
             textSize = 14f
             setTextColor(colorTextMuted)
             setPadding(px(8), 0, px(4), 0)
+            rotation = 180f  // collapsed state — chevron points up
         }
         header.addView(icon); header.addView(title); header.addView(badge); header.addView(chevron)
 
@@ -1026,11 +1012,17 @@ class PassportActivity : AppCompatActivity() {
 
         inner.addView(header); inner.addView(div); inner.addView(body)
         
+        // Collapsible state — starts collapsed
+        var isExpanded = false
+        body.visibility = View.GONE
+
         header.setOnClickListener {
-            val isVisible = body.visibility == View.VISIBLE
-            body.visibility = if (isVisible) View.GONE else View.VISIBLE
-            div.visibility = if (isVisible) View.GONE else View.VISIBLE
-            chevron.text = if (isVisible) "▶" else "▼"
+            isExpanded = !isExpanded
+            body.visibility = if (isExpanded) View.VISIBLE else View.GONE
+            chevron.animate()
+                .rotation(if (isExpanded) 0f else 180f)
+                .setDuration(200)
+                .start()
         }
         card.addView(inner)
         wrapper.addView(card)
@@ -1288,6 +1280,7 @@ return col
     // ── Phase 2: State-Specific Haptics ───────────────────────────────────────
     enum class HapticType { SUCCESS, ERROR, CHIP_CONNECT, STEP_COMPLETE, PROOF_READY }
     
+    @Suppress("DEPRECATION")
     private fun performHaptic(type: HapticType) {
         try {
             val v = getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator ?: return
@@ -1326,19 +1319,50 @@ return col
         if (::tvStatusDot.isInitialized) tvStatusDot.alpha = 1f
     }
 
+        private fun startCountdown(validUntilSec: Long?) {
+        countdownJob?.cancel()
+
+        if (validUntilSec == null) {
+            tvCountdown.text = "Session: Persistent"
+            tvCountdown.setTextColor(colorTextMuted)
+            return
+        }
+
+        val endTime = validUntilSec * 1000L
+        countdownJob = lifecycleScope.launch {
+            while (isActive
+                && System.currentTimeMillis() < endTime
+                && !isFinishing
+                && !isDestroyed
+            ) {
+                if (lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+                    val remaining = endTime - System.currentTimeMillis()
+                    val mins = (remaining / 60_000).toInt()
+                    val secs = ((remaining / 1000) % 60).toInt()
+                    tvCountdown.text = "Valid for %02d:%02d".format(mins, secs)
+                    tvCountdown.setTextColor(
+                        when {
+                            remaining < 30_000 -> colorRed
+                            remaining < 60_000 -> colorOrange
+                            else -> colorAccent
+                        }
+                    )
+                }
+                delay(1000)
+            }
+            if (!isFinishing && !isDestroyed) {
+                tvCountdown.text = "EXPIRED"
+                tvCountdown.setTextColor(colorRed)
+            }
+        }
+    }
+
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg
         tvStatusMsg.setTextColor(color)
-        
-        // Phase 4: Accessibility - Announce state changes to screen readers
-        if (::statusBanner.isInitialized) {
-            statusBanner.accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE
-        }
-        if (::tvStatusMsg.isInitialized) {
-            tvStatusMsg.announceForAccessibility("$msg. $sub")
-        }
         tvStatusDot.setTextColor(color)
         tvStatusSub.text = sub
+        // Live region (set in buildStatusBanner) handles screen reader announcement
     }
 
     private fun updateStepBar(activeIndex: Int) {
@@ -1353,7 +1377,8 @@ return col
         }
     }
 
-    private fun resetResultUI() {
+        private fun resetResultUI() {
+        countdownJob?.cancel()
         cardIdentity.visibility  = View.INVISIBLE
         cardProof.visibility     = View.GONE
         cardIntegrity.visibility = View.GONE
@@ -1410,10 +1435,8 @@ return col
     private val MATCH = LinearLayout.LayoutParams.MATCH_PARENT
     private val WRAP  = LinearLayout.LayoutParams.WRAP_CONTENT
 
-    // ── Haptics ───────────────────────────────────────────────────────────────
-
-
     override fun onDestroy() {
+        countdownJob?.cancel()
         super.onDestroy()
         // Phase 2: Clean up step bar animations
         stepAnimators.values.forEach { it.cancel() }
