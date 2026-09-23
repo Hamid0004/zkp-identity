@@ -989,6 +989,7 @@ class PassportActivity : AppCompatActivity() {
             textSize = 14f
             setTextColor(colorTextMuted)
             setPadding(px(8), 0, px(4), 0)
+            rotation = 180f  // collapsed state — chevron points up
         }
         header.addView(icon); header.addView(title); header.addView(badge); header.addView(chevron)
 
@@ -1011,11 +1012,17 @@ class PassportActivity : AppCompatActivity() {
 
         inner.addView(header); inner.addView(div); inner.addView(body)
         
+        // Collapsible state — starts collapsed
+        var isExpanded = false
+        body.visibility = View.GONE
+
         header.setOnClickListener {
-            val isVisible = body.visibility == View.VISIBLE
-            body.visibility = if (isVisible) View.GONE else View.VISIBLE
-            div.visibility = if (isVisible) View.GONE else View.VISIBLE
-            chevron.text = if (isVisible) "▶" else "▼"
+            isExpanded = !isExpanded
+            body.visibility = if (isExpanded) View.VISIBLE else View.GONE
+            chevron.animate()
+                .rotation(if (isExpanded) 0f else 180f)
+                .setDuration(200)
+                .start()
         }
         card.addView(inner)
         wrapper.addView(card)
