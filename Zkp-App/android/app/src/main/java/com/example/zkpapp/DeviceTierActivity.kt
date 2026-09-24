@@ -15,6 +15,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.cardview.widget.CardView
 import androidx.core.content.ContextCompat
 import com.example.zkpapp.security.ZkBiometricManager
+import com.example.zkpapp.ui.DesignTokens
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.launch
 
@@ -41,7 +42,7 @@ class DeviceTierActivity : AppCompatActivity() {
 
     // ── Colors ────────────────────────────────────────────────────────────────
     private val colorBg     = Color.parseColor("#020810")
-    private val colorCyan   = Color.parseColor("#00f5ff")
+    private val colorCyan   = DesignTokens.accent
     private val colorGreen  = Color.parseColor("#00ff88")
     private val colorRed    = Color.parseColor("#ff3366")
     private val colorGold   = Color.parseColor("#ffd700")

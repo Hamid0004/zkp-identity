@@ -177,7 +177,12 @@ class PassportActivity : AppCompatActivity() {
             showToast("⚠️ Scan MRZ first!")
             return
         }
-        val tag: Tag = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG) ?: return
+        val tag: Tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+        } ?: return
         val isoDep = IsoDep.get(tag) ?: run {
             updateStatus("NOT AN E-PASSPORT", colorRed, "ISO DEP NOT FOUND")
             return
@@ -906,7 +911,7 @@ class PassportActivity : AppCompatActivity() {
         val generatedLbl = TextView(this).apply {
             text = "GENERATED"
             textSize = 11f
-            setTextColor(Color.parseColor("#224433"))
+            setTextColor(DesignTokens.textFaint)
             letterSpacing = 0.1f
             gravity = Gravity.END
         }

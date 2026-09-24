@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="./docs/assets/banner.png" alt="ZKAuth — Offline Zero-Knowledge Identity Verifier" width="100%">
+</div>
+
 # ZKAuth — Offline Zero-Knowledge Identity Verifier
 
 > Privacy-preserving identity verification for Android — no blockchain, no internet required.
