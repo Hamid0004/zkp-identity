@@ -18,7 +18,7 @@ class TierSelectionActivity : AppCompatActivity() {
 
     private val colorBg       = Color.parseColor("#020810")
     private val colorBg2      = Color.parseColor("#050f1e")
-    private val colorCyan     = Color.parseColor("#00f5ff")
+    private val colorCyan     = DesignTokens.accent
     private val colorGreen    = Color.parseColor("#00ff88")
     private val colorRed      = Color.parseColor("#ff3366")
     private val colorGold     = Color.parseColor("#ffd700")
