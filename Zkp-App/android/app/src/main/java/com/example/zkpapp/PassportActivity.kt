@@ -14,6 +14,7 @@ import android.nfc.Tag
 import android.nfc.TagLostException
 import android.nfc.tech.IsoDep
 import android.os.*
+import android.provider.Settings
 import android.view.*
 import android.view.animation.*
 import android.widget.*
@@ -61,6 +62,17 @@ class PassportActivity : AppCompatActivity() {
     private var session  = PassportSession()
     private var rustJob: Job? = null
     private var countdownJob: Job? = null
+
+    // Respect system "Remove animations" accessibility setting
+    private val reduceMotion: Boolean by lazy {
+        try {
+            Settings.Global.getFloat(
+                contentResolver,
+                Settings.Global.ANIMATOR_DURATION_SCALE,
+                1f
+            ) == 0f
+        } catch (_: Exception) { false }
+    }
 
     // ── UI References ─────────────────────────────────────────────────────────
     private lateinit var tvHeader:        TextView
@@ -792,6 +804,7 @@ class PassportActivity : AppCompatActivity() {
             radius = px(16).toFloat()
             cardElevation = 0f
             setCardBackgroundColor(Color.parseColor("#040e1a"))
+            contentDescription = "Passport photo — verify this is you"
             layoutParams = LinearLayout.LayoutParams(px(130), px(170)).apply {
                 setMargins(0, 0, px(14), 0)
             }
@@ -954,6 +967,10 @@ class PassportActivity : AppCompatActivity() {
             radius = px(16).toFloat()
             cardElevation = 0f
             setCardBackgroundColor(colorCardBg)
+            contentDescription = if (isIntegrity)
+                "Passport integrity report — tap to expand"
+            else
+                "Cryptographic proof report — tap to expand"
             visibility = View.GONE
         }
         val inner = LinearLayout(this).apply {
@@ -1050,6 +1067,7 @@ class PassportActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.2f
             setTextColor(Color.WHITE)
+            contentDescription = "Scan passport MRZ — opens camera"
             background = gradientBg(Color.parseColor("#0055cc"), Color.parseColor("#00bcd4"), 16f)
             layoutParams = LinearLayout.LayoutParams(MATCH, px(52)).apply { setMargins(0, 0, 0, px(12)) }
             setPadding(0, 0, 0, 0)
@@ -1066,6 +1084,7 @@ class PassportActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.12f
             setTextColor(Color.parseColor("#66aacc"))
+            contentDescription = "Simulate passport scan — demo mode only"
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE
                 cornerRadius = px(14).toFloat()
@@ -1073,7 +1092,7 @@ class PassportActivity : AppCompatActivity() {
                 setColor(Color.parseColor("#0a1a2a"))
             }
             layoutParams = LinearLayout.LayoutParams(MATCH, px(44)).apply { 
-                setMargins(0, px(8), 0, 0) 
+                setMargins(0, px(8), 0, px(14)) 
             }
             setPadding(px(16), px(10), px(16), px(10))
             elevation = 0f
@@ -1311,6 +1330,10 @@ return col
     private fun startDotPulse() {
         dotPulseAnimator?.cancel()
         if (!::tvStatusDot.isInitialized) return
+        if (reduceMotion) {
+            tvStatusDot.alpha = 1f
+            return
+        }
         dotPulseAnimator = ObjectAnimator.ofFloat(tvStatusDot, "alpha", 1f, 0.2f).apply {
             duration = 600
             repeatCount = ObjectAnimator.INFINITE
@@ -1365,9 +1388,15 @@ return col
     private fun updateStatus(msg: String, color: Int, sub: String = "") {
         tvStatusMsg.text = msg
         tvStatusMsg.setTextColor(color)
-        tvStatusDot.setTextColor(color)
         tvStatusSub.text = sub
-        // Live region (set in buildStatusBanner) handles screen reader announcement
+        tvStatusDot.setTextColor(color)
+
+        // Pulse dot only for active states (accent/cyan); static for terminal states
+        if (color == colorCyan || color == colorAccent) {
+            startDotPulse()
+        } else {
+            stopDotPulse()
+        }
     }
 
     private fun updateStepBar(activeIndex: Int) {
@@ -1409,6 +1438,10 @@ return col
 
     private fun animateFadeIn(v: View) {
         v.visibility = View.VISIBLE
+        if (reduceMotion) {
+            v.alpha = 1f
+            return
+        }
         v.alpha = 0f
         v.animate().alpha(1f).setDuration(400).start()
     }
