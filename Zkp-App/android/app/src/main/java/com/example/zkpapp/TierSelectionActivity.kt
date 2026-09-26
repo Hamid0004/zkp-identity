@@ -117,7 +117,7 @@ class TierSelectionActivity : AppCompatActivity() {
             setTextColor(colorCyan); letterSpacing = 0.15f; typeface = Typeface.DEFAULT_BOLD
         })
         titleBlock.addView(TextView(this).apply {
-            text = "SELECT YOUR TRUST TIER"; textSize = 9f
+            text = "SELECT YOUR TRUST TIER"; textSize = 11f
             setTextColor(Color.parseColor("#447788")); letterSpacing = 0.1f
         })
         val shield = TextView(this).apply {
@@ -153,7 +153,7 @@ class TierSelectionActivity : AppCompatActivity() {
                    "🔵 National ID" to colorCyan, " > " to Color.parseColor("#334455"),
                    "🟡 Device" to colorGold).forEach { (label, color) ->
                 strip.addView(TextView(this@TierSelectionActivity).apply {
-                    text = label; textSize = 9f; setTextColor(color)
+                    text = label; textSize = 11f; setTextColor(color)
                     letterSpacing = 0.05f; typeface = Typeface.DEFAULT_BOLD
                 })
             }
@@ -207,11 +207,11 @@ class TierSelectionActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.1f
         })
         titleBlock.addView(TextView(this).apply {
-            text = subtitle; textSize = 8f
+            text = subtitle; textSize = 10f
             setTextColor(Color.parseColor("#447788")); letterSpacing = 0.08f
         })
         val trustBadge = TextView(this).apply {
-            text = trustLabel; textSize = 8f; setPadding(px(8), px(5), px(8), px(5))
+            text = trustLabel; textSize = 10f; setPadding(px(8), px(5), px(8), px(5))
             setTextColor(trustColor); typeface = Typeface.DEFAULT_BOLD
             background = GradientDrawable().apply {
                 shape = GradientDrawable.RECTANGLE; cornerRadius = px(20).toFloat()
@@ -254,12 +254,12 @@ class TierSelectionActivity : AppCompatActivity() {
             }
         }
         val tagTv = TextView(this).apply {
-            text = tagText; textSize = 8f; setTextColor(trustColor)
+            text = tagText; textSize = 10f; setTextColor(trustColor)
             typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.15f
             layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
         }
         val selectIndicator = TextView(this).apply {
-            text = "TAP TO SELECT"; textSize = 8f
+            text = "TAP TO SELECT"; textSize = 10f
             setTextColor(Color.parseColor("#334455")); letterSpacing = 0.1f
         }
         tierIndicators.add(selectIndicator)

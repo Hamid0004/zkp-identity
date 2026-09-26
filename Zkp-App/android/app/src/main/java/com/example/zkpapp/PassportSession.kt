@@ -133,7 +133,7 @@ enum class SessionState {
         BAC_AUTH                    -> 2
         READING                     -> 3
         SOD_READING, DONE           -> 4
-        ZKP_GENERATING, ZKP_READY   -> 5
+        ZKP_GENERATING, ZKP_READY   -> 4
         ERROR                       -> 0
     }
 

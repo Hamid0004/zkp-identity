@@ -362,7 +362,7 @@ class DeviceTierActivity : AppCompatActivity() {
         })
         titleBlock.addView(TextView(this).apply {
             text = "TIER 3  ·  BIOMETRIC  ·  HARDWARE BACKED"
-            textSize = 9f; setTextColor(Color.parseColor("#776633")); letterSpacing = 0.1f
+            textSize = 11f; setTextColor(Color.parseColor("#776633")); letterSpacing = 0.1f
         })
         val badge = TextView(this).apply {
             text = "📱"; textSize = 20f; setPadding(px(10), px(8), px(10), px(8))
@@ -391,7 +391,7 @@ class DeviceTierActivity : AppCompatActivity() {
             setPadding(px(14), px(14), px(14), px(14)); gravity = Gravity.CENTER_VERTICAL
         }
         tvStatusDot = TextView(this).apply {
-            text = "●"; textSize = 10f; setTextColor(colorGold)
+            text = "●"; textSize = 12f; setTextColor(colorGold)
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(10), 0) }
         }
         val textCol = LinearLayout(this).apply {
@@ -403,7 +403,7 @@ class DeviceTierActivity : AppCompatActivity() {
             typeface = Typeface.DEFAULT_BOLD; letterSpacing = 0.12f
         }
         tvStatusSub = TextView(this).apply {
-            text = "LOADING PLONKY2 CIRCUIT"; textSize = 9f
+            text = "LOADING PLONKY2 CIRCUIT"; textSize = 11f
             setTextColor(Color.parseColor("#776633")); letterSpacing = 0.08f
         }
         textCol.addView(tvStatusMsg); textCol.addView(tvStatusSub)
@@ -425,7 +425,7 @@ class DeviceTierActivity : AppCompatActivity() {
             setPadding(px(16), px(16), px(16), px(16))
         }
         inner.addView(TextView(this).apply {
-            text = "WHAT WILL BE PROVEN"; textSize = 9f
+            text = "WHAT WILL BE PROVEN"; textSize = 11f
             setTextColor(Color.parseColor("#445566"))
             letterSpacing = 0.15f; typeface = Typeface.DEFAULT_BOLD
         })
@@ -451,7 +451,7 @@ class DeviceTierActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(0, WRAP, 1f)
             })
             row.addView(TextView(this).apply {
-                text = desc; textSize = 9f; setTextColor(Color.parseColor("#4a6677"))
+                text = desc; textSize = 11f; setTextColor(Color.parseColor("#4a6677"))
             })
             inner.addView(row)
         }
@@ -506,7 +506,7 @@ class DeviceTierActivity : AppCompatActivity() {
     }
 
     private fun buildMerkleNode(label: String, color: Int) = TextView(this).apply {
-        text = label; textSize = 9f; setTextColor(color)
+        text = label; textSize = 11f; setTextColor(color)
         typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
         setPadding(px(12), px(6), px(12), px(6))
         background = GradientDrawable().apply {
@@ -516,7 +516,7 @@ class DeviceTierActivity : AppCompatActivity() {
     }
 
     private fun buildMerkleLeaf(label: String, color: Int) = TextView(this).apply {
-        text = label; textSize = 9f; setTextColor(color)
+        text = label; textSize = 11f; setTextColor(color)
         typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER
         setPadding(px(10), px(5), px(10), px(5))
         background = GradientDrawable().apply {
@@ -548,7 +548,7 @@ class DeviceTierActivity : AppCompatActivity() {
             text = "—"; textSize = 12f; setTextColor(colorGreen); typeface = Typeface.DEFAULT_BOLD
         }
         tvResultRows = TextView(this).apply {
-            textSize = 10f; setTextColor(Color.parseColor("#4a8a6a"))
+            textSize = 11f; setTextColor(Color.parseColor("#4a8a6a"))
             letterSpacing = 0.04f; lineHeight = (textSize * 1.9f).toInt()
         }
         col.addView(tvProofTime); col.addView(tvResultRows)
@@ -648,7 +648,7 @@ class DeviceTierActivity : AppCompatActivity() {
     }
 
     private fun buildSectionLabel(text: String) = TextView(this).apply {
-        this.text = text; textSize = 9f; setTextColor(Color.parseColor("#334455"))
+        this.text = text; textSize = 11f; setTextColor(Color.parseColor("#334455"))
         letterSpacing = 0.15f; typeface = Typeface.DEFAULT_BOLD
         setPadding(px(20), px(16), px(20), px(8))
     }
