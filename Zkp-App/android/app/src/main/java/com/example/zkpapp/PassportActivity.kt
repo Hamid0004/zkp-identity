@@ -28,6 +28,7 @@ import kotlinx.coroutines.*
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import com.example.zkpapp.ui.NfcPulseView
 
 class PassportActivity : AppCompatActivity() {
 
@@ -713,14 +714,24 @@ class PassportActivity : AppCompatActivity() {
         }
         val wrapper = phoneIndicator
         
-        // Phone icon — pulses to indicate "waiting for chip"
-        val visual = TextView(this).apply {
+        // Phone icon + NFC radiating arcs
+        val visualWrapper = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(160))
+        }
+        val pulseView = NfcPulseView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            setArcColor(colorAccent)
+            setReduceMotion(reduceMotion)
+        }
+        val phoneIcon = TextView(this).apply {
             text = "📱"
-            textSize = 56f
+            textSize = 48f
             gravity = Gravity.CENTER
-            setPadding(px(12), px(16), px(12), px(16))
+            layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER)
             contentDescription = "Place phone on passport to read chip"
         }
+        visualWrapper.addView(pulseView)
+        visualWrapper.addView(phoneIcon)
         
         // Instruction text
         val instruction = TextView(this).apply {
@@ -741,7 +752,7 @@ class PassportActivity : AppCompatActivity() {
             setPadding(0, px(4), 0, 0)
         }
         
-        wrapper.addView(visual)
+        wrapper.addView(visualWrapper)
         wrapper.addView(instruction)
         wrapper.addView(tip)
         return wrapper
@@ -1497,7 +1508,7 @@ return col
         }
     }    
 
-        private fun startCountdown(validUntilSec: Long?) {
+    private fun startCountdown(validUntilSec: Long?) {
         countdownJob?.cancel()
 
         if (validUntilSec == null) {
