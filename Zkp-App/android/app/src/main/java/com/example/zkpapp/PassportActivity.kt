@@ -713,30 +713,13 @@ class PassportActivity : AppCompatActivity() {
         }
         val wrapper = phoneIndicator
         
-        // Phone + passport visual
+        // Phone icon — pulses to indicate "waiting for chip"
         val visual = TextView(this).apply {
-            text = """
-                ┌─────────┐
-                │  📱     │
-                │         │
-                └─────────┘
-                   ↓↓
-                ┌─────────┐
-                │PASSPORT │
-                │  NFC    │
-                │  chip   │
-                └─────────┘
-            """.trimIndent()
-            textSize = 12f
-            setTextColor(colorCyan)
-            typeface = Typeface.MONOSPACE
+            text = "📱"
+            textSize = 56f
             gravity = Gravity.CENTER
-            setPadding(px(12), px(8), px(12), px(8))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0a141f"))
-                setStroke(1, Color.parseColor("#1a3a4a"))
-                cornerRadius = px(8).toFloat()
-            }
+            setPadding(px(12), px(16), px(12), px(16))
+            contentDescription = "Place phone on passport to read chip"
         }
         
         // Instruction text
@@ -766,10 +749,18 @@ class PassportActivity : AppCompatActivity() {
 
     // ═══ Progress indicator for READING state (B-STATE-3) ═══
     private fun buildProgressIndicator(): View {
-        progressIndicator = ProgressBar(this).apply {
+        progressIndicator = ProgressBar(
+            this, null,
+            android.R.attr.progressBarStyleHorizontal
+        ).apply {
             isIndeterminate = true
             visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(4))
+            // Tint to accent color
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(colorAccent)
+            // Subtle 3dp line with horizontal padding
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(3)).apply {
+                setMargins(px(24), px(16), px(24), px(4))
+            }
         }
         return progressIndicator
     }
@@ -1339,24 +1330,44 @@ return col
         // Show/hide phone indicator and progress indicator based on state
         when (state) {
             SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
-                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
-                phoneIndicator.alpha = 0f
-                phoneIndicator.animate().alpha(1f).setDuration(300).start()
+                if (::phoneIndicator.isInitialized) {
+                    phoneIndicator.visibility = View.VISIBLE
+                    phoneIndicator.alpha = 0f
+                    phoneIndicator.animate().alpha(1f).setDuration(300).start()
+                    startPhonePulse()
+                }
                 progressIndicator.visibility = View.GONE
             }
             SessionState.READING, SessionState.SOD_READING -> {
                 if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.GONE
+                stopPhonePulse()
+                progressIndicator.alpha = 0f
                 progressIndicator.visibility = View.VISIBLE
+                if (!reduceMotion) {
+                    progressIndicator.animate().alpha(1f).setDuration(250).start()
+                } else {
+                    progressIndicator.alpha = 1f
+                }
             }
             else -> {
                 // Fade out before hiding
                 if (phoneIndicator.visibility == View.VISIBLE) {
+                    stopPhonePulse()
                     phoneIndicator.animate().alpha(0f).setDuration(200).withEndAction {
                         phoneIndicator.visibility = View.GONE
                         phoneIndicator.alpha = 1f
                     }.start()
                 }
-                progressIndicator.visibility = View.GONE
+                if (progressIndicator.visibility == View.VISIBLE) {
+                    if (!reduceMotion) {
+                        progressIndicator.animate().alpha(0f).setDuration(200).withEndAction {
+                            progressIndicator.visibility = View.GONE
+                            progressIndicator.alpha = 1f
+                        }.start()
+                    } else {
+                        progressIndicator.visibility = View.GONE
+                    }
+                }
             }
         }
         
@@ -1436,6 +1447,7 @@ return col
 
     // ── Phase 2: Status Dot Pulse Animation ───────────────────────────────────
     private var dotPulseAnimator: ObjectAnimator? = null
+    private var phonePulseAnimator: ObjectAnimator? = null
     private val stepAnimators = mutableMapOf<Int, ObjectAnimator>()
 
     private fun startDotPulse() {
@@ -1457,6 +1469,33 @@ return col
         dotPulseAnimator?.cancel()
         if (::tvStatusDot.isInitialized) tvStatusDot.alpha = 1f
     }
+
+    private fun startPhonePulse() {
+        phonePulseAnimator?.cancel()
+        if (!::phoneIndicator.isInitialized) return
+        if (reduceMotion) return
+        phonePulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            phoneIndicator,
+            PropertyValuesHolder.ofFloat("scaleX", 1f, 1.08f),
+            PropertyValuesHolder.ofFloat("scaleY", 1f, 1.08f),
+            PropertyValuesHolder.ofFloat("alpha", 1f, 0.7f)
+        ).apply {
+            duration = 800
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun stopPhonePulse() {
+        phonePulseAnimator?.cancel()
+        if (::phoneIndicator.isInitialized) {
+            phoneIndicator.scaleX = 1f
+            phoneIndicator.scaleY = 1f
+            phoneIndicator.alpha = 1f
+        }
+    }    
 
         private fun startCountdown(validUntilSec: Long?) {
         countdownJob?.cancel()
@@ -1590,6 +1629,7 @@ return col
 
     override fun onDestroy() {
         countdownJob?.cancel()
+        phonePulseAnimator?.cancel()
         super.onDestroy()
         // Phase 2: Clean up step bar animations
         stepAnimators.values.forEach { it.cancel() }
