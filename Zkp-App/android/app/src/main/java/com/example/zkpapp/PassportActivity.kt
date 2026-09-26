@@ -28,6 +28,7 @@ import kotlinx.coroutines.*
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import com.example.zkpapp.ui.NfcPulseView
 
 class PassportActivity : AppCompatActivity() {
 
@@ -62,6 +63,7 @@ class PassportActivity : AppCompatActivity() {
     private var session  = PassportSession()
     private var rustJob: Job? = null
     private var countdownJob: Job? = null
+    private var pendingPassportData: PassportData? = null
 
     // Respect system "Remove animations" accessibility setting
     private val reduceMotion: Boolean by lazy {
@@ -98,6 +100,7 @@ class PassportActivity : AppCompatActivity() {
     private lateinit var tvIntegrityRows: TextView
     private lateinit var cardCrypto:      CardView
     private lateinit var tvCryptoRows:    TextView
+    private lateinit var confirmationPanel: LinearLayout
     private lateinit var progressBar:     ProgressBar
     private lateinit var phoneIndicator:  LinearLayout
     private lateinit var progressIndicator: ProgressBar
@@ -253,7 +256,7 @@ class PassportActivity : AppCompatActivity() {
         updateStepBar(session.state.stepIndex)
         renderChecklist(session.state)
 
-        // Photo — use PassportData.getCachedPhoto() first (survives Parcel roundtrip)
+        // Photo
         val photo = data.facePhoto
             ?: PassportData.getCachedPhoto(data.documentNumber)
         photo?.let {
@@ -268,25 +271,53 @@ class PassportActivity : AppCompatActivity() {
         tvDocNum.text      = data.documentNumber
         tvNationality.text = nationalityDisplay(data.nationality)
         val sodSize = data.sodRaw?.size ?: 0
-        tvSodStatus.text = if (sodSize > 0) "✅ FOUND · ${sodSize}B" else "❌ MISSING"
+        tvSodStatus.text = if (sodSize > 0) "SOD: FOUND · ${sodSize}B" else "SOD: MISSING"
         tvSodStatus.setTextColor(if (sodSize > 0) colorGreen else colorRed)
         tvMode.text = if (session.mrzInfo == null) "SIMULATION" else "REAL NFC"
         cardIdentity.visibility = View.VISIBLE
         animateFadeIn(cardIdentity)
 
-        // [v3.0] Biometric-gated encrypted save
-        // KeyStoreManager AES → encrypt DG1/SOD → EncryptedSharedPreferences
-        // User never needs to rescan passport on this device after this.
+        // [B-STATE-4] Human-in-the-loop security gate
+        // Do NOT auto-trigger biometric. Show confirmation panel first.
+        pendingPassportData = data
+        showConfirmationPanel()
+    }
+
+    private fun showConfirmationPanel() {
+        if (!::confirmationPanel.isInitialized) return
+        confirmationPanel.visibility = View.VISIBLE
+        animateFadeIn(confirmationPanel)
+        updateStatus("REVIEW YOUR IDENTITY", colorCyan, "Confirm this is you to continue")
+        scrollView.post { scrollView.fullScroll(View.FOCUS_DOWN) }
+    }
+
+    private fun onConfirmed() {
+        val data = pendingPassportData ?: return
+        confirmationPanel.visibility = View.GONE
+        performHaptic(HapticType.STEP_COMPLETE)
+        startBiometricFlow(data)
+    }
+
+    private fun onRejected() {
+        confirmationPanel.visibility = View.GONE
+        pendingPassportData = null
+        performHaptic(HapticType.ERROR)
+        showToast("Identity not confirmed — scan again")
+        resetResultUI()
+        session = session.copy(state = SessionState.IDLE)
+        updateStatus("SCAN CANCELLED", colorTextMuted, "Passport did not match")
+        updateStepBar(0)
+        renderChecklist(SessionState.IDLE)
+    }
+
+    // Biometric-gated encrypted save — extracted from handleSuccess
+    private fun startBiometricFlow(data: PassportData) {
         try {
             val cipher    = keyStoreManager.getCipherForEncryption()
             val cryptoObj = androidx.biometric.BiometricPrompt.CryptoObject(cipher)
 
-            // Announce next phase before biometric prompt
             updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
-            
-            // Announce next phase before biometric prompt
-            updateStatus("NEXT: SECURING YOUR DATA", colorCyan, "Biometric verification required")
-            
+
             biometricManager.authenticateUser(
                 activity     = this,
                 cryptoObject = cryptoObj,
@@ -317,8 +348,6 @@ class PassportActivity : AppCompatActivity() {
                     startZkProofGeneration(data)
                 },
                 onError = { _ ->
-                    // Biometric cancelled or failed — do NOT proceed to proof
-                    // Identity saved to RAM only; user must re-authenticate to generate proof
                     saveIdentityRamOnly(data)
                     showToast("⚠️ Biometric cancelled — tap Authenticate to continue")
                 },
@@ -573,6 +602,7 @@ class PassportActivity : AppCompatActivity() {
         // [B-STATE] Morphing checklist
         container.addView(buildChecklist())
         container.addView(buildPhotoIdentityRow())
+        container.addView(buildConfirmationPanel())
         container.addView(buildProofBar())
         container.addView(buildSectionLabel("RUST INTEGRITY REPORT"))
         container.addView(buildResultCard(isIntegrity = true))
@@ -684,31 +714,24 @@ class PassportActivity : AppCompatActivity() {
         }
         val wrapper = phoneIndicator
         
-        // Phone + passport visual
-        val visual = TextView(this).apply {
-            text = """
-                ┌─────────┐
-                │  📱     │
-                │         │
-                └─────────┘
-                   ↓↓
-                ┌─────────┐
-                │PASSPORT │
-                │  NFC    │
-                │  chip   │
-                └─────────┘
-            """.trimIndent()
-            textSize = 12f
-            setTextColor(colorCyan)
-            typeface = Typeface.MONOSPACE
-            gravity = Gravity.CENTER
-            setPadding(px(12), px(8), px(12), px(8))
-            background = GradientDrawable().apply {
-                setColor(Color.parseColor("#0a141f"))
-                setStroke(1, Color.parseColor("#1a3a4a"))
-                cornerRadius = px(8).toFloat()
-            }
+        // Phone icon + NFC radiating arcs
+        val visualWrapper = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(160))
         }
+        val pulseView = NfcPulseView(this).apply {
+            layoutParams = FrameLayout.LayoutParams(MATCH, MATCH)
+            setArcColor(colorAccent)
+            setReduceMotion(reduceMotion)
+        }
+        val phoneIcon = TextView(this).apply {
+            text = "📱"
+            textSize = 48f
+            gravity = Gravity.CENTER
+            layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER)
+            contentDescription = "Place phone on passport to read chip"
+        }
+        visualWrapper.addView(pulseView)
+        visualWrapper.addView(phoneIcon)
         
         // Instruction text
         val instruction = TextView(this).apply {
@@ -729,7 +752,7 @@ class PassportActivity : AppCompatActivity() {
             setPadding(0, px(4), 0, 0)
         }
         
-        wrapper.addView(visual)
+        wrapper.addView(visualWrapper)
         wrapper.addView(instruction)
         wrapper.addView(tip)
         return wrapper
@@ -737,10 +760,18 @@ class PassportActivity : AppCompatActivity() {
 
     // ═══ Progress indicator for READING state (B-STATE-3) ═══
     private fun buildProgressIndicator(): View {
-        progressIndicator = ProgressBar(this).apply {
+        progressIndicator = ProgressBar(
+            this, null,
+            android.R.attr.progressBarStyleHorizontal
+        ).apply {
             isIndeterminate = true
             visibility = View.GONE
-            layoutParams = LinearLayout.LayoutParams(MATCH, px(4))
+            // Tint to accent color
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(colorAccent)
+            // Subtle 3dp line with horizontal padding
+            layoutParams = LinearLayout.LayoutParams(MATCH, px(3)).apply {
+                setMargins(px(24), px(16), px(24), px(4))
+            }
         }
         return progressIndicator
     }
@@ -869,6 +900,88 @@ class PassportActivity : AppCompatActivity() {
         row.addView(photoFrame)
         row.addView(cardIdentity)
         return row
+    }
+    // ═══ Human-in-the-loop confirmation (B-STATE-4 security gate) ═══
+    private fun buildConfirmationPanel(): View {
+        confirmationPanel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(16), px(14), px(16), 0)
+            visibility = View.GONE
+        }
+
+        val card = CardView(this).apply {
+            radius = px(16).toFloat()
+            cardElevation = 0f
+            setCardBackgroundColor(DesignTokens.successChipBg)
+        }
+        val inner = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(px(16), px(16), px(16), px(16))
+        }
+
+        val prompt = TextView(this).apply {
+            text = "Does this identity belong to you?"
+            textSize = 14f
+            setTextColor(colorTextMain)
+            typeface = Typeface.DEFAULT_BOLD
+            gravity = Gravity.CENTER
+        }
+        val subtext = TextView(this).apply {
+            text = "Confirm to proceed with biometric and ZK proof"
+            textSize = 12f
+            setTextColor(colorTextMuted)
+            gravity = Gravity.CENTER
+            setPadding(0, px(6), 0, px(14))
+        }
+
+        val buttonRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+        }
+
+        val btnConfirm = Button(this).apply {
+            text = "✓  THIS IS ME"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.1f
+            setTextColor(Color.WHITE)
+            background = gradientBg(colorGreen, colorAccent, 14f)
+            layoutParams = LinearLayout.LayoutParams(0, px(48), 1f).apply {
+                setMargins(0, 0, px(6), 0)
+            }
+            setPadding(0, 0, 0, 0)
+            contentDescription = "Confirm this passport belongs to me"
+            setOnClickListener { onConfirmed() }
+        }
+
+        val btnReject = Button(this).apply {
+            text = "✗  NOT ME"
+            textSize = 12f
+            typeface = Typeface.DEFAULT_BOLD
+            letterSpacing = 0.1f
+            setTextColor(colorRed)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = px(14).toFloat()
+                setStroke(px(1), colorRed)
+                setColor(Color.TRANSPARENT)
+            }
+            layoutParams = LinearLayout.LayoutParams(0, px(48), 1f).apply {
+                setMargins(px(6), 0, 0, 0)
+            }
+            setPadding(0, 0, 0, 0)
+            contentDescription = "Reject — this is not my passport"
+            setOnClickListener { onRejected() }
+        }
+
+        buttonRow.addView(btnConfirm)
+        buttonRow.addView(btnReject)
+
+        inner.addView(prompt)
+        inner.addView(subtext)
+        inner.addView(buttonRow)
+        card.addView(inner)
+        confirmationPanel.addView(card)
+        return confirmationPanel
     }
 
     private fun buildProofBar(): View {
@@ -1228,24 +1341,44 @@ return col
         // Show/hide phone indicator and progress indicator based on state
         when (state) {
             SessionState.IDLE, SessionState.MRZ_SCANNED, SessionState.NFC_READY -> {
-                if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.VISIBLE  // Show positioning guide
-                phoneIndicator.alpha = 0f
-                phoneIndicator.animate().alpha(1f).setDuration(300).start()
+                if (::phoneIndicator.isInitialized) {
+                    phoneIndicator.visibility = View.VISIBLE
+                    phoneIndicator.alpha = 0f
+                    phoneIndicator.animate().alpha(1f).setDuration(300).start()
+                    startPhonePulse()
+                }
                 progressIndicator.visibility = View.GONE
             }
             SessionState.READING, SessionState.SOD_READING -> {
                 if (::phoneIndicator.isInitialized) phoneIndicator.visibility = View.GONE
+                stopPhonePulse()
+                progressIndicator.alpha = 0f
                 progressIndicator.visibility = View.VISIBLE
+                if (!reduceMotion) {
+                    progressIndicator.animate().alpha(1f).setDuration(250).start()
+                } else {
+                    progressIndicator.alpha = 1f
+                }
             }
             else -> {
                 // Fade out before hiding
                 if (phoneIndicator.visibility == View.VISIBLE) {
+                    stopPhonePulse()
                     phoneIndicator.animate().alpha(0f).setDuration(200).withEndAction {
                         phoneIndicator.visibility = View.GONE
                         phoneIndicator.alpha = 1f
                     }.start()
                 }
-                progressIndicator.visibility = View.GONE
+                if (progressIndicator.visibility == View.VISIBLE) {
+                    if (!reduceMotion) {
+                        progressIndicator.animate().alpha(0f).setDuration(200).withEndAction {
+                            progressIndicator.visibility = View.GONE
+                            progressIndicator.alpha = 1f
+                        }.start()
+                    } else {
+                        progressIndicator.visibility = View.GONE
+                    }
+                }
             }
         }
         
@@ -1325,6 +1458,7 @@ return col
 
     // ── Phase 2: Status Dot Pulse Animation ───────────────────────────────────
     private var dotPulseAnimator: ObjectAnimator? = null
+    private var phonePulseAnimator: ObjectAnimator? = null
     private val stepAnimators = mutableMapOf<Int, ObjectAnimator>()
 
     private fun startDotPulse() {
@@ -1347,7 +1481,34 @@ return col
         if (::tvStatusDot.isInitialized) tvStatusDot.alpha = 1f
     }
 
-        private fun startCountdown(validUntilSec: Long?) {
+    private fun startPhonePulse() {
+        phonePulseAnimator?.cancel()
+        if (!::phoneIndicator.isInitialized) return
+        if (reduceMotion) return
+        phonePulseAnimator = ObjectAnimator.ofPropertyValuesHolder(
+            phoneIndicator,
+            PropertyValuesHolder.ofFloat("scaleX", 1f, 1.08f),
+            PropertyValuesHolder.ofFloat("scaleY", 1f, 1.08f),
+            PropertyValuesHolder.ofFloat("alpha", 1f, 0.7f)
+        ).apply {
+            duration = 800
+            repeatCount = ObjectAnimator.INFINITE
+            repeatMode = ObjectAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            start()
+        }
+    }
+
+    private fun stopPhonePulse() {
+        phonePulseAnimator?.cancel()
+        if (::phoneIndicator.isInitialized) {
+            phoneIndicator.scaleX = 1f
+            phoneIndicator.scaleY = 1f
+            phoneIndicator.alpha = 1f
+        }
+    }    
+
+    private fun startCountdown(validUntilSec: Long?) {
         countdownJob?.cancel()
 
         if (validUntilSec == null) {
@@ -1411,12 +1572,16 @@ return col
         }
     }
 
-        private fun resetResultUI() {
+    private fun resetResultUI() {
         countdownJob?.cancel()
         cardIdentity.visibility  = View.INVISIBLE
         cardProof.visibility     = View.GONE
         cardIntegrity.visibility = View.GONE
         cardCrypto.visibility    = View.GONE
+        if (::confirmationPanel.isInitialized) {
+            confirmationPanel.visibility = View.GONE
+        }
+        pendingPassportData = null
         photoView.setImageDrawable(null)
         photoView.visibility    = View.GONE
         tvPhotoLabel.visibility = View.VISIBLE
@@ -1475,6 +1640,7 @@ return col
 
     override fun onDestroy() {
         countdownJob?.cancel()
+        phonePulseAnimator?.cancel()
         super.onDestroy()
         // Phase 2: Clean up step bar animations
         stepAnimators.values.forEach { it.cancel() }
