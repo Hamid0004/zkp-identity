@@ -1566,7 +1566,7 @@ return col
             PropertyValuesHolder.ofFloat("scaleY", 1f, 1.08f),
             PropertyValuesHolder.ofFloat("alpha", 1f, 0.7f)
         ).apply {
-            duration = 800
+            duration = 1400
             repeatCount = ObjectAnimator.INFINITE
             repeatMode = ObjectAnimator.REVERSE
             interpolator = AccelerateDecelerateInterpolator()
