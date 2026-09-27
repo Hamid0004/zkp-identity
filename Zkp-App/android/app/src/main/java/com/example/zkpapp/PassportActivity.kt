@@ -585,49 +585,49 @@ class PassportActivity : AppCompatActivity() {
 
         val failure = when (e) {
             is TagLostException ->
-                FailureInfo("📵 CONNECTION LOST",
+                FailureInfo("CONNECTION LOST",
                     "The phone moved during reading.",
                     "Retry chip", "Hold still — reading takes 3-5 seconds")
             is IOException ->
-                FailureInfo("⚠️ READ FAILED",
+                FailureInfo("READ FAILED",
                     "NFC communication interrupted.",
                     "Remove case & retry", "Hold phone against passport back")
             is SecurityException ->
-                FailureInfo("❌ SECURITY ERROR",
+                FailureInfo("SECURITY ERROR",
                     e.message ?: "Access denied", "Retry", "")
             else -> {
                 val em = e.message ?: ""
                 when {
                     em.contains("BAC", ignoreCase = true) ->
-                        FailureInfo("🔐 CHIP UNLOCK FAILED",
+                        FailureInfo("CHIP UNLOCK FAILED",
                             "Chip rejected the access key — MRZ likely misread.",
                             "Re-scan MRZ", "Even 1 wrong digit blocks access")
                     em.contains("SOD", ignoreCase = true) ->
-                        FailureInfo("⚠️ SECURITY DATA INCOMPLETE",
+                        FailureInfo("SECURITY DATA INCOMPLETE",
                             "Security signature (SOD) not found — passport may be damaged.",
                             "Retry", "If this keeps happening, chip may be faulty")
                     em.contains("check digit", ignoreCase = true) ->
-                        FailureInfo("📷 MRZ DATA CORRUPTED",
+                        FailureInfo("MRZ DATA CORRUPTED",
                             "Check digit mismatch — OCR misread a character.",
                             "Re-scan MRZ", "Scan in better lighting")
                     em.contains("date_of_birth", ignoreCase = true) ->
-                        FailureInfo("⚠️ INVALID DATE",
+                        FailureInfo("INVALID DATE",
                             "The MRZ contains an impossible date (OCR misread).",
                             "Re-scan MRZ", "Better lighting improves OCR accuracy")
                     em.contains("device_rng", ignoreCase = true) ->
-                        FailureInfo("📱 DEVICE ERROR",
+                        FailureInfo("DEVICE ERROR",
                             "Device registration data invalid.",
                             "Restart app and retry", "")
                     em.contains("device_pubkey", ignoreCase = true) ->
-                        FailureInfo("🔑 DEVICE KEY ERROR",
+                        FailureInfo("DEVICE KEY ERROR",
                             "Device key invalid or too short.",
                             "Restart app", "")
                     em.contains("expected_nationality", ignoreCase = true) ->
-                        FailureInfo("🌍 NATIONALITY MISMATCH",
+                        FailureInfo("NATIONALITY MISMATCH",
                             "Passport nationality doesn't match selection.",
                             "Check selection and retry", "")
                     else ->
-                        FailureInfo("❌ ENGINE ERROR",
+                        FailureInfo("ENGINE ERROR",
                             e.localizedMessage?.take(80) ?: "Unknown error",
                             "Retry", "")
                 }
