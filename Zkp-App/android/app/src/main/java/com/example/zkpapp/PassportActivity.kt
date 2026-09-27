@@ -1459,7 +1459,7 @@ return col
     // ── Phase 2: Status Dot Pulse Animation ───────────────────────────────────
     private var dotPulseAnimator: ObjectAnimator? = null
     private var phonePulseAnimator: ObjectAnimator? = null
-    private val stepAnimators = mutableMapOf<Int, ObjectAnimator>()
+    private val stepAnimators = mutableMapOf<Int, ValueAnimator>()
 
     private fun startDotPulse() {
         dotPulseAnimator?.cancel()
@@ -1564,12 +1564,50 @@ return col
         val steps = listOf("MRZ", "NFC", "READ", "SOD", "ZKP")
         for (i in steps.indices) {
             val chip = stepBar.findViewWithTag<TextView>("step_$i") ?: continue
-            when {
-                i < activeIndex  -> { chip.setTextColor(colorCyan);  chip.background = cyberBorder(colorBorder, 20f) }
-                i == activeIndex -> { chip.setTextColor(colorGreen); chip.background = cyberBorder(Color.parseColor("#003322"), 20f) }
-                else             -> { chip.setTextColor(Color.parseColor("#223344")); chip.background = cyberBorder(colorBorder, 20f) }
+
+            // Cancel any in-flight animation on this chip
+            stepAnimators[i]?.cancel()
+
+            // Target text color based on position
+            val targetColor = when {
+                i < activeIndex  -> colorCyan
+                i == activeIndex -> colorGreen
+                else             -> Color.parseColor("#223344")
+            }
+
+            // Background — instant (border only, no animation needed)
+            chip.background = when {
+                i == activeIndex -> cyberBorder(Color.parseColor("#003322"), 20f)
+                else             -> cyberBorder(colorBorder, 20f)
+            }
+
+            // Text color — animate smoothly
+            if (reduceMotion) {
+                chip.setTextColor(targetColor)
+            } else {
+                val startColor = chip.currentTextColor
+                val anim = ValueAnimator.ofFloat(0f, 1f).apply {
+                    duration = 300
+                    interpolator = AccelerateDecelerateInterpolator()
+                    addUpdateListener { a ->
+                        chip.setTextColor(blendColors(startColor, targetColor, a.animatedFraction))
+                    }
+                    start()
+                }
+                stepAnimators[i] = anim
             }
         }
+    }
+
+    // Linear color blend helper (for step bar transitions)
+    private fun blendColors(from: Int, to: Int, fraction: Float): Int {
+        val inv = 1f - fraction
+        return Color.argb(
+            (Color.alpha(from) * inv + Color.alpha(to) * fraction).toInt(),
+            (Color.red(from)   * inv + Color.red(to)   * fraction).toInt(),
+            (Color.green(from) * inv + Color.green(to) * fraction).toInt(),
+            (Color.blue(from)  * inv + Color.blue(to)  * fraction).toInt()
+        )
     }
 
     private fun resetResultUI() {
@@ -1603,12 +1641,30 @@ return col
 
     private fun animateFadeIn(v: View) {
         v.visibility = View.VISIBLE
+
+        // Reduce-motion: instant appearance, no transform
         if (reduceMotion) {
             v.alpha = 1f
+            v.translationY = 0f
+            v.scaleX = 1f
+            v.scaleY = 1f
             return
         }
+
+        // Fade + slight scale + slide up
         v.alpha = 0f
-        v.animate().alpha(1f).setDuration(400).start()
+        v.translationY = px(12).toFloat()
+        v.scaleX = 0.97f
+        v.scaleY = 0.97f
+
+        v.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .scaleX(1f)
+            .scaleY(1f)
+            .setDuration(400)
+            .setInterpolator(OvershootInterpolator(0.6f))
+            .start()
     }
 
     private fun showToast(msg: String) =
