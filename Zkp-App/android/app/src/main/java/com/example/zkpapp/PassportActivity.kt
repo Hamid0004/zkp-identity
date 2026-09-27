@@ -1479,11 +1479,14 @@ return col
             val icon = TextView(this).apply {
                 textSize = 14f
                 text = when (item.state) {
-                    CheckState.DONE    -> "✓"
-                    CheckState.ACTIVE  -> "•"
-                    CheckState.FAILED  -> "✗"
+                    CheckState.DONE    -> "\uE5CA"    // check
+                    CheckState.ACTIVE  -> "\uE3A6"    // circle (filled dot)
+                    CheckState.FAILED  -> "\uE5CD"    // close
                     CheckState.PENDING -> ""
                 }
+                typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                    this@PassportActivity, R.font.material_symbols
+                )
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
                     setMargins(0, 0, px(10), 0)
                 }
