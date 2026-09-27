@@ -32,6 +32,65 @@ import com.example.zkpapp.ui.NfcPulseView
 
 class PassportActivity : AppCompatActivity() {
 
+    // ── Material Symbols helper ────────────────────────────────────
+    private fun materialIconTv(codePoint: String, sizeSp: Float = 20f): TextView {
+        return TextView(this).apply {
+            text = codePoint
+            textSize = sizeSp
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@PassportActivity, R.font.material_symbols
+            )
+        }
+    }
+
+    private fun applyMaterialFont(tv: TextView, codePoint: String) {
+        tv.text = codePoint
+        tv.typeface = androidx.core.content.res.ResourcesCompat.getFont(
+            this, R.font.material_symbols
+        )
+    }
+
+    // Builds multi-row icon + label text with Material Symbols font on icons only
+    private fun setIconRows(tv: TextView, rows: List<Pair<String, String>>) {
+        val sb = android.text.SpannableStringBuilder()
+        val font = androidx.core.content.res.ResourcesCompat.getFont(
+            this, R.font.material_symbols
+        )
+        rows.forEachIndexed { index, (icon, label) ->
+            val start = sb.length
+            sb.append(icon)
+            val end = sb.length
+            if (font != null) {
+                sb.setSpan(
+                    android.text.style.TypefaceSpan(font),
+                    start, end,
+                    android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+                )
+            }
+            sb.append("  ").append(label)
+            if (index < rows.size - 1) sb.append("\n")
+        }
+        tv.text = sb
+    }
+
+    // Applies Material Symbols font to first character only (icon + label pattern)
+    private fun setIconText(tv: TextView, iconCodePoint: String, label: String) {
+        val fullText = "$iconCodePoint  $label"
+        val spannable = android.text.SpannableString(fullText)
+        val font = androidx.core.content.res.ResourcesCompat.getFont(
+            this, R.font.material_symbols
+        )
+        if (font != null) {
+            spannable.setSpan(
+                android.text.style.TypefaceSpan(font),
+                0, 1,
+                android.text.Spannable.SPAN_EXCLUSIVE_EXCLUSIVE
+            )
+        }
+        tv.text = spannable
+    }
+
+
     // ── Design Tokens ────────────────────────────────────────────────────────
     private val colorBg        = DesignTokens.bgDark
     private val colorBg2       = DesignTokens.bgElevated
@@ -450,25 +509,32 @@ class PassportActivity : AppCompatActivity() {
 
         // Integrity card
         cardIntegrity.visibility = View.VISIBLE
-        tvIntegrityRows.text =
         // [A-05/K7] Local identity display only — never sent to network
-        "👤  ${data.firstName} ${data.lastName}\n" +
-        "🔒  Integrity:  ${result.integrityCheck}\n" +
-        "🛡️  Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}\n" +
-        "🔒  Data:       Encrypted on device"
+        setIconRows(tvIntegrityRows, listOf(
+            "\uE7FD" to "${data.firstName} ${data.lastName}",
+            "\uE897" to "Integrity:  ${result.integrityCheck}",
+            "\uE8E8" to "Trust:      ${result.trustLevel}${if (!result.trusted) " (DEMO)" else ""}",
+            "\uE897" to "Data:       Encrypted on device"
+        ))
         animateFadeIn(cardIntegrity)
 
         // Crypto card
         val zkOutput  = result.zkOutput
         val proofType = if (zkOutput != null) "RECURSIVE v${zkOutput.version}" else "NONE"
         cardCrypto.visibility = View.VISIBLE
-        tvCryptoRows.text =
-            "🛡️  Integrity:  ${result.integrityCheck}\n" +
-            "✅  Signature:  ${result.signatureCheck}\n" +
-            "🔑  Algorithm:  RSA-2048 + Poseidon\n" +
-            "⚡  ZK Proof:   ${result.zkProofStatus}\n" +
-            "📦  Proof Type: $proofType\n" +
-            if (zkOutput != null) "HW Binding: ACTIVE" else "HW Binding: NONE"
+        val cryptoRows = mutableListOf(
+            "\uE8E8" to "Integrity:  ${result.integrityCheck}",
+            "\uE86C" to "Signature:  ${result.signatureCheck}",
+            "\uE73C" to "Algorithm:  RSA-2048 + Poseidon",
+            "\uEA0B" to "ZK Proof:   ${result.zkProofStatus}",
+            "\uE1A1" to "Proof Type: $proofType"
+        )
+        if (zkOutput != null) {
+            cryptoRows.add("\uE897" to "HW Binding: ACTIVE")
+        } else {
+            cryptoRows.add("\uE5CD" to "HW Binding: NONE")
+        }
+        setIconRows(tvCryptoRows, cryptoRows)
         animateFadeIn(cardCrypto)
         
                 // Phase 1: Lifecycle-aware countdown
@@ -519,49 +585,49 @@ class PassportActivity : AppCompatActivity() {
 
         val failure = when (e) {
             is TagLostException ->
-                FailureInfo("📵 CONNECTION LOST",
+                FailureInfo("CONNECTION LOST",
                     "The phone moved during reading.",
                     "Retry chip", "Hold still — reading takes 3-5 seconds")
             is IOException ->
-                FailureInfo("⚠️ READ FAILED",
+                FailureInfo("READ FAILED",
                     "NFC communication interrupted.",
                     "Remove case & retry", "Hold phone against passport back")
             is SecurityException ->
-                FailureInfo("❌ SECURITY ERROR",
+                FailureInfo("SECURITY ERROR",
                     e.message ?: "Access denied", "Retry", "")
             else -> {
                 val em = e.message ?: ""
                 when {
                     em.contains("BAC", ignoreCase = true) ->
-                        FailureInfo("🔐 CHIP UNLOCK FAILED",
+                        FailureInfo("CHIP UNLOCK FAILED",
                             "Chip rejected the access key — MRZ likely misread.",
                             "Re-scan MRZ", "Even 1 wrong digit blocks access")
                     em.contains("SOD", ignoreCase = true) ->
-                        FailureInfo("⚠️ SECURITY DATA INCOMPLETE",
+                        FailureInfo("SECURITY DATA INCOMPLETE",
                             "Security signature (SOD) not found — passport may be damaged.",
                             "Retry", "If this keeps happening, chip may be faulty")
                     em.contains("check digit", ignoreCase = true) ->
-                        FailureInfo("📷 MRZ DATA CORRUPTED",
+                        FailureInfo("MRZ DATA CORRUPTED",
                             "Check digit mismatch — OCR misread a character.",
                             "Re-scan MRZ", "Scan in better lighting")
                     em.contains("date_of_birth", ignoreCase = true) ->
-                        FailureInfo("⚠️ INVALID DATE",
+                        FailureInfo("INVALID DATE",
                             "The MRZ contains an impossible date (OCR misread).",
                             "Re-scan MRZ", "Better lighting improves OCR accuracy")
                     em.contains("device_rng", ignoreCase = true) ->
-                        FailureInfo("📱 DEVICE ERROR",
+                        FailureInfo("DEVICE ERROR",
                             "Device registration data invalid.",
                             "Restart app and retry", "")
                     em.contains("device_pubkey", ignoreCase = true) ->
-                        FailureInfo("🔑 DEVICE KEY ERROR",
+                        FailureInfo("DEVICE KEY ERROR",
                             "Device key invalid or too short.",
                             "Restart app", "")
                     em.contains("expected_nationality", ignoreCase = true) ->
-                        FailureInfo("🌍 NATIONALITY MISMATCH",
+                        FailureInfo("NATIONALITY MISMATCH",
                             "Passport nationality doesn't match selection.",
                             "Check selection and retry", "")
                     else ->
-                        FailureInfo("❌ ENGINE ERROR",
+                        FailureInfo("ENGINE ERROR",
                             e.localizedMessage?.take(80) ?: "Unknown error",
                             "Retry", "")
                 }
@@ -654,9 +720,8 @@ class PassportActivity : AppCompatActivity() {
         titleBlock.addView(tvHeader)
         titleBlock.addView(tvSubHeader)
 
-        val shield = TextView(this).apply {
-            text = "🛡️"
-            textSize = 20f
+        val shield = materialIconTv("\uE8E8", 20f).apply {
+            setTextColor(colorGreen)
             setPadding(px(10), px(8), px(10), px(8))
             background = cyberBorder(Color.parseColor("#003322"), 10f)
         }
@@ -723,9 +788,8 @@ class PassportActivity : AppCompatActivity() {
             setArcColor(colorAccent)
             setReduceMotion(reduceMotion)
         }
-        val phoneIcon = TextView(this).apply {
-            text = "📱"
-            textSize = 48f
+        val phoneIcon = materialIconTv("\uE32C", 48f).apply {
+            setTextColor(colorAccent)
             gravity = Gravity.CENTER
             layoutParams = FrameLayout.LayoutParams(WRAP, WRAP, Gravity.CENTER)
             contentDescription = "Place phone on passport to read chip"
@@ -793,9 +857,12 @@ class PassportActivity : AppCompatActivity() {
             gravity = Gravity.CENTER_VERTICAL
         }
         tvStatusDot = TextView(this).apply {
-            text = "●"
+            text = "\uE3A6"
             textSize = 14f
             setTextColor(Color.GRAY)
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@PassportActivity, R.font.material_symbols
+            )
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(12), 0) }
         }
         val textCol = LinearLayout(this).apply {
@@ -847,11 +914,13 @@ class PassportActivity : AppCompatActivity() {
             visibility = View.GONE
         }
         tvPhotoLabel = TextView(this).apply {
-            text = "👤\nPHOTO"
-            textSize = 12f
+            text = "\uE7FD"
+            textSize = 32f
+            typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                this@PassportActivity, R.font.material_symbols
+            )
             setTextColor(colorTextMuted)
             gravity = Gravity.CENTER
-            letterSpacing = 0.1f
             layoutParams = FrameLayout.LayoutParams(MATCH, MATCH, Gravity.CENTER)
         }
         photoInner.addView(photoView)
@@ -939,7 +1008,6 @@ class PassportActivity : AppCompatActivity() {
         }
 
         val btnConfirm = Button(this).apply {
-            text = "✓  THIS IS ME"
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.1f
@@ -952,9 +1020,9 @@ class PassportActivity : AppCompatActivity() {
             contentDescription = "Confirm this passport belongs to me"
             setOnClickListener { onConfirmed() }
         }
+        setIconText(btnConfirm, "\uE5CA", "THIS IS ME")
 
         val btnReject = Button(this).apply {
-            text = "✗  NOT ME"
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.1f
@@ -972,6 +1040,7 @@ class PassportActivity : AppCompatActivity() {
             contentDescription = "Reject — this is not my passport"
             setOnClickListener { onRejected() }
         }
+        setIconText(btnReject, "\uE5CD", "NOT ME")
 
         buttonRow.addView(btnConfirm)
         buttonRow.addView(btnReject)
@@ -999,9 +1068,8 @@ class PassportActivity : AppCompatActivity() {
             setPadding(px(14), px(12), px(14), px(12))
             gravity = Gravity.CENTER_VERTICAL
         }
-        val icon = TextView(this).apply {
-            text = "⚡"
-            textSize = 20f
+        val icon = materialIconTv("\uEA0B", 20f).apply {
+            setTextColor(colorGreen)
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0, 0, px(12), 0) }
         }
         val infoCol = LinearLayout(this).apply {
@@ -1096,9 +1164,11 @@ class PassportActivity : AppCompatActivity() {
             setBackgroundColor(Color.parseColor("#060e1c"))
             gravity = Gravity.CENTER_VERTICAL
         }
-        val icon = TextView(this).apply {
-            text = if (isIntegrity) "🦁" else "🔐"
-            textSize = 16f
+        val icon = materialIconTv(
+            if (isIntegrity) "\uE8E8" else "\uE63F",
+            16f
+        ).apply {
+            setTextColor(colorAccent)
             layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply { setMargins(0,0,px(10),0) }
         }
         val title = TextView(this).apply {
@@ -1175,7 +1245,6 @@ class PassportActivity : AppCompatActivity() {
         }
 
         btnScanMrz = Button(this).apply {
-            text = "📷  SCAN MRZ"
             textSize = 12f
             typeface = Typeface.DEFAULT_BOLD
             letterSpacing = 0.2f
@@ -1188,6 +1257,9 @@ class PassportActivity : AppCompatActivity() {
                 cameraLauncher.launch(Intent(this@PassportActivity, CameraActivity::class.java))
             }
         }
+
+        // Icon font applied after button setup (icon + label pattern)
+        setIconText(btnScanMrz, "\uE412", "SCAN MRZ")
 
         // [A-07/U-7] Simulate button — debug builds only (release Rust has no sim symbols)
         if (BuildConfig.DEBUG) {
@@ -1407,11 +1479,14 @@ return col
             val icon = TextView(this).apply {
                 textSize = 14f
                 text = when (item.state) {
-                    CheckState.DONE    -> "✓"
-                    CheckState.ACTIVE  -> "•"
-                    CheckState.FAILED  -> "✗"
+                    CheckState.DONE    -> "\uE5CA"    // check
+                    CheckState.ACTIVE  -> "\uE3A6"    // circle (filled dot)
+                    CheckState.FAILED  -> "\uE5CD"    // close
                     CheckState.PENDING -> ""
                 }
+                typeface = androidx.core.content.res.ResourcesCompat.getFont(
+                    this@PassportActivity, R.font.material_symbols
+                )
                 layoutParams = LinearLayout.LayoutParams(WRAP, WRAP).apply {
                     setMargins(0, 0, px(10), 0)
                 }
@@ -1491,7 +1566,7 @@ return col
             PropertyValuesHolder.ofFloat("scaleY", 1f, 1.08f),
             PropertyValuesHolder.ofFloat("alpha", 1f, 0.7f)
         ).apply {
-            duration = 800
+            duration = 1400
             repeatCount = ObjectAnimator.INFINITE
             repeatMode = ObjectAnimator.REVERSE
             interpolator = AccelerateDecelerateInterpolator()
