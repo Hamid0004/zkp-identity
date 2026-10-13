@@ -23,4 +23,7 @@
     <color name="neon_green_dim">#00552E</color>
     <color name="neon_orange_dim">#663A00</color>
     <color name="glass_grey">#22FFFFFF</color>
+    
+    <!-- Adaptive icon background — sampled from source PNG -->
+    <color name="ic_launcher_background">#0E2539</color>
 </resources>
