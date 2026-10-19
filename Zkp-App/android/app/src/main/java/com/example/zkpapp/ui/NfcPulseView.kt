@@ -60,7 +60,7 @@ class NfcPulseView @JvmOverloads constructor(
         if (reduceMotion) return
         animator?.cancel()
         animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1800L
+            duration = 1900L
             repeatCount = ValueAnimator.INFINITE
             interpolator = LinearInterpolator()
             addUpdateListener {
