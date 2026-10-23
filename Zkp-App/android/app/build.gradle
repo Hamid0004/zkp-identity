@@ -3,7 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'kotlin-parcelize'
     // 🦁 Kotlin Serialization for Rust JSON outputs
-    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.20'
+    id 'org.jetbrains.kotlin.plugin.serialization' version '1.9.24'
 }
 
 android {
@@ -66,9 +66,9 @@ android {
         compose true        // ✅ Compose enable
     }
 
-    // ✅ Compose compiler version — Kotlin 1.9.20 ke saath compatible
+    // ✅ Compose compiler version — Kotlin 1.9.24 ke saath compatible
     composeOptions {
-        kotlinCompilerExtensionVersion '1.5.1'
+        kotlinCompilerExtensionVersion '1.5.14'
     }
 
     packagingOptions {
