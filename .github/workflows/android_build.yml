@@ -65,6 +65,11 @@ jobs:
         chmod +x gradlew
         ./gradlew assembleDebug
 
+    # ── Step 7b: Compile Android UI tests (catches broken tests early) ────
+    - name: Compile Android tests
+      working-directory: ./Zkp-App/android
+      run: ./gradlew :app:compileDebugAndroidTestKotlin
+
     # ── Step 8: Upload APKs as single downloadable artifact ───────────────
     - name: Upload APK
       uses: actions/upload-artifact@v5
